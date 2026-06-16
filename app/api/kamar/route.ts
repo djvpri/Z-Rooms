@@ -19,11 +19,12 @@ const createKamarSchema = z.object({
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session.user.id } })
+  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
   const kamar = await prisma.kamar.findMany({
@@ -48,12 +49,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const body = await req.json()
   const parsed = createKamarSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session.user.id } })
+  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
   const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, ...kamarData } = parsed.data

@@ -27,6 +27,7 @@ const bookingSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const body = await req.json()
   const parsed = bookingSchema.safeParse(body)
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Notifikasi
-    const properti = await tx.properti.findFirst({ where: { ownerId: session.user.id } })
+    const properti = await tx.properti.findFirst({ where: { ownerId: userId } })
     if (properti) {
       await tx.notifikasi.create({
         data: {
@@ -120,11 +121,12 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session.user.id } })
+  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
   if (!properti) return NextResponse.json([], { status: 200 })
 
   const sewa = await prisma.sewa.findMany({

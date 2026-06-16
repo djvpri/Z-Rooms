@@ -7,11 +7,12 @@ import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const { searchParams } = new URL(req.url)
   const bulan = parseInt(searchParams.get('bulan') ?? '0') // 0 = bulan ini, 1 = bulan lalu, dst
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session.user.id } })
+  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
   if (!properti) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
 
   const targetBulan = subMonths(new Date(), bulan)

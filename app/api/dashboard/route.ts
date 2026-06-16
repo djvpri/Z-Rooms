@@ -7,9 +7,10 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id as string
 
   const properti = await prisma.properti.findFirst({
-    where: { ownerId: session.user.id },
+    where: { ownerId: userId },
     select: { id: true, nama: true, kota: true },
   })
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
