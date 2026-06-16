@@ -6,7 +6,7 @@ import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const bulan = parseInt(searchParams.get('bulan') ?? '0') // 0 = bulan ini, 1 = bulan lalu, dst
