@@ -1,0 +1,318 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────────────────────────
+// AUTH
+// ───────────────────────────────────────────────
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          Role       @default(PEMILIK)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  properti      Properti[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  PEMILIK
+  PENGELOLA
+  ADMIN
+}
+
+// ───────────────────────────────────────────────
+// PROPERTI
+// ───────────────────────────────────────────────
+model Properti {
+  id          String        @id @default(cuid())
+  nama        String
+  tipe        TipeProperti
+  alamat      String
+  kota        String
+  provinsi    String        @default("Kalimantan Barat")
+  deskripsi   String?
+  fasilitas   String[]      @default([])
+  aktif       Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id])
+
+  kamar       Kamar[]
+}
+
+enum TipeProperti {
+  KOS
+  KONTRAKAN
+  HOTEL
+  APARTEMEN
+}
+
+// ───────────────────────────────────────────────
+// KAMAR
+// ───────────────────────────────────────────────
+model Kamar {
+  id          String       @id @default(cuid())
+  nomor       String
+  lantai      Int          @default(1)
+  tipe        TipeKamar
+  luas        Float?       // m²
+  fasilitas   String[]     @default([])
+  foto        String[]     @default([])
+  status      StatusKamar  @default(TERSEDIA)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  propertiId  String
+  properti    Properti     @relation(fields: [propertiId], references: [id])
+
+  harga       HargaKamar[]
+  sewa        Sewa[]
+
+  @@unique([propertiId, nomor])
+}
+
+enum TipeKamar {
+  STANDAR
+  DELUXE
+  VIP
+  SUITE
+  STUDIO
+}
+
+enum StatusKamar {
+  TERSEDIA
+  TERISI
+  PEMELIHARAAN
+  DIPESAN
+}
+
+model HargaKamar {
+  id          String      @id @default(cuid())
+  kamarId     String
+  periodeSewa PeriodeSewa
+  harga       Decimal     @db.Decimal(12, 0)
+  deposit     Decimal?    @db.Decimal(12, 0)
+  aktif       Boolean     @default(true)
+
+  kamar       Kamar       @relation(fields: [kamarId], references: [id])
+
+  @@unique([kamarId, periodeSewa])
+}
+
+enum PeriodeSewa {
+  HARIAN
+  MINGGUAN
+  BULANAN
+  TAHUNAN
+}
+
+// ───────────────────────────────────────────────
+// PENYEWA
+// ───────────────────────────────────────────────
+model Penyewa {
+  id           String     @id @default(cuid())
+  nama         String
+  nik          String?    @unique
+  noHp         String
+  email        String?
+  pekerjaan    String?
+  alamatAsal   String?
+  fotoKtp      String?
+  tipeEntitas  TipeEntitas @default(INDIVIDU)
+  namaPerusahaan String?
+  npwp         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  sewa         Sewa[]
+}
+
+enum TipeEntitas {
+  INDIVIDU
+  PERUSAHAAN
+}
+
+// ───────────────────────────────────────────────
+// SEWA (kontrak)
+// ───────────────────────────────────────────────
+model Sewa {
+  id           String      @id @default(cuid())
+  kamarId      String
+  penyewaId    String
+  periodeSewa  PeriodeSewa
+  tanggalMasuk DateTime
+  tanggalKeluar DateTime
+  hargaSewa    Decimal     @db.Decimal(12, 0)
+  deposit      Decimal     @db.Decimal(12, 0) @default(0)
+  statusSewa   StatusSewa  @default(AKTIF)
+  sumber       SumberBooking @default(LANGSUNG)
+  catatan      String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  kamar        Kamar       @relation(fields: [kamarId], references: [id])
+  penyewa      Penyewa     @relation(fields: [penyewaId], references: [id])
+  tagihan      Tagihan[]
+}
+
+enum StatusSewa {
+  AKTIF
+  SELESAI
+  DIBATALKAN
+  PENDING
+}
+
+enum SumberBooking {
+  LANGSUNG
+  MAMIKOS
+  TRAVELOKA
+  BOOKING_COM
+  TOKOPEDIA
+  ONLINE_LAIN
+}
+
+// ───────────────────────────────────────────────
+// TAGIHAN & PEMBAYARAN
+// ───────────────────────────────────────────────
+model Tagihan {
+  id           String         @id @default(cuid())
+  sewaId       String
+  nominal      Decimal        @db.Decimal(12, 0)
+  periodeDari  DateTime
+  periodeHingga DateTime
+  jatuhTempo   DateTime
+  status       StatusTagihan  @default(BELUM_BAYAR)
+  catatan      String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  sewa         Sewa           @relation(fields: [sewaId], references: [id])
+  pembayaran   Pembayaran[]
+}
+
+enum StatusTagihan {
+  BELUM_BAYAR
+  SEBAGIAN
+  LUNAS
+  TERLAMBAT
+  DIBATALKAN
+}
+
+model Pembayaran {
+  id            String        @id @default(cuid())
+  tagihanId     String
+  nominal       Decimal       @db.Decimal(12, 0)
+  metodeBayar   MetodeBayar
+  buktiTransfer String?
+  catatan       String?
+  dibayarPada   DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  tagihan       Tagihan       @relation(fields: [tagihanId], references: [id])
+}
+
+enum MetodeBayar {
+  TUNAI
+  TRANSFER
+  QRIS
+  VA_BCA
+  VA_BRI
+  VA_MANDIRI
+  LAINNYA
+}
+
+// ───────────────────────────────────────────────
+// PENGELUARAN
+// ───────────────────────────────────────────────
+model Pengeluaran {
+  id          String           @id @default(cuid())
+  propertiId  String
+  kategori    KategoriBeban
+  deskripsi   String
+  nominal     Decimal          @db.Decimal(12, 0)
+  tanggal     DateTime
+  bukti       String?
+  createdAt   DateTime         @default(now())
+
+  @@index([propertiId, tanggal])
+}
+
+enum KategoriBeban {
+  LISTRIK
+  AIR
+  INTERNET
+  KEBERSIHAN
+  PERAWATAN
+  PAJAK
+  GAJI
+  LAINNYA
+}
+
+// ───────────────────────────────────────────────
+// NOTIFIKASI
+// ───────────────────────────────────────────────
+model Notifikasi {
+  id          String           @id @default(cuid())
+  propertiId  String
+  tipe        TipeNotifikasi
+  judul       String
+  pesan       String
+  dibaca      Boolean          @default(false)
+  referensiId String?          // bisa sewaId, tagihanId, dll
+  createdAt   DateTime         @default(now())
+
+  @@index([propertiId, dibaca])
+}
+
+enum TipeNotifikasi {
+  TAGIHAN_JATUH_TEMPO
+  TAGIHAN_TERLAMBAT
+  PEMBAYARAN_DITERIMA
+  CHECKIN_BARU
+  CHECKOUT_BESOK
+  BOOKING_BARU
+  PEMELIHARAAN
+  INFO
+}
