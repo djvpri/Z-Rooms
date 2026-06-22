@@ -1,7 +1,7 @@
 // app/api/auth/qr/generate/route.ts
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-import { setQRSession } from '@/lib/qr-sessions'
+import { setQRSession, getQRSession, deleteQRSession } from '@/lib/qr-sessions'
 
 export async function POST() {
   const sessionId = randomBytes(16).toString('hex')
@@ -20,7 +20,6 @@ export async function POST() {
 }
 
 export async function GET(req: Request) {
-  const { default: { getQRSession, deleteQRSession } } = await import('@/lib/qr-sessions')
   const url = new URL(req.url)
   const sessionId = url.searchParams.get('sid')
 
