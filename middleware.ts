@@ -6,7 +6,12 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   
   // Allow public routes
-  if (pathname === '/' || pathname.startsWith('/api/auth') || pathname === '/api/health') {
+  if (
+    pathname === '/' || 
+    pathname.startsWith('/api/auth') || 
+    pathname === '/api/health' ||
+    pathname === '/api/admin/cross-app'
+  ) {
     return NextResponse.next()
   }
   
