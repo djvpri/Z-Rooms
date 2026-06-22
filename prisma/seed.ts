@@ -8,7 +8,7 @@ import { addDays, subDays, startOfMonth, endOfMonth } from 'date-fns'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Seeding NusaSewa database...')
+  console.log('🌱 Seeding Z-Rooms database...')
 
   // ── User pemilik
   const hash = await bcrypt.hash('admin123', 12)

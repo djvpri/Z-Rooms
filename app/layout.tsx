@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'NusaSewa — Manajemen Properti Sewa',
+  title: 'Z-Rooms — Manajemen Properti Sewa',
   description: 'Kelola kos, kontrakan, dan hotel Anda dengan mudah',
 }
 

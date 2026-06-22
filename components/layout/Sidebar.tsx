@@ -28,7 +28,7 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
           </div>
-          <span className="font-semibold text-gray-900 text-sm">NusaSewa</span>
+          <span className="font-semibold text-gray-900 text-sm">Z-Rooms</span>
         </div>
         <p className="text-xs text-gray-400 mt-1 pl-0.5">Manajemen Properti</p>
       </div>
