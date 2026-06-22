@@ -6,7 +6,7 @@ export default auth((req) => {
   const { pathname } = req.nextUrl
   
   // Allow public routes
-  if (pathname.startsWith('/api/auth') || pathname === '/api/health') {
+  if (pathname === '/' || pathname.startsWith('/api/auth') || pathname === '/api/health') {
     return NextResponse.next()
   }
   
