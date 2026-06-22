@@ -1,24 +1,12 @@
 // app/api/auth/qr/generate/route.ts
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-
-// In-memory store (production: use Redis)
-const sessions = new Map<string, { createdAt: number; token?: string }>()
-
-// Cleanup expired sessions every minute
-setInterval(() => {
-  const now = Date.now()
-  for (const [sessionId, data] of sessions.entries()) {
-    if (now - data.createdAt > 120000) { // 2 minutes TTL
-      sessions.delete(sessionId)
-    }
-  }
-}, 60000)
+import { setQRSession } from '@/lib/qr-sessions'
 
 export async function POST() {
   const sessionId = randomBytes(16).toString('hex')
   
-  sessions.set(sessionId, {
+  setQRSession(sessionId, {
     createdAt: Date.now(),
   })
 
@@ -32,24 +20,25 @@ export async function POST() {
 }
 
 export async function GET(req: Request) {
+  const { default: { getQRSession, deleteQRSession } } = await import('@/lib/qr-sessions')
   const url = new URL(req.url)
   const sessionId = url.searchParams.get('sid')
 
-  if (!sessionId || !sessions.has(sessionId)) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 400 })
+  if (!sessionId) {
+    return NextResponse.json({ error: 'Missing session' }, { status: 400 })
   }
 
-  const session = sessions.get(sessionId)!
+  const session = getQRSession(sessionId)
+  
+  if (!session) {
+    return NextResponse.json({ error: 'Invalid session' }, { status: 400 })
+  }
   
   if (session.token) {
-    // Token found, return it and delete session
     const token = session.token
-    sessions.delete(sessionId)
+    deleteQRSession(sessionId)
     return NextResponse.json({ success: true, token })
   }
 
   return NextResponse.json({ success: false, waiting: true })
 }
-
-// Export sessions for approve endpoint
-export { sessions }

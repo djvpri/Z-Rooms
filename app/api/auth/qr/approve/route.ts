@@ -3,9 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { SignJWT } from 'jose'
-
-// Import sessions from generate route
-const sessions = new Map<string, { createdAt: number; token?: string }>()
+import { getQRSession, setQRSession } from '@/lib/qr-sessions'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.NEXTAUTH_SECRET || 'fallback-secret'
@@ -16,7 +14,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sessionId, email, password, faceId } = body
 
-    if (!sessionId || !sessions.has(sessionId)) {
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Missing session' }, { status: 400 })
+    }
+
+    const session = getQRSession(sessionId)
+    if (!session) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 400 })
     }
 
@@ -57,11 +60,10 @@ export async function POST(req: NextRequest) {
       .sign(JWT_SECRET)
 
     // Store token in session
-    const session = sessions.get(sessionId)
-    if (session) {
-      session.token = token
-      sessions.set(sessionId, session)
-    }
+    setQRSession(sessionId, {
+      createdAt: session.createdAt,
+      token,
+    })
 
     return NextResponse.json({
       success: true,
