@@ -6,11 +6,11 @@ const sessions = new Map<string, { createdAt: number; token?: string }>()
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     const now = Date.now()
-    for (const [sessionId, data] of sessions.entries()) {
+    Array.from(sessions.entries()).forEach(([sessionId, data]) => {
       if (now - data.createdAt > 120000) { // 2 minutes TTL
         sessions.delete(sessionId)
       }
-    }
+    })
   }, 60000)
 }
 

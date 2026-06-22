@@ -17,9 +17,10 @@ async function main() {
     update: {},
     create: {
       email: 'admin@nusasewa.id',
-      name: 'Andi Pemilik',
+      name: 'Andi Admin',
       password: hash,
-      role: Role.PEMILIK,
+      role: Role.ADMIN,
+      isActive: true,
     },
   })
   console.log('✅ User:', user.email)

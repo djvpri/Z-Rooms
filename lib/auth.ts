@@ -2,6 +2,7 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
+import { verifyToken, createToken } from './jwt'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -26,20 +27,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         
         // Token-based login (from QR approval)
         if ((credentials as any).token) {
-          try {
-            const { jwtVerify } = await import('jose')
-            const JWT_SECRET = new TextEncoder().encode(
-              process.env.NEXTAUTH_SECRET || 'fallback-secret'
-            )
-            const { payload } = await jwtVerify((credentials as any).token, JWT_SECRET)
-            return { 
-              id: payload.sub as string, 
-              email: payload.email as string, 
-              name: payload.name as string, 
-              role: payload.role as string 
-            }
-          } catch {
-            return null
+          const payload = await verifyToken((credentials as any).token)
+          if (!payload) return null
+          return { 
+            id: payload.sub as string, 
+            email: payload.email as string, 
+            name: payload.name as string, 
+            role: payload.role as string 
           }
         }
 

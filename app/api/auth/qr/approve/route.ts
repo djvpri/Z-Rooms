@@ -1,13 +1,9 @@
 // app/api/auth/qr/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { createToken } from '@/lib/jwt'
 import bcrypt from 'bcryptjs'
-import { SignJWT } from 'jose'
 import { getQRSession, setQRSession } from '@/lib/qr-sessions'
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET || 'fallback-secret'
-)
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,16 +44,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate JWT token
-    const token = await new SignJWT({
+    const token = await createToken({
       sub: user.id,
       email: user.email,
-      name: user.name,
+      name: user.name || 'User',
       role: user.role,
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('1h')
-      .sign(JWT_SECRET)
 
     // Store token in session
     setQRSession(sessionId, {
@@ -76,3 +68,4 @@ export async function POST(req: NextRequest) {
     }, { status: 500 })
   }
 }
+

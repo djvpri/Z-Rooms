@@ -30,3 +30,4 @@ yarn-error.log*
 # Vercel / Railway
 .vercel
 .railway
+next-env.d.ts
