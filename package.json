@@ -8,7 +8,7 @@
     "start": "prisma migrate deploy && npm run seed:prod && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'OWNER'}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}await prisma.$disconnect()})()\"",
+    "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN'}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}await prisma.$disconnect()})()\"",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio"
