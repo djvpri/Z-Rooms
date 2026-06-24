@@ -21,10 +21,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        ssoToken: { label: 'SSO Token', type: 'text' },
       },
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials)
-        
+
+        // SSO login dari Z One
+        if ((credentials as any).ssoToken) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const jwt = require('jsonwebtoken')
+            const payload = jwt.verify((credentials as any).ssoToken, process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026') as any
+            if (payload.app !== 'zrooms') return null
+            const email = String(payload.email || '').trim().toLowerCase()
+            const user = await prisma.user.findUnique({ where: { email } })
+            if (!user || !user.isActive) return null
+            return { id: user.id, name: user.name, email: user.email, role: user.role }
+          } catch { return null }
+        }
+
         // Token-based login (from QR approval)
         if ((credentials as any).token) {
           const payload = await verifyToken((credentials as any).token)
