@@ -32,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const jwt = require('jsonwebtoken')
             const payload = jwt.verify((credentials as any).ssoToken, process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026') as any
-            if (payload.app !== 'zrooms') return null
+            if (payload.app !== 'zrooms' && payload.app !== 'z-rooms') return null
             const email = String(payload.email || '').trim().toLowerCase()
             const user = await prisma.user.findUnique({ where: { email } })
             if (!user || !user.isActive) return null
