@@ -1,5 +1,6 @@
 // lib/auth.ts
 import NextAuth from 'next-auth'
+import jwt from 'jsonwebtoken'
 import Credentials from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import { verifyToken, createToken } from './jwt'
@@ -12,6 +13,7 @@ const loginSchema = z.object({
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   session: { strategy: 'jwt' },
   pages: {
     signIn: '/login',
@@ -29,8 +31,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // SSO login dari Z One
         if ((credentials as any).ssoToken) {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const jwt = require('jsonwebtoken')
             const payload = jwt.verify((credentials as any).ssoToken, process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026') as any
             if (payload.app !== 'zrooms' && payload.app !== 'z-rooms') return null
             const email = String(payload.email || '').trim().toLowerCase()
