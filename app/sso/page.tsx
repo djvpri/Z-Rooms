@@ -13,7 +13,7 @@ function SsoContent() {
     if (!token) { setStatus('error'); setMsg('Token tidak ditemukan. Buka ZRooms lewat Z One lagi.'); return }
     signIn('credentials', { ssoToken: token, email: '', password: '', redirect: false })
       .then(res => {
-        if (res?.ok) window.location.replace('https://zrooms.zomet.my.id/dashboard')
+        if (res?.ok) window.location.replace('https://z-rooms.zomet.my.id/dashboard')
         else { setStatus('error'); setMsg('Login SSO gagal. Pastikan akun terdaftar di ZRooms.') }
       })
       .catch(() => { setStatus('error'); setMsg('Tidak dapat terhubung ke server ZRooms') })
