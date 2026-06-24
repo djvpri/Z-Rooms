@@ -32,12 +32,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if ((credentials as any).ssoToken) {
           try {
             const payload = jwt.verify((credentials as any).ssoToken, process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026') as any
-            if (payload.app !== 'zrooms' && payload.app !== 'z-rooms') return null
+            console.log('[SSO] payload.app:', payload.app, 'email:', payload.email)
+            if (payload.app !== 'zrooms' && payload.app !== 'z-rooms') {
+              console.log('[SSO] app mismatch, rejecting')
+              return null
+            }
             const email = String(payload.email || '').trim().toLowerCase()
             const user = await prisma.user.findUnique({ where: { email } })
+            console.log('[SSO] user found:', !!user, 'isActive:', user?.isActive)
             if (!user || !user.isActive) return null
             return { id: user.id, name: user.name, email: user.email, role: user.role }
-          } catch { return null }
+          } catch (e: any) {
+            console.log('[SSO] verify error:', e.message)
+            return null
+          }
         }
 
         // Token-based login (from QR approval)
