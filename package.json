@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "prisma migrate deploy && npm run seed:prod && next start",
+    "start": "prisma generate && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('\u2705 Admin user seeded')}else{console.log('\u2705 Users exist, skipping seed')}}catch(e){console.log('\u2139\ufe0f Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
