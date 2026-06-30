@@ -40,8 +40,8 @@ export default async function NotifikasiPage() {
   const belumDibaca = notifikasi.filter(n => !n.dibaca).length
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Notifikasi</h1>
           <p className="text-sm text-gray-400">

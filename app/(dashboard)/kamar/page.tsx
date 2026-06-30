@@ -36,8 +36,8 @@ export default async function KamarPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Kamar</h1>
           <p className="text-sm text-gray-400">{kamar.length} kamar terdaftar</p>
@@ -61,7 +61,7 @@ export default async function KamarPage() {
       </div>
 
       {/* Grid kamar */}
-      <div className="grid grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
           const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
           const penyewa = k.sewa[0]?.penyewa
@@ -88,7 +88,9 @@ export default async function KamarPage() {
       {/* Tabel detail */}
       <div className="card">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Detail kamar</h2>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -121,6 +123,31 @@ export default async function KamarPage() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-2">
+          {kamar.map(k => {
+            const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
+            const penyewa = k.sewa[0]?.penyewa
+            return (
+              <div key={k.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-800 text-sm">{k.nomor}</span>
+                    <span className={`badge text-[10px] ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {tipeKamarLabel[k.tipe]}{k.luas ? ` · ${k.luas}m²` : ''}
+                    {hargaBulanan ? ` · ${formatRupiah(hargaBulanan.harga)}/bln` : ''}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {penyewa?.nama ?? '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

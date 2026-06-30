@@ -26,7 +26,7 @@ export default function LandingPage() {
         <div className="inline-block px-4 py-1.5 bg-teal-50 text-teal-700 text-sm font-medium rounded-full mb-6">
           🚀 Sistem Manajemen Properti Modern
         </div>
-        <h1 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">
+        <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
           Kelola Kos, Kontrakan & Hotel<br/>
           <span className="text-teal-600">Lebih Mudah & Efisien</span>
         </h1>

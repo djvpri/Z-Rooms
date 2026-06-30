@@ -1,9 +1,9 @@
 'use client'
-// components/layout/Sidebar.tsx
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { cn, inisial } from '@/lib/utils'
+import { X, Menu, LogOut } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard',    label: 'Dashboard',   icon: '▦' },
@@ -16,11 +16,12 @@ const navItems = [
 
 export default function Sidebar({ user }: { user?: { name?: string | null; email?: string | null } }) {
   const path = usePathname()
+  const router = useRouter()
 
-  return (
-    <aside className="w-52 shrink-0 flex flex-col bg-white border-r border-gray-100 h-full">
+  const sidebar = (
+    <aside className="flex flex-col bg-white h-full w-full">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-gray-100">
+      <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-teal-600 rounded-lg flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
@@ -30,7 +31,6 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
           </div>
           <span className="font-semibold text-gray-900 text-sm">Z-Rooms</span>
         </div>
-        <p className="text-xs text-gray-400 mt-1 pl-0.5">Manajemen Properti</p>
       </div>
 
       {/* Nav */}
@@ -40,7 +40,7 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
             key={item.href}
             href={item.href}
             className={cn(
-              'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors',
+              'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors',
               path.startsWith(item.href)
                 ? 'bg-teal-50 text-teal-700 font-medium'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -71,5 +71,36 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
         </button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex w-52 shrink-0 border-r border-gray-100 h-full">
+        {sidebar}
+      </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 flex items-center justify-around px-1 pb-safe">
+        {navItems.map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex flex-col items-center py-1.5 px-2 rounded-lg transition-colors min-w-0',
+              path.startsWith(item.href)
+                ? 'text-teal-600'
+                : 'text-gray-400 hover:text-gray-600'
+            )}
+          >
+            <span className="text-lg leading-none">{item.icon}</span>
+            <span className="text-[10px] mt-0.5 truncate max-w-full">{item.label}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {/* Spacer for mobile bottom nav */}
+      <div className="md:hidden h-16" />
+    </>
   )
 }

@@ -71,37 +71,37 @@ export default async function KeuanganPage() {
   const maxBar = Math.max(...trend6bulan.map(t => Math.max(t.pendapatan, t.pengeluaran)), 1)
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Keuangan</h1>
         <p className="text-sm text-gray-400">Pendapatan, tagihan, dan pengeluaran bulan ini</p>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pendapatan bulan ini</p>
-          <p className="text-xl font-semibold text-teal-600">{formatRupiah(totalPendapatan)}</p>
+          <p className="text-base md:text-xl font-semibold text-teal-600">{formatRupiah(totalPendapatan)}</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pengeluaran bulan ini</p>
-          <p className="text-xl font-semibold text-coral-600">{formatRupiah(totalPengeluaran)}</p>
+          <p className="text-base md:text-xl font-semibold text-coral-600">{formatRupiah(totalPengeluaran)}</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Laba bersih</p>
-          <p className="text-xl font-semibold text-gray-900">{formatRupiah(totalPendapatan - totalPengeluaran)}</p>
+          <p className="text-base md:text-xl font-semibold text-gray-900">{formatRupiah(totalPendapatan - totalPengeluaran)}</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Belum terkumpul</p>
-          <p className="text-xl font-semibold text-amber-400">{formatRupiah(belumLunas)}</p>
+          <p className="text-base md:text-xl font-semibold text-amber-400">{formatRupiah(belumLunas)}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
         {/* Chart 6 bulan */}
-        <div className="card col-span-2">
+        <div className="card md:col-span-2">
           <h2 className="text-sm font-medium text-gray-700 mb-4">Trend 6 bulan terakhir</h2>
-          <div className="flex items-end gap-2 h-36">
+          <div className="flex items-end gap-2 h-28 md:h-36">
             {trend6bulan.map((t, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
                 <div className="w-full flex gap-0.5 items-end" style={{ height: '100px' }}>
@@ -152,7 +152,9 @@ export default async function KeuanganPage() {
       {/* Tabel tagihan bulan ini */}
       <div className="card">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Tagihan bulan {now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h2>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -178,6 +180,25 @@ export default async function KeuanganPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-2">
+          {tagihan.map(t => (
+            <div key={t.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <span className="font-medium text-gray-800 text-sm">Kamar {t.sewa.kamar.nomor}</span>
+                  <span className="text-gray-600 text-sm ml-2">{t.sewa.penyewa.nama}</span>
+                </div>
+                <span className={`badge text-[10px] shrink-0 ${statusTagihanColor(t.status)}`}>{statusTagihanLabel(t.status)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>{formatRupiah(t.nominal)} · {formatTanggal(t.jatuhTempo, { day: 'numeric', month: 'short' })}</span>
+                <span>{t.pembayaran[0]?.metodeBayar?.replace('_', ' ') ?? '-'}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -88,8 +88,8 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+      <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Booking / Sewa Baru</h1>
         <p className="text-sm text-gray-400">Catat penyewa baru dan buat tagihan otomatis</p>
       </div>
@@ -114,7 +114,7 @@ export default function BookingPage() {
         {/* Data penyewa */}
         <div className="card space-y-3">
           <h2 className="text-sm font-medium text-gray-700">Data penyewa</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Nama lengkap *</label>
               <input className="form-input" value={form.nama} onChange={e => set('nama', e.target.value)} required placeholder="Nama sesuai KTP" />
@@ -126,7 +126,7 @@ export default function BookingPage() {
           </div>
 
           {activeTab === 'INDIVIDU' ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="form-label">NIK (opsional)</label>
                 <input className="form-input" value={form.nik} onChange={e => set('nik', e.target.value)} placeholder="16 digit NIK" maxLength={16} />
@@ -139,7 +139,7 @@ export default function BookingPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="form-label">Nama perusahaan *</label>
                 <input className="form-input" value={form.namaPerusahaan} onChange={e => set('namaPerusahaan', e.target.value)} placeholder="PT. / CV. / Dinas ..." />
@@ -155,7 +155,7 @@ export default function BookingPage() {
         {/* Detail sewa */}
         <div className="card space-y-3">
           <h2 className="text-sm font-medium text-gray-700">Detail sewa</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Pilih kamar *</label>
               <select className="form-input" value={form.kamarId} onChange={e => set('kamarId', e.target.value)} required>
@@ -177,7 +177,7 @@ export default function BookingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Tanggal masuk *</label>
               <input type="date" className="form-input" value={form.tanggalMasuk} onChange={e => set('tanggalMasuk', e.target.value)} required />
@@ -188,7 +188,7 @@ export default function BookingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Harga sewa</label>
               <div className="form-input bg-gray-50 text-gray-500 cursor-not-allowed">
@@ -201,7 +201,7 @@ export default function BookingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Sumber booking</label>
               <select className="form-input" value={form.sumber} onChange={e => set('sumber', e.target.value)}>

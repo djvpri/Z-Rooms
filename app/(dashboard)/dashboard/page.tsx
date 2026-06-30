@@ -47,38 +47,38 @@ export default async function DashboardPage() {
   const hunian = Math.round((statusMap['TERISI'] ?? 0) / totalKamar * 100)
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">{properti.nama}</h1>
         <p className="text-sm text-gray-400">{properti.alamat}, {properti.kota} · {formatTanggal(now)}</p>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Total kamar</p>
-          <p className="text-2xl font-semibold text-gray-900">{totalKamar}</p>
+          <p className="text-xl md:text-2xl font-semibold text-gray-900">{totalKamar}</p>
           <p className="text-xs text-teal-600 mt-1">Hunian {hunian}%</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Kamar terisi</p>
-          <p className="text-2xl font-semibold text-gray-900">{statusMap['TERISI'] ?? 0}</p>
+          <p className="text-xl md:text-2xl font-semibold text-gray-900">{statusMap['TERISI'] ?? 0}</p>
           <p className="text-xs text-gray-400 mt-1">Tersedia: {statusMap['TERSEDIA'] ?? 0}</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pendapatan bulan ini</p>
-          <p className="text-xl font-semibold text-gray-900">{formatRupiah(pendapatan)}</p>
+          <p className="text-base md:text-xl font-semibold text-gray-900">{formatRupiah(pendapatan)}</p>
           <p className="text-xs text-teal-600 mt-1">Laba: {formatRupiah(pendapatan - pengeluaran)}</p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Tagihan belum lunas</p>
-          <p className="text-2xl font-semibold text-coral-600">{tagihanBelumBayar}</p>
+          <p className="text-xl md:text-2xl font-semibold text-coral-600">{tagihanBelumBayar}</p>
           <p className="text-xs text-gray-400 mt-1">{notifCount} notifikasi baru</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
         {/* Status kamar */}
         <div className="card">
           <h2 className="text-sm font-medium text-gray-700 mb-3">Status kamar</h2>
@@ -134,7 +134,9 @@ export default async function DashboardPage() {
       {/* Aktivitas terbaru */}
       <div className="card">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Aktivitas terbaru</h2>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -164,6 +166,31 @@ export default async function DashboardPage() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-2">
+          {aktivitas.map(s => {
+            const tagStatus = s.tagihan[0]?.status ?? 'BELUM_BAYAR'
+            const tagColor = tagStatus === 'LUNAS' ? 'bg-teal-50 text-teal-700'
+              : tagStatus === 'TERLAMBAT' ? 'bg-coral-50 text-coral-600'
+              : 'bg-gray-100 text-gray-500'
+            const tagLabel = tagStatus === 'LUNAS' ? 'Lunas' : tagStatus === 'TERLAMBAT' ? 'Terlambat' : 'Belum bayar'
+            return (
+              <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-800 text-sm">{s.kamar.nomor}</span>
+                    <span className="text-gray-600 text-sm">{s.penyewa.nama}</span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {s.periodeSewa.toLowerCase()} · {formatTanggal(s.createdAt, { day: 'numeric', month: 'short' })}
+                  </div>
+                </div>
+                <span className={`badge shrink-0 ml-2 ${tagColor}`}>{tagLabel}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

@@ -31,8 +31,8 @@ export default async function PenyewaPage() {
   ]
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Penyewa Aktif</h1>
           <p className="text-sm text-gray-400">{sewa.length} penyewa saat ini</p>
@@ -40,7 +40,7 @@ export default async function PenyewaPage() {
       </div>
 
       {/* Kartu penyewa */}
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-8">
         {sewa.map((s, i) => {
           const tagihan = s.tagihan[0]
           const color = avatarColors[i % avatarColors.length]
@@ -82,7 +82,9 @@ export default async function PenyewaPage() {
       {/* Tabel lengkap */}
       <div className="card">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Semua penyewa aktif</h2>
-        <div className="overflow-x-auto">
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -132,6 +134,45 @@ export default async function PenyewaPage() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-2">
+          {sewa.map((s, i) => {
+            const tagihan = s.tagihan[0]
+            const sumberBadge: Record<string, string> = {
+              LANGSUNG: 'bg-gray-100 text-gray-500',
+              MAMIKOS: 'bg-teal-50 text-teal-700',
+              TRAVELOKA: 'bg-purple-50 text-purple-600',
+              BOOKING_COM: 'bg-blue-50 text-blue-600',
+            }
+            return (
+              <div key={s.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${avatarColors[i % avatarColors.length]}`}>
+                      {inisial(s.penyewa.nama)}
+                    </div>
+                    <span className="font-medium text-gray-800 text-sm">{s.penyewa.nama}</span>
+                  </div>
+                  {tagihan && (
+                    <span className={`badge text-[10px] shrink-0 ${statusTagihanColor(tagihan.status)}`}>
+                      {statusTagihanLabel(tagihan.status)}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 ml-8">
+                  Kamar <span className="font-medium text-gray-700">{s.kamar.nomor}</span> · {s.periodeSewa.toLowerCase()} · {formatRupiah(s.hargaSewa)}
+                </div>
+                <div className="text-xs text-gray-400 ml-8 mt-0.5">
+                  {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} → {formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })}
+                  <span className={`badge text-[10px] ml-2 ${sumberBadge[s.sumber] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {s.sumber === 'LANGSUNG' ? 'Langsung' : s.sumber.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

@@ -197,39 +197,39 @@ export default function LoginPage() {
 
         <div className="card space-y-4 shadow-sm">
           {/* Method selector */}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setMethod('email')}
-              className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              className={`py-3 px-2 rounded-lg border-2 transition-all ${
                 method === 'email'
                   ? 'border-teal-600 bg-teal-50 text-teal-700'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
               <Mail className="w-5 h-5 mx-auto mb-1" />
-              <span className="text-xs font-medium">Email</span>
+              <span className="text-xs font-medium block">Email</span>
             </button>
             <button
               onClick={() => setMethod('face')}
-              className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              className={`py-3 px-2 rounded-lg border-2 transition-all ${
                 method === 'face'
                   ? 'border-teal-600 bg-teal-50 text-teal-700'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
               <Camera className="w-5 h-5 mx-auto mb-1" />
-              <span className="text-xs font-medium">Face</span>
+              <span className="text-xs font-medium block">Face</span>
             </button>
             <button
               onClick={() => setMethod('qr')}
-              className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all ${
+              className={`py-3 px-2 rounded-lg border-2 transition-all ${
                 method === 'qr'
                   ? 'border-teal-600 bg-teal-50 text-teal-700'
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
               <QrCodeIcon className="w-5 h-5 mx-auto mb-1" />
-              <span className="text-xs font-medium">QR</span>
+              <span className="text-xs font-medium block">QR</span>
             </button>
           </div>
 
