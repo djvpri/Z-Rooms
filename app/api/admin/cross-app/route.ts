@@ -51,11 +51,18 @@ export async function POST(req: NextRequest) {
     if (action === 'createTenant') {
       const nama = String(data?.name || '').trim()
       if (!nama) return NextResponse.json({ error: 'name wajib diisi' }, { status: 400 })
-      // Butuh owner — pakai user admin pertama yang ada
-      const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } })
-      if (!admin) return NextResponse.json({ error: 'Belum ada user ADMIN di Z-Rooms' }, { status: 400 })
+      // Owner properti: pakai ownerEmail kalau dikirim (mis. provisioning demo —
+      // demo jadi PEMILIK propertinya sendiri, terisolasi), selain itu ADMIN pertama.
+      let owner = data?.ownerEmail
+        ? await prisma.user.findUnique({ where: { email: String(data.ownerEmail).trim() } })
+        : null
+      if (!owner) owner = await prisma.user.findFirst({ where: { role: 'ADMIN' } })
+      if (!owner) return NextResponse.json({ error: 'Tidak ada owner (ownerEmail/ADMIN)' }, { status: 400 })
+      // Idempotent: jangan bikin properti ganda dgn nama sama untuk owner yang sama
+      const existing = await prisma.properti.findFirst({ where: { nama, ownerId: owner.id } })
+      if (existing) return NextResponse.json({ success: true, tenant: { id: existing.id, name: existing.nama } })
       const p = await prisma.properti.create({
-        data: { nama, tipe: 'KOS', alamat: '-', kota: '-', ownerId: admin.id },
+        data: { nama, tipe: 'KOS', alamat: '-', kota: '-', ownerId: owner.id },
       })
       return NextResponse.json({ success: true, tenant: { id: p.id, name: p.nama } })
     }
