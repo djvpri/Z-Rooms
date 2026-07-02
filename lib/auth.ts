@@ -31,7 +31,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // SSO login dari Z One
         if ((credentials as any).ssoToken) {
           try {
-            const payload = jwt.verify((credentials as any).ssoToken, process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026') as any
+            // Migration 2026-07-02: try both secrets
+            const NEW_SECRET = process.env.CROSS_APP_SECRET || 'uurclTHL375CiZeWi2g4T3GczU2YNY9I1wzjlsVTgSk'
+            const OLD_SECRET = 'z-ecosystem-admin-2026'
+            
+            let payload: any = null
+            for (const s of [NEW_SECRET, OLD_SECRET]) {
+              try {
+                payload = jwt.verify((credentials as any).ssoToken, s)
+                break
+              } catch {}
+            }
+            if (!payload) return null
             console.log('[SSO] payload.app:', payload.app, 'email:', payload.email)
             if (payload.app !== 'zrooms' && payload.app !== 'z-rooms') {
               console.log('[SSO] app mismatch, rejecting')

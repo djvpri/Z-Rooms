@@ -6,10 +6,15 @@ import bcrypt from 'bcryptjs'
 // browser pengguna langsung — autentikasi pakai Bearer secret, bukan cookie.
 // Z-Rooms pakai Properti sebagai "tenant" (satu user bisa punya banyak properti).
 
-const CROSS_APP_SECRET = process.env.CROSS_APP_SECRET || 'z-ecosystem-admin-2026'
+// Migration 2026-07-02: dual secret support
+const NEW_SECRET = process.env.CROSS_APP_SECRET || 'uurclTHL375CiZeWi2g4T3GczU2YNY9I1wzjlsVTgSk'
+const OLD_SECRET = 'z-ecosystem-admin-2026'
+const VALID_SECRETS = [NEW_SECRET, OLD_SECRET]
 
 function checkAuth(req: NextRequest) {
-  return req.headers.get('authorization') === `Bearer ${CROSS_APP_SECRET}`
+  const header = req.headers.get('authorization') || ''
+  const token = header.replace('Bearer ', '')
+  return VALID_SECRETS.includes(token)
 }
 
 export async function GET(req: NextRequest) {
