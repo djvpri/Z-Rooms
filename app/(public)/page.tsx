@@ -1,7 +1,7 @@
 // app/(public)/page.tsx
 'use client'
 import Link from 'next/link'
-import { Building2, Users, TrendingUp, Shield, Clock, BarChart3, CheckCircle2 } from 'lucide-react'
+import { Building, People, GraphUpArrow, ShieldCheck, ClockFill, BarChartLine, CheckCircleFill } from 'react-bootstrap-icons'
 
 export default function LandingPage() {
   return (
@@ -11,7 +11,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 bg-teal-600 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
+              <Building className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-semibold text-gray-900">Z-Rooms</span>
           </div>
@@ -61,7 +61,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Users className="w-6 h-6 text-teal-600" />
+                <People className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Manajemen Penyewa</h3>
               <p className="text-gray-600">
@@ -71,7 +71,7 @@ export default function LandingPage() {
 
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <TrendingUp className="w-6 h-6 text-teal-600" />
+                <GraphUpArrow className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Pembayaran & Tagihan</h3>
               <p className="text-gray-600">
@@ -81,7 +81,7 @@ export default function LandingPage() {
 
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <BarChart3 className="w-6 h-6 text-teal-600" />
+                <BarChartLine className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Laporan & Analitik</h3>
               <p className="text-gray-600">
@@ -91,7 +91,7 @@ export default function LandingPage() {
 
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Building2 className="w-6 h-6 text-teal-600" />
+                <Building className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Multi-Properti</h3>
               <p className="text-gray-600">
@@ -101,7 +101,7 @@ export default function LandingPage() {
 
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-teal-600" />
+                <ClockFill className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Otomasi Pintar</h3>
               <p className="text-gray-600">
@@ -111,7 +111,7 @@ export default function LandingPage() {
 
             <div className="card hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mb-4">
-                <Shield className="w-6 h-6 text-teal-600" />
+                <ShieldCheck className="w-6 h-6 text-teal-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Aman & Terpercaya</h3>
               <p className="text-gray-600">
@@ -147,19 +147,19 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Hingga 20 kamar</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">1 properti</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Laporan dasar</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Email support</span>
                 </li>
               </ul>
@@ -183,23 +183,23 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Hingga 100 kamar</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">5 properti</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Laporan lengkap + export</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">WhatsApp reminder</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Priority support</span>
                 </li>
               </ul>
@@ -219,23 +219,23 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-3 mb-8">
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Unlimited kamar</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Unlimited properti</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Custom integration</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">Dedicated support</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
+                  <CheckCircleFill className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" />
                   <span className="text-gray-700">SLA guarantee</span>
                 </li>
               </ul>

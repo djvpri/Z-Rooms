@@ -8,7 +8,7 @@
     "start": "prisma generate && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('\u2705 Admin user seeded')}else{console.log('\u2705 Users exist, skipping seed')}}catch(e){console.log('\u2139\ufe0f Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
+    "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}}catch(e){console.log('ℹ️ Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio"
@@ -19,29 +19,30 @@
     "@types/qrcode": "^1.5.6",
     "autoprefixer": "^10.5.0",
     "bcryptjs": "^2.4.3",
+    "bootstrap-icons": "1.11.3",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "lucide-react": "^0.395.0",
+    "jsonwebtoken": "^9.0.3",
     "next": "^14.2.35",
     "next-auth": "^5.0.0-beta.19",
     "postcss": "^8.5.15",
     "qrcode": "^1.5.4",
     "react": "^18",
+    "react-bootstrap-icons": "^1.11.6",
     "react-dom": "^18",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.3.0",
     "tailwindcss": "^3.4.19",
-    "zod": "^3.23.8",
-    "jsonwebtoken": "^9.0.3"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "18.3.31",
     "@types/react-dom": "^18",
     "prisma": "5.22.0",
     "tsx": "^4.15.7",
-    "typescript": "5.9.3",
-    "@types/jsonwebtoken": "^9.0.10"
+    "typescript": "5.9.3"
   }
 }

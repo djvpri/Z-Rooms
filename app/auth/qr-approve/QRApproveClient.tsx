@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Camera, Mail, CheckCircle2 } from 'lucide-react'
+import { Camera, Envelope, CheckCircleFill } from 'react-bootstrap-icons'
 
 export default function QRApproveClient() {
   const searchParams = useSearchParams()
@@ -67,7 +67,7 @@ export default function QRApproveClient() {
   if (success) return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white flex items-center justify-center px-4">
       <div className="card text-center max-w-sm">
-        <CheckCircle2 className="w-16 h-16 text-teal-600 mx-auto mb-4" />
+        <CheckCircleFill className="w-16 h-16 text-teal-600 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Login Berhasil!</h2>
         <p className="text-gray-600">Kembali ke komputer Anda untuk melanjutkan.</p>
       </div>
@@ -104,7 +104,7 @@ export default function QRApproveClient() {
         <div className="card space-y-4">
           <div className="flex gap-2">
             <button onClick={() => setMethod('email')} className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${method === 'email' ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600'}`}>
-              <Mail className="w-5 h-5 mx-auto mb-1" /><span className="text-xs font-medium">Email</span>
+              <Envelope className="w-5 h-5 mx-auto mb-1" /><span className="text-xs font-medium">Email</span>
             </button>
             <button onClick={() => setMethod('face')} className={`flex-1 py-2 px-4 rounded-lg border-2 transition-all ${method === 'face' ? 'border-teal-600 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600'}`}>
               <Camera className="w-5 h-5 mx-auto mb-1" /><span className="text-xs font-medium">Face</span>

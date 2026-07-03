@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { cn, inisial } from '@/lib/utils'
-import { X, Menu, LogOut } from 'lucide-react'
+import { X, List as Menu, BoxArrowRight as LogOut } from 'react-bootstrap-icons'
 
 const navItems = [
   { href: '/dashboard',    label: 'Dashboard',   icon: '▦' },

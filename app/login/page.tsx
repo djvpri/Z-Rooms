@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
-import { Mail, Camera, QrCode as QrCodeIcon } from 'lucide-react'
+import { Envelope, Camera, QrCodeScan } from 'react-bootstrap-icons'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -206,7 +206,7 @@ export default function LoginPage() {
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
-              <Mail className="w-5 h-5 mx-auto mb-1" />
+              <Envelope className="w-5 h-5 mx-auto mb-1" />
               <span className="text-xs font-medium block">Email</span>
             </button>
             <button
@@ -228,7 +228,7 @@ export default function LoginPage() {
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
             >
-              <QrCodeIcon className="w-5 h-5 mx-auto mb-1" />
+              <QrCodeScan className="w-5 h-5 mx-auto mb-1" />
               <span className="text-xs font-medium block">QR</span>
             </button>
           </div>
