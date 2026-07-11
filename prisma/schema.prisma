@@ -75,6 +75,8 @@ model Properti {
   deskripsi   String?
   fasilitas   String[]      @default([])
   aktif       Boolean       @default(true)
+  isDemo      Boolean       @default(false)
+  demoExpiresAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
