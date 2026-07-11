@@ -49,9 +49,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               return null
             }
             const email = String(payload.email || '').trim().toLowerCase()
-            const user = await prisma.user.findUnique({ where: { email } })
-            console.log('[SSO] user found:', !!user, 'isActive:', user?.isActive)
-            if (!user || !user.isActive) return null
+            let user = await prisma.user.findUnique({ where: { email } })
+            
+            // Auto-create user jika belum ada (first-time SSO access)
+            if (!user) {
+              const name = String(payload.name || email.split('@')[0])
+              user = await prisma.user.create({
+                data: {
+                  email,
+                  name,
+                  password: '', // SSO user, no password needed
+                  role: 'USER',
+                  isActive: true,
+                },
+              })
+              console.log(`[SSO] Auto-created ZRooms user: ${email}`)
+            }
+            
+            if (!user.isActive) return null
             return { id: user.id, name: user.name, email: user.email, role: user.role }
           } catch (e: any) {
             console.log('[SSO] verify error:', e.message)
