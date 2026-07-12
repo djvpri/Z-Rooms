@@ -15,9 +15,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure demo columns exist
-    await prisma.$queryRaw`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Properti' AND column_name='isDemo') THEN ALTER TABLE "Properti" ADD COLUMN "isDemo" BOOLEAN NOT NULL DEFAULT false; ALTER TABLE "Properti" ADD COLUMN "demoExpiresAt" TIMESTAMP(3); END IF; END $$;`.catch(() => {});
+    try {
+      await prisma.$queryRaw`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Properti' AND column_name='isDemo') THEN ALTER TABLE "Properti" ADD COLUMN "isDemo" BOOLEAN NOT NULL DEFAULT false; ALTER TABLE "Properti" ADD COLUMN "demoExpiresAt" TIMESTAMP(3); END IF; END $$;`;
+    } catch (e) {
+      console.log("Migration check done, error ignored:", e);
+    }
 
-    // Clear existing demo data (order matters for FK)
+    // Clear existing demo data in FK-safe order
     await prisma.$queryRaw`DELETE FROM "Notifikasi" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
     await prisma.$queryRaw`DELETE FROM "Pembayaran" WHERE "tagihanId" IN (SELECT id FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true))))`;
     await prisma.$queryRaw`DELETE FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
@@ -86,8 +90,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, properti: { id: properti.id, nama: properti.nama } });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Demo setup error:", error);
-    return NextResponse.json({ error: "Failed: " + String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Failed: " + String(error?.message || error) }, { status: 500 });
   }
 }
