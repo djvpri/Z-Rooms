@@ -14,24 +14,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 403 });
     }
 
-    // Ensure demo columns exist
-    try {
-      await prisma.$queryRaw`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Properti' AND column_name='isDemo') THEN ALTER TABLE "Properti" ADD COLUMN "isDemo" BOOLEAN NOT NULL DEFAULT false; ALTER TABLE "Properti" ADD COLUMN "demoExpiresAt" TIMESTAMP(3); END IF; END $$;`;
-    } catch (e) {
-      console.log("Migration check done, error ignored:", e);
+    // Find existing demo user and properti
+    const existingUser = await prisma.user.findUnique({ where: { email: "demo@zomet.my.id" } });
+    const existingProperti = existingUser ? await prisma.properti.findFirst({ where: { ownerId: existingUser.id, isDemo: true } }) : null;
+
+    if (existingProperti) {
+      // Delete in FK-safe order via Prisma
+      const propertiSewas = await prisma.sewa.findMany({ where: { propertiId: existingProperti.id }, select: { id: true } });
+      const sewaIds = propertiSewas.map(s => s.id);
+      if (sewaIds.length > 0) {
+        await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
+        await prisma.notifikasi.deleteMany({ where: { sewaId: { in: sewaIds } } });
+        await prisma.sewa.deleteMany({ where: { id: { in: sewaIds } } });
+      }
+      await prisma.penyewa.deleteMany({ where: { propertiId: existingProperti.id } });
+      await prisma.kamar.deleteMany({ where: { propertiId: existingProperti.id } });
+      await prisma.properti.delete({ where: { id: existingProperti.id } });
+    }
+    if (existingUser) {
+      await prisma.user.delete({ where: { email: "demo@zomet.my.id" } });
     }
 
-    // Clear existing demo data in FK-safe order
-    await prisma.$queryRaw`DELETE FROM "Notifikasi" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
-    await prisma.$queryRaw`DELETE FROM "Pembayaran" WHERE "tagihanId" IN (SELECT id FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true))))`;
-    await prisma.$queryRaw`DELETE FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
-    await prisma.$queryRaw`DELETE FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true))`;
-    await prisma.$queryRaw`DELETE FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)`;
-    await prisma.$queryRaw`DELETE FROM "Kamar" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)`;
-    await prisma.$queryRaw`DELETE FROM "Properti" WHERE "isDemo" = true`;
-    await prisma.$queryRaw`DELETE FROM "User" WHERE email = 'demo@zomet.my.id'`;
-
-    // Seed via Prisma client
+    // Seed
     const user = await prisma.user.create({
       data: { email: "demo@zomet.my.id", name: "Demo User", role: "ADMIN" }
     });
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
       { nama: "Kamar B2", tipe: "Deluxe", harga: 1200000, kapasitas: 1, luas: "4x4", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja", "TV"] },
       { nama: "Kamar VIP", tipe: "VIP", harga: 1500000, kapasitas: 2, luas: "5x5", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja", "TV", "AC", "Sofa"] },
     ];
-    const kamars = [];
+    const kamars: string[] = [];
     for (const k of kamarData) {
       const kamar = await prisma.kamar.create({ data: { ...k, propertiId: properti.id } });
       kamars.push(kamar.id);
