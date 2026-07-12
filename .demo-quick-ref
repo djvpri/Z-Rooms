@@ -1,0 +1,44 @@
+Z-ROOMS DEMO SYSTEM - QUICK REFERENCE
+
+SAMPLE CREDENTIALS:
+  Secret: zrooms-demo-gtiyz4h2p3q
+  Email: demo@zomet.my.id
+  Expiry: 2 hours
+
+ENDPOINTS:
+  POST /api/demo/setup
+  POST /api/demo/reset-daily
+  Auth: Bearer zrooms-demo-[secret]
+
+DEMO DATA:
+  Property: Demo Kos Sejahtera (KOS type)
+  Rooms: 5 (Standar, Deluxe, VIP)
+  Tenants: 2 (Budi Santoso, Siti Nurhaliza)
+  Rentals: 3 (2 active, 1 pending)
+  Invoices: 5 (various payment statuses)
+
+SETUP:
+  1. npx prisma migrate deploy
+  2. Generate secret: node -e "console.log('zrooms-demo-' + Math.random().toString(36).substring(2, 15))"
+  3. Call setup endpoint with Bearer token
+
+RESET (Cron):
+  0 2 * * * curl -X POST http://localhost:3000/api/demo/reset-daily \
+    -H "Authorization: Bearer zrooms-demo-your-secret"
+
+DOCS:
+  - DEMO_SYSTEM.md (full spec)
+  - DEMO_INTEGRATION_GUIDE.md (examples)
+  - DEMO_CREDENTIALS.md (reference)
+
+FILES:
+  app/lib/demo-seed.ts
+  app/api/demo/setup/route.ts
+  app/api/demo/reset-daily/route.ts
+  prisma/migrations/20260711222600_add_demo_fields/
+
+COMMITS:
+  8a4a6ad docs: Add demo credentials and quick reference guide
+  656cc02 docs: Add demo system integration guide
+  7e8b9b0 docs: Add comprehensive demo system documentation
+  669ddf2 feat: Add demo system for Z-Rooms app

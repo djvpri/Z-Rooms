@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { seedDemoData } from "@/app/lib/demo-seed";
 
-const prisma = new PrismaClient();
 const SECRET_PREFIX = "zrooms-demo-";
 
 export async function POST(request: NextRequest) {
@@ -26,7 +25,6 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     if (existingDemo) {
-      // Use resetDemoData from demo-seed
       const { resetDemoData } = await import("@/app/lib/demo-seed");
       await resetDemoData(existingDemo.id);
     }

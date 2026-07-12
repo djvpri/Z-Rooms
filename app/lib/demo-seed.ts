@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
 import { addHours } from "date-fns";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 interface SeedResult {
   userId: string;
@@ -323,7 +321,6 @@ export async function resetDemoData(propertiId: string): Promise<void> {
   // 7. Delete notifikasi linked to this properti
   await prisma.notifikasi.deleteMany({ where: { propertiId } });
 
-  // 8. Remove properti as demo (set isDemo=false) — or delete it entirely
-  // Switch approach: delete properti and its owner user if it's demo-only
+  // 8. Delete properti
   await prisma.properti.delete({ where: { id: propertiId } });
 }
