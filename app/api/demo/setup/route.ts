@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     await prisma.$queryRaw`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Properti' AND column_name='isDemo') THEN ALTER TABLE "Properti" ADD COLUMN "isDemo" BOOLEAN NOT NULL DEFAULT false; ALTER TABLE "Properti" ADD COLUMN "demoExpiresAt" TIMESTAMP(3); END IF; END $$;`.catch(() => {});
 
     // Clear existing demo data
+    await prisma.$queryRaw`DELETE FROM "User" WHERE email = 'demo@zomet.my.id'`;
     await prisma.$queryRaw`DELETE FROM "Notifikasi" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
     await prisma.$queryRaw`DELETE FROM "Pembayaran" WHERE "tagihanId" IN (SELECT id FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true))))`;
     await prisma.$queryRaw`DELETE FROM "Tagihan" WHERE "sewaId" IN (SELECT id FROM "Sewa" WHERE "penyewaId" IN (SELECT id FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)))`;
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     await prisma.$queryRaw`DELETE FROM "Penyewa" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)`;
     await prisma.$queryRaw`DELETE FROM "Kamar" WHERE "propertiId" IN (SELECT id FROM "Properti" WHERE "isDemo" = true)`;
     await prisma.$queryRaw`DELETE FROM "Properti" WHERE "isDemo" = true`;
-    await prisma.$queryRaw`DELETE FROM "User" WHERE email = 'demo@zomet.my.id' AND "isDemo" = true`;
+
 
     // Seed via Prisma client
     const user = await prisma.user.create({
