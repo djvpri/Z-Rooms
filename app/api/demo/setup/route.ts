@@ -14,48 +14,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 403 });
     }
 
-    // Cek DB connection
-    try {
-      const r = await prisma.$queryRaw`SELECT 1 as ok`;
-      console.log("DB ping ok:", r);
-    } catch (e) {
-      return NextResponse.json({ error: "DB not connected: " + String(e) }, { status: 500 });
+    // Add demo columns if missing
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3)`);
+
+    // Get or create demo user
+    let user = await prisma.user.findUnique({ where: { email: "demo@zomet.my.id" } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { email: "demo@zomet.my.id", name: "Demo User", role: "ADMIN" }
+      });
     }
 
-    // Migrate: add isDemo column if not exist
-    try {
-      await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false`);
-      await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3)`);
-    } catch (e) {
-      console.log("Migration step warning:", e);
-    }
-
-    // Find existing demo user
-    const existingUser = await prisma.user.findUnique({ where: { email: "demo@zomet.my.id" } });
-    
-    if (existingUser) {
-      const existingProperti = await prisma.properti.findFirst({ where: { ownerId: existingUser.id, isDemo: true } });
-      
-      if (existingProperti) {
-        // Delete in FK-safe order
-        const sewaIds = (await prisma.sewa.findMany({ where: { propertiId: existingProperti.id }, select: { id: true } })).map(s => s.id);
-        if (sewaIds.length > 0) {
-          await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
-          await prisma.notifikasi.deleteMany({ where: { sewaId: { in: sewaIds } } });
-          await prisma.sewa.deleteMany({ where: { id: { in: sewaIds } } });
-        }
-        await prisma.penyewa.deleteMany({ where: { propertiId: existingProperti.id } });
-        await prisma.kamar.deleteMany({ where: { propertiId: existingProperti.id } });
-        await prisma.properti.delete({ where: { id: existingProperti.id } });
+    // Clean existing demo properti
+    const oldProperti = await prisma.properti.findFirst({ where: { ownerId: user.id, isDemo: true } });
+    if (oldProperti) {
+      const sewaIds = (await prisma.sewa.findMany({ where: { propertiId: oldProperti.id }, select: { id: true } })).map(s => s.id);
+      if (sewaIds.length > 0) {
+        await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
+        await prisma.notifikasi.deleteMany({ where: { sewaId: { in: sewaIds } } });
+        await prisma.sewa.deleteMany({ where: { id: { in: sewaIds } } });
       }
-      await prisma.user.delete({ where: { email: "demo@zomet.my.id" } });
+      await prisma.penyewa.deleteMany({ where: { propertiId: oldProperti.id } });
+      await prisma.kamar.deleteMany({ where: { propertiId: oldProperti.id } });
+      await prisma.properti.delete({ where: { id: oldProperti.id } });
     }
 
-    // Seed
-    const user = await prisma.user.create({
-      data: { email: "demo@zomet.my.id", name: "Demo User", role: "ADMIN" }
-    });
-
+    // Create new demo properti
     const properti = await prisma.properti.create({
       data: {
         nama: "Demo Kos Sejahtera", tipe: "KOS",
