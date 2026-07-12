@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
+import { seedDemoData } from "@/app/lib/demo-seed";
 
+const prisma = new PrismaClient();
 const SECRET_PREFIX = "zrooms-demo-";
 
 export async function POST(request: NextRequest) {
@@ -14,89 +16,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 403 });
     }
 
-    // Add demo columns if missing
+    // Ensure demo columns exist
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3)`);
 
-    // Get or create demo user
-    let user = await prisma.user.findUnique({ where: { email: "demo@zomet.my.id" } });
-    if (!user) {
-      user = await prisma.user.create({
-        data: { email: "demo@zomet.my.id", name: "Demo User", role: "ADMIN" }
-      });
+    // Clean existing demo properti first
+    const existingDemo = await prisma.properti.findFirst({
+      where: { isDemo: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existingDemo) {
+      // Use resetDemoData from demo-seed
+      const { resetDemoData } = await import("@/app/lib/demo-seed");
+      await resetDemoData(existingDemo.id);
     }
 
-    // Clean existing demo properti
-    const oldProperti = await prisma.properti.findFirst({ where: { ownerId: user.id, isDemo: true } });
-    if (oldProperti) {
-      const sewaIds = (await prisma.sewa.findMany({ where: { propertiId: oldProperti.id }, select: { id: true } })).map(s => s.id);
-      if (sewaIds.length > 0) {
-        await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
-        await prisma.notifikasi.deleteMany({ where: { sewaId: { in: sewaIds } } });
-        await prisma.sewa.deleteMany({ where: { id: { in: sewaIds } } });
-      }
-      await prisma.penyewa.deleteMany({ where: { propertiId: oldProperti.id } });
-      await prisma.kamar.deleteMany({ where: { propertiId: oldProperti.id } });
-      await prisma.properti.delete({ where: { id: oldProperti.id } });
-    }
+    // Seed fresh demo data
+    const result = await seedDemoData();
 
-    // Create new demo properti
-    const properti = await prisma.properti.create({
-      data: {
-        nama: "Demo Kos Sejahtera", tipe: "KOS",
-        alamat: "Jln. Merdeka No. 123", kota: "Pontianak",
-        provinsi: "Kalimantan Barat",
-        deskripsi: "Kos berkualitas dengan fasilitas lengkap untuk demo",
-        fasilitas: ["WiFi", "Parkir Gratis", "Kamar Mandi Dalam", "AC"],
-        aktif: true, isDemo: true,
-        demoExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
-        ownerId: user.id,
-      }
+    return NextResponse.json({
+      success: true,
+      properti: { id: result.propertiId },
+      data: result,
     });
-
-    const kamarData = [
-      { nama: "Kamar A1", tipe: "Standar", harga: 1000000, kapasitas: 1, luas: "3x4", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja"] },
-      { nama: "Kamar A2", tipe: "Standar", harga: 1000000, kapasitas: 1, luas: "3x4", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja"] },
-      { nama: "Kamar B1", tipe: "Deluxe", harga: 1200000, kapasitas: 1, luas: "4x4", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja", "TV"] },
-      { nama: "Kamar B2", tipe: "Deluxe", harga: 1200000, kapasitas: 1, luas: "4x4", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja", "TV"] },
-      { nama: "Kamar VIP", tipe: "VIP", harga: 1500000, kapasitas: 2, luas: "5x5", status: "TERSEDIA", fasilitas: ["Kasur", "Lemari", "Meja", "TV", "AC", "Sofa"] },
-    ];
-    const kamars: string[] = [];
-    for (const k of kamarData) {
-      const kamar = await prisma.kamar.create({ data: { ...k, propertiId: properti.id } });
-      kamars.push(kamar.id);
-    }
-
-    const penyewa1 = await prisma.penyewa.create({
-      data: { nama: "Budi Santoso", noTelp: "081234567890", email: "budi@mail.com", alamat: "Jln. Ahmad Yani", propertiId: properti.id }
-    });
-    const penyewa2 = await prisma.penyewa.create({
-      data: { nama: "Siti Nurhaliza", noTelp: "081234567891", email: "siti@mail.com", alamat: "Jln. Diponegoro", propertiId: properti.id }
-    });
-
-    const sewa1 = await prisma.sewa.create({
-      data: { penyewaId: penyewa1.id, kamarId: kamars[0], propertiId: properti.id, tglMasuk: new Date("2026-07-01"), tglKeluar: new Date("2026-08-01"), status: "AKTIF", biayaSewa: 1000000, deposit: 500000 }
-    });
-    const sewa2 = await prisma.sewa.create({
-      data: { penyewaId: penyewa2.id, kamarId: kamars[2], propertiId: properti.id, tglMasuk: new Date("2026-07-05"), tglKeluar: new Date("2026-08-05"), status: "AKTIF", biayaSewa: 1200000, deposit: 600000 }
-    });
-    const sewa3 = await prisma.sewa.create({
-      data: { penyewaId: penyewa1.id, kamarId: kamars[1], propertiId: properti.id, tglMasuk: new Date("2026-08-01"), tglKeluar: new Date("2026-09-01"), status: "PENDING", biayaSewa: 1000000, deposit: 500000 }
-    });
-
-    await prisma.tagihan.createMany({
-      data: [
-        { sewaId: sewa1.id, propertiId: properti.id, bulan: 7, tahun: 2026, jumlah: 1000000, status: "LUNAS", tglJatuhTempo: new Date("2026-07-10"), tglBayar: new Date("2026-07-08"), denda: 0 },
-        { sewaId: sewa2.id, propertiId: properti.id, bulan: 8, tahun: 2026, jumlah: 1200000, status: "BELUM_BAYAR", tglJatuhTempo: new Date("2026-08-10"), denda: 0 },
-        { sewaId: sewa1.id, propertiId: properti.id, bulan: 8, tahun: 2026, jumlah: 1000000, status: "BELUM_BAYAR", tglJatuhTempo: new Date("2026-08-10"), denda: 0 },
-        { sewaId: sewa3.id, propertiId: properti.id, bulan: 8, tahun: 2026, jumlah: 1000000, status: "BELUM_BAYAR", tglJatuhTempo: new Date("2026-08-10"), denda: 0 },
-        { sewaId: sewa2.id, propertiId: properti.id, bulan: 7, tahun: 2026, jumlah: 1200000, status: "LUNAS", tglJatuhTempo: new Date("2026-07-10"), tglBayar: new Date("2026-07-09"), denda: 0 },
-      ]
-    });
-
-    return NextResponse.json({ success: true, properti: { id: properti.id, nama: properti.nama } });
   } catch (error: any) {
     console.error("Demo setup error:", error);
-    return NextResponse.json({ error: "Failed: " + String(error?.message || error) }, { status: 500 });
+    return NextResponse.json(
+      { error: "Setup failed", detail: String(error?.message || error) },
+      { status: 500 }
+    );
   }
 }

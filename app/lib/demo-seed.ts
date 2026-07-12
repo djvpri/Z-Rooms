@@ -287,66 +287,43 @@ export async function seedDemoData(): Promise<SeedResult> {
 }
 
 export async function resetDemoData(propertiId: string): Promise<void> {
-  // Delete all related data
+  // Get all kamar IDs for this properti
   const kamarIds = (await prisma.kamar.findMany({ where: { propertiId } })).map((k) => k.id);
 
   if (kamarIds.length > 0) {
-    // Delete pembayaran
-    await prisma.pembayaran.deleteMany({
-      where: {
-        tagihan: {
-          sewa: {
-            kamarId: {
-              in: kamarIds,
-            },
-          },
-        },
-      },
-    });
+    // Get all sewa IDs for cascade
+    const sewaIds = (await prisma.sewa.findMany({ where: { kamarId: { in: kamarIds } } })).map((s) => s.id);
 
-    // Delete tagihan
-    await prisma.tagihan.deleteMany({
-      where: {
-        sewa: {
-          kamarId: {
-            in: kamarIds,
-          },
-        },
-      },
-    });
+    if (sewaIds.length > 0) {
+      // Get all tagihan IDs
+      const tagihanIds = (await prisma.tagihan.findMany({ where: { sewaId: { in: sewaIds } } })).map((t) => t.id);
 
-    // Delete sewa
-    await prisma.sewa.deleteMany({
-      where: {
-        kamarId: {
-          in: kamarIds,
-        },
-      },
-    });
+      if (tagihanIds.length > 0) {
+        // 1. Delete pembayaran first
+        await prisma.pembayaran.deleteMany({ where: { tagihanId: { in: tagihanIds } } });
+      }
 
-    // Delete harga kamar
-    await prisma.hargaKamar.deleteMany({
-      where: {
-        kamarId: {
-          in: kamarIds,
-        },
-      },
-    });
+      // 2. Delete tagihan
+      await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
 
-    // Delete kamar
-    await prisma.kamar.deleteMany({
-      where: {
-        propertiId,
-      },
-    });
+      // 3. Delete sewa
+      await prisma.sewa.deleteMany({ where: { kamarId: { in: kamarIds } } });
+    }
+
+    // 4. Delete harga kamar
+    await prisma.hargaKamar.deleteMany({ where: { kamarId: { in: kamarIds } } });
+
+    // 5. Delete kamar
+    await prisma.kamar.deleteMany({ where: { propertiId } });
   }
 
-  // Reset properti demo fields
-  await prisma.properti.update({
-    where: { id: propertiId },
-    data: {
-      isDemo: false,
-      demoExpiresAt: null,
-    },
-  });
+  // 6. Delete pengeluaran linked to this properti
+  await prisma.pengeluaran.deleteMany({ where: { propertiId } });
+
+  // 7. Delete notifikasi linked to this properti
+  await prisma.notifikasi.deleteMany({ where: { propertiId } });
+
+  // 8. Remove properti as demo (set isDemo=false) — or delete it entirely
+  // Switch approach: delete properti and its owner user if it's demo-only
+  await prisma.properti.delete({ where: { id: propertiId } });
 }
