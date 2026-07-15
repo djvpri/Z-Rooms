@@ -293,7 +293,7 @@ export async function resetDemoData(propertiId: string): Promise<void> {
       select: { id: true, penyewaId: true },
     });
     const sewaIds = sewas.map((s) => s.id);
-    const penyewaIds = [...new Set(sewas.map((s) => s.penyewaId))];
+    const penyewaIds = Array.from(new Set(sewas.map((s) => s.penyewaId)));
 
     if (sewaIds.length > 0) {
       const tagihanIds = (await prisma.tagihan.findMany({ where: { sewaId: { in: sewaIds } } })).map((t) => t.id);
