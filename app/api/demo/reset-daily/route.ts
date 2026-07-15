@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { resetDemoData } from "@/app/lib/demo-seed";
+import { resetDemoData, seedDemoData } from "@/app/lib/demo-seed";
 
 const SECRET_PREFIX = "zrooms-demo-";
 
@@ -15,30 +15,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 403 });
     }
 
-    // Find expired demo properties
-    const expired = await prisma.properti.findMany({
-      where: {
-        isDemo: true,
-        demoExpiresAt: { lt: new Date() },
-      },
+    const demos = await prisma.properti.findMany({
+      where: { isDemo: true },
+      select: { id: true, nama: true },
     });
 
-    if (expired.length === 0) {
-      return NextResponse.json({ message: "No expired demo properties" });
-    }
-
-    // Reset each expired demo property
-    const results = [];
-    for (const properti of expired) {
+    const direset: string[] = [];
+    for (const properti of demos) {
       try {
         await resetDemoData(properti.id);
-        results.push({ id: properti.id, status: "reset" });
+        await seedDemoData();
+        direset.push(properti.nama);
       } catch (err: any) {
-        results.push({ id: properti.id, status: "error", detail: String(err?.message || err) });
+        console.error(`reset-daily error for ${properti.nama}:`, err);
       }
     }
 
-    return NextResponse.json({ reset: results.length, details: results });
+    return NextResponse.json({ ok: true, direset, total: demos.length });
   } catch (error: any) {
     console.error("reset-daily error:", error);
     return NextResponse.json(

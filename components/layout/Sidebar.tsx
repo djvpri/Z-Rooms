@@ -3,15 +3,19 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { cn, inisial } from '@/lib/utils'
-import { X, List as Menu, BoxArrowRight as LogOut } from 'react-bootstrap-icons'
+import {
+  X, List as Menu, BoxArrowRight as LogOut,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell,
+} from 'react-bootstrap-icons'
+import type { ComponentType } from 'react'
 
-const navItems = [
-  { href: '/dashboard',    label: 'Dashboard',   icon: '▦' },
-  { href: '/kamar',        label: 'Kamar',        icon: '⊞' },
-  { href: '/penyewa',      label: 'Penyewa',      icon: '👤' },
-  { href: '/booking',      label: 'Booking Baru', icon: '📅' },
-  { href: '/keuangan',     label: 'Keuangan',     icon: '💰' },
-  { href: '/notifikasi',   label: 'Notifikasi',   icon: '🔔' },
+const navItems: { href: string; label: string; Icon: ComponentType<{ className?: string }> }[] = [
+  { href: '/dashboard',    label: 'Dashboard',   Icon: Speedometer2 },
+  { href: '/kamar',        label: 'Kamar',       Icon: DoorOpen },
+  { href: '/penyewa',      label: 'Penyewa',     Icon: People },
+  { href: '/booking',      label: 'Booking Baru',Icon: CalendarPlus },
+  { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
+  { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
 ]
 
 export default function Sidebar({ user }: { user?: { name?: string | null; email?: string | null } }) {
@@ -46,7 +50,7 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             )}
           >
-            <span className="text-base leading-none">{item.icon}</span>
+            <item.Icon className="text-base shrink-0" />
             {item.label}
           </Link>
         ))}
@@ -93,7 +97,7 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
                 : 'text-gray-400 hover:text-gray-600'
             )}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
+            <item.Icon className="text-lg" />
             <span className="text-[10px] mt-0.5 truncate max-w-full">{item.label}</span>
           </Link>
         ))}

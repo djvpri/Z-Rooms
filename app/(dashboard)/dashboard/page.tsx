@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatRupiah, formatTanggal, statusKamarColor, statusKamarLabel } from '@/lib/utils'
 import { startOfMonth, endOfMonth } from 'date-fns'
+import DemoBanner from '@/components/demo/DemoBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
+      {properti.isDemo && <DemoBanner />}
+
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">{properti.nama}</h1>

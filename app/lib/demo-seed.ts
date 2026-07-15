@@ -1,4 +1,4 @@
-import { addHours } from "date-fns";
+import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
 
 interface SeedResult {
@@ -12,7 +12,7 @@ interface SeedResult {
 
 export async function seedDemoData(): Promise<SeedResult> {
   const demoEmail = "demo@zomet.my.id";
-  const demoExpiresAt = addHours(new Date(), 2);
+  const demoExpiresAt = addDays(new Date(), 30);
 
   // 1. Create or get demo user
   let user = await prisma.user.findUnique({
@@ -285,42 +285,34 @@ export async function seedDemoData(): Promise<SeedResult> {
 }
 
 export async function resetDemoData(propertiId: string): Promise<void> {
-  // Get all kamar IDs for this properti
   const kamarIds = (await prisma.kamar.findMany({ where: { propertiId } })).map((k) => k.id);
 
   if (kamarIds.length > 0) {
-    // Get all sewa IDs for cascade
-    const sewaIds = (await prisma.sewa.findMany({ where: { kamarId: { in: kamarIds } } })).map((s) => s.id);
+    const sewas = await prisma.sewa.findMany({
+      where: { kamarId: { in: kamarIds } },
+      select: { id: true, penyewaId: true },
+    });
+    const sewaIds = sewas.map((s) => s.id);
+    const penyewaIds = [...new Set(sewas.map((s) => s.penyewaId))];
 
     if (sewaIds.length > 0) {
-      // Get all tagihan IDs
       const tagihanIds = (await prisma.tagihan.findMany({ where: { sewaId: { in: sewaIds } } })).map((t) => t.id);
-
       if (tagihanIds.length > 0) {
-        // 1. Delete pembayaran first
         await prisma.pembayaran.deleteMany({ where: { tagihanId: { in: tagihanIds } } });
       }
-
-      // 2. Delete tagihan
       await prisma.tagihan.deleteMany({ where: { sewaId: { in: sewaIds } } });
-
-      // 3. Delete sewa
       await prisma.sewa.deleteMany({ where: { kamarId: { in: kamarIds } } });
     }
 
-    // 4. Delete harga kamar
-    await prisma.hargaKamar.deleteMany({ where: { kamarId: { in: kamarIds } } });
+    if (penyewaIds.length > 0) {
+      await prisma.penyewa.deleteMany({ where: { id: { in: penyewaIds } } });
+    }
 
-    // 5. Delete kamar
+    await prisma.hargaKamar.deleteMany({ where: { kamarId: { in: kamarIds } } });
     await prisma.kamar.deleteMany({ where: { propertiId } });
   }
 
-  // 6. Delete pengeluaran linked to this properti
   await prisma.pengeluaran.deleteMany({ where: { propertiId } });
-
-  // 7. Delete notifikasi linked to this properti
   await prisma.notifikasi.deleteMany({ where: { propertiId } });
-
-  // 8. Delete properti
   await prisma.properti.delete({ where: { id: propertiId } });
 }
