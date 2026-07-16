@@ -2,7 +2,15 @@
 // app/(dashboard)/booking/page.tsx
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Printer } from 'react-bootstrap-icons'
 import { formatRupiah } from '@/lib/utils'
+
+type NotaBooking = {
+  nama: string; noHp: string; kamarNomor: string; kamarTipe: string
+  periodeSewa: string; tanggalMasuk: string; durasi: number
+  harga: number; deposit: number; sumber: string; catatan: string
+  tanggalCetak: string
+}
 
 type Kamar = {
   id: string
@@ -20,7 +28,7 @@ export default function BookingPage() {
   const router = useRouter()
   const [kamarList, setKamarList] = useState<Kamar[]>([])
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [nota, setNota] = useState<NotaBooking | null>(null)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'INDIVIDU' | 'PERUSAHAAN'>('INDIVIDU')
 
@@ -68,8 +76,20 @@ export default function BookingPage() {
         const data = await res.json()
         throw new Error(data.error?.message ?? 'Gagal menyimpan booking')
       }
-      setSuccess(true)
-      setTimeout(() => router.push('/dashboard'), 2000)
+      setNota({
+        nama: form.nama,
+        noHp: form.noHp,
+        kamarNomor: kamarDipilih?.nomor ?? '',
+        kamarTipe: kamarDipilih?.tipe ?? '',
+        periodeSewa: form.periodeSewa,
+        tanggalMasuk: form.tanggalMasuk,
+        durasi: Number(form.durasi),
+        harga: hargaNum,
+        deposit: Number(form.deposit) || hargaNum * 2,
+        sumber: form.sumber,
+        catatan: form.catatan,
+        tanggalCetak: new Date().toISOString(),
+      })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -77,18 +97,20 @@ export default function BookingPage() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="p-6 max-w-xl mx-auto text-center mt-20">
-        <div className="text-5xl mb-4">✅</div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Booking berhasil disimpan!</h2>
-        <p className="text-sm text-gray-500">Mengarahkan ke dashboard...</p>
-      </div>
-    )
-  }
+  const PERIODE_LABEL: Record<string, string> = { HARIAN: 'Harian', BULANAN: 'Bulanan', TAHUNAN: 'Tahunan' }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #nota-booking, #nota-booking * { visibility: visible !important; }
+          #nota-booking {
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100% !important; padding: 24px !important; background: white !important;
+          }
+        }
+      `}</style>
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Booking / Sewa Baru</h1>
         <p className="text-sm text-gray-400">Catat penyewa baru dan buat tagihan otomatis</p>
@@ -249,6 +271,109 @@ export default function BookingPage() {
           </button>
         </div>
       </form>
+
+      {/* Modal Nota Booking */}
+      {nota && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div id="nota-booking" className="p-6 font-mono text-sm">
+              <div className="text-center mb-4">
+                <div className="text-lg font-bold flex items-center justify-center gap-2">
+                  <i className="bi bi-house-door-fill text-teal-600" /> ZRooms
+                </div>
+                <div className="text-xs text-gray-500 mt-1">Sistem Manajemen Kos & Apartemen</div>
+                <div className="border-t border-dashed border-gray-300 my-3" />
+              </div>
+
+              <div className="text-center text-xs font-medium text-gray-600 mb-3">NOTA BOOKING SEWA</div>
+
+              <div className="space-y-1 text-xs mb-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tanggal</span>
+                  <span>{new Date(nota.tanggalCetak).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 my-3" />
+
+              <div className="space-y-1 text-xs mb-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Penyewa</span>
+                  <span className="font-semibold">{nota.nama}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">No. HP</span>
+                  <span>{nota.noHp}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Kamar</span>
+                  <span className="font-semibold">{nota.kamarNomor} ({nota.kamarTipe.toLowerCase()})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Periode</span>
+                  <span>{PERIODE_LABEL[nota.periodeSewa] ?? nota.periodeSewa}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tanggal Masuk</span>
+                  <span>{new Date(nota.tanggalMasuk).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Durasi</span>
+                  <span>{nota.durasi} {nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Sumber</span>
+                  <span>{nota.sumber.replace('_', ' ')}</span>
+                </div>
+                {nota.catatan && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Catatan</span>
+                    <span className="text-right max-w-[55%]">{nota.catatan}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 my-3" />
+
+              <div className="space-y-1 text-xs mb-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Harga Sewa</span>
+                  <span>{formatRupiah(nota.harga)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Deposit</span>
+                  <span>{formatRupiah(nota.deposit)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between font-bold text-sm mb-3 pt-1 border-t border-dashed border-gray-300">
+                <span>TOTAL BAYAR PERTAMA</span>
+                <span>{formatRupiah(nota.harga + nota.deposit)}</span>
+              </div>
+
+              <div className="border-t border-dashed border-gray-300 my-3" />
+              <div className="text-center text-xs text-gray-500">
+                <p>Selamat bergabung di properti kami!</p>
+                <p>Simpan nota ini sebagai bukti booking.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 pb-5">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+              >
+                <Printer size={14} /> Cetak
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+              >
+                Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

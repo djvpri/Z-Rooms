@@ -1,8 +1,9 @@
 // app/(dashboard)/keuangan/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { formatRupiah, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
+import { formatRupiah } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import TagihanTable from './TagihanTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -150,57 +151,20 @@ export default async function KeuanganPage() {
       </div>
 
       {/* Tabel tagihan bulan ini */}
-      <div className="card">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">Tagihan bulan {now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h2>
-
-        {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                {['Kamar', 'Penyewa', 'Nominal', 'Jatuh Tempo', 'Status', 'Metode'].map(h => (
-                  <th key={h} className="text-left py-2 text-xs font-medium text-gray-400">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tagihan.map(t => (
-                <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="py-2.5 font-medium text-gray-800">{t.sewa.kamar.nomor}</td>
-                  <td className="py-2.5 text-gray-600">{t.sewa.penyewa.nama}</td>
-                  <td className="py-2.5 text-gray-700 font-medium">{formatRupiah(t.nominal)}</td>
-                  <td className="py-2.5 text-gray-500 text-xs">{formatTanggal(t.jatuhTempo, { day: 'numeric', month: 'short' })}</td>
-                  <td className="py-2.5">
-                    <span className={`badge ${statusTagihanColor(t.status)}`}>{statusTagihanLabel(t.status)}</span>
-                  </td>
-                  <td className="py-2.5 text-gray-400 text-xs">
-                    {t.pembayaran[0]?.metodeBayar?.replace('_', ' ') ?? '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile cards */}
-        <div className="md:hidden space-y-2">
-          {tagihan.map(t => (
-            <div key={t.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <span className="font-medium text-gray-800 text-sm">Kamar {t.sewa.kamar.nomor}</span>
-                  <span className="text-gray-600 text-sm ml-2">{t.sewa.penyewa.nama}</span>
-                </div>
-                <span className={`badge text-[10px] shrink-0 ${statusTagihanColor(t.status)}`}>{statusTagihanLabel(t.status)}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>{formatRupiah(t.nominal)} · {formatTanggal(t.jatuhTempo, { day: 'numeric', month: 'short' })}</span>
-                <span>{t.pembayaran[0]?.metodeBayar?.replace('_', ' ') ?? '-'}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <TagihanTable
+        bulanLabel={now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+        tagihan={tagihan.map(t => ({
+          id: t.id,
+          nominal: Number(t.nominal),
+          jatuhTempo: t.jatuhTempo.toISOString(),
+          status: t.status,
+          sewa: {
+            kamar: { nomor: t.sewa.kamar.nomor },
+            penyewa: { nama: t.sewa.penyewa.nama },
+          },
+          pembayaran: t.pembayaran.map(p => ({ metodeBayar: p.metodeBayar ?? null })),
+        }))}
+      />
     </div>
   )
 }
