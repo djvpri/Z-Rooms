@@ -73,8 +73,11 @@ export default function BookingPage() {
         }),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error?.message ?? 'Gagal menyimpan booking')
+        const data = await res.json().catch(() => ({}))
+        const msg = typeof data.error === 'string'
+          ? data.error
+          : data.error?.message ?? data.message ?? `Error ${res.status}`
+        throw new Error(msg)
       }
       setNota({
         nama: form.nama,

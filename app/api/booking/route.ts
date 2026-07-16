@@ -66,7 +66,9 @@ export async function POST(req: NextRequest) {
       })
 
   // Transaksi: buat sewa + update status kamar + buat tagihan
-  const result = await prisma.$transaction(async (tx) => {
+  let result
+  try {
+  result = await prisma.$transaction(async (tx) => {
     const sewa = await tx.sewa.create({
       data: {
         kamarId: d.kamarId,
@@ -114,6 +116,10 @@ export async function POST(req: NextRequest) {
 
     return { sewa, tagihan }
   })
+  } catch (err: any) {
+    console.error('[booking] transaction error:', err)
+    return NextResponse.json({ error: err?.message ?? 'Terjadi kesalahan server' }, { status: 500 })
+  }
 
   return NextResponse.json(result, { status: 201 })
 }
