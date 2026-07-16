@@ -74,9 +74,15 @@ export default function BookingPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        const msg = typeof data.error === 'string'
-          ? data.error
-          : data.error?.message ?? data.message ?? `Error ${res.status}`
+        let msg: string
+        if (typeof data.error === 'string') {
+          msg = data.error
+        } else if (data.error?.fieldErrors) {
+          const fields = Object.entries(data.error.fieldErrors as Record<string, string[]>)
+          msg = fields.map(([k, v]) => `${k}: ${v[0]}`).join(', ')
+        } else {
+          msg = data.error?.message ?? data.message ?? `Booking gagal (${res.status})`
+        }
         throw new Error(msg)
       }
       setNota({
