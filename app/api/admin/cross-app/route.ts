@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       tenants: properti.map((p: typeof properti[number]) => ({
         id: p.id,
-        name: `${p.nama} (${p.tipe}, ${p.kota})`,
+        name: p.nama,
         plan: 'pro',
         active: p.aktif,
         expires_at: null,
