@@ -159,6 +159,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, reactivated: true })
     }
 
+    if (action === 'updateRole') {
+      const role = String(data?.role || '').trim().toUpperCase()
+      const valid = ['USER', 'ADMIN', 'MANAGER']
+      if (!valid.includes(role)) {
+        return NextResponse.json(
+          { error: `role "${data?.role}" tidak dikenal. Pilihan: ${valid.join(', ')}` },
+          { status: 400 },
+        )
+      }
+      const targetEmail = String(data?.email || email || '').trim()
+      if (!targetEmail) return NextResponse.json({ error: 'email wajib diisi' }, { status: 400 })
+      const result = await prisma.user.updateMany({ where: { email: targetEmail }, data: { role: role as any } })
+      if (!result.count) return NextResponse.json({ error: `User "${targetEmail}" tidak terdaftar di ZXRoom` }, { status: 404 })
+      return NextResponse.json({ success: true, role })
+    }
+
     // Tetap dukung action lama (create, updateRole, toggleActive, resetPassword, list)
     // biar kode lain yang sudah pakai endpoint ini tidak rusak
     if (action === 'list') {
