@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
     })
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: {
+        id: true, name: true, email: true, role: true, isActive: true,
+        properti: { select: { id: true }, where: { aktif: true }, take: 1, orderBy: { createdAt: 'desc' } },
+      },
     })
     return NextResponse.json({
       tenants: properti.map((p: typeof properti[number]) => ({
@@ -38,6 +41,7 @@ export async function GET(req: NextRequest) {
       })),
       users: users.map((u: typeof users[number]) => ({
         id: u.id, name: u.name, email: u.email, role: u.role, active: u.isActive,
+        tenantId: u.properti[0]?.id ?? null,
       })),
     })
   } catch (err) {
