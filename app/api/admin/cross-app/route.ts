@@ -58,11 +58,21 @@ export async function POST(req: NextRequest) {
       if (!nama) return NextResponse.json({ error: 'name wajib diisi' }, { status: 400 })
       // Owner properti: pakai ownerEmail kalau dikirim (mis. provisioning demo —
       // demo jadi PEMILIK propertinya sendiri, terisolasi), selain itu ADMIN pertama.
-      let owner = data?.ownerEmail
-        ? await prisma.user.findUnique({ where: { email: String(data.ownerEmail).trim() } })
+      // Hub ZOne mengirim email admin hanya di field top-level `email` (bukan
+      // data.ownerEmail), jadi pakai itu sebagai fallback.
+      const ownerEmail = String(data?.ownerEmail || email || '').trim()
+      let owner = ownerEmail
+        ? await prisma.user.findUnique({ where: { email: ownerEmail } })
         : null
       if (!owner) owner = await prisma.user.findFirst({ where: { role: 'ADMIN' } })
-      if (!owner) return NextResponse.json({ error: 'Tidak ada owner (ownerEmail/ADMIN)' }, { status: 400 })
+      if (!owner) {
+        const total = await prisma.user.count()
+        return NextResponse.json({
+          error: ownerEmail
+            ? `Email owner "${ownerEmail}" tidak terdaftar di ZXRoom dan tidak ada user ADMIN. Tambahkan user tersebut dulu, atau jadikan salah satu user ZXRoom sebagai ADMIN.`
+            : `Tidak ada owner: permintaan tidak menyertakan email owner dan ZXRoom belum punya user ADMIN (total user: ${total}). Set user pertama jadi ADMIN, atau kirim ownerEmail yang terdaftar.`,
+        }, { status: 400 })
+      }
       // Idempotent: jangan bikin properti ganda dgn nama sama untuk owner yang sama
       const existing = await prisma.properti.findFirst({ where: { nama, ownerId: owner.id } })
       if (existing) return NextResponse.json({ success: true, tenant: { id: existing.id, name: existing.nama } })
