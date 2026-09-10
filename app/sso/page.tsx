@@ -10,13 +10,13 @@ function SsoContent() {
   const [msg, setMsg] = useState('')
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setMsg('Token tidak ditemukan. Buka ZRooms lewat Z One lagi.'); return }
+    if (!token) { setStatus('error'); setMsg('Token tidak ditemukan. Buka ZXRoom lewat Z One lagi.'); return }
     signIn('credentials', { ssoToken: token, email: '', password: '', redirect: false })
       .then(res => {
         if (res?.ok) window.location.replace('/dashboard')
-        else { setStatus('error'); setMsg('Login SSO gagal. Pastikan akun terdaftar di ZRooms.') }
+        else { setStatus('error'); setMsg('Login SSO gagal. Pastikan akun terdaftar di ZXRoom.') }
       })
-      .catch(() => { setStatus('error'); setMsg('Tidak dapat terhubung ke server ZRooms') })
+      .catch(() => { setStatus('error'); setMsg('Tidak dapat terhubung ke server ZXRoom') })
   }, [token])
 
   return (

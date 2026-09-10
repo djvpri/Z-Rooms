@@ -4,7 +4,7 @@ import './globals.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 
 export const metadata: Metadata = {
-  title: 'Z-Rooms — Manajemen Properti Sewa',
+  title: 'ZXRoom — Manajemen Properti Sewa',
   description: 'Kelola kos, kontrakan, dan hotel Anda dengan mudah',
 }
 

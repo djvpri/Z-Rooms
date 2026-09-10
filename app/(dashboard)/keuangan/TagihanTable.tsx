@@ -109,7 +109,7 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
             <div id="nota-tagihan" className="p-6 font-mono text-sm">
               <div className="text-center mb-4">
                 <div className="text-lg font-bold flex items-center justify-center gap-2">
-                  <i className="bi bi-house-door-fill text-teal-600" /> ZRooms
+                  <i className="bi bi-house-door-fill text-teal-600" /> ZXRoom
                 </div>
                 <div className="text-xs text-gray-500 mt-1">Sistem Manajemen Kos & Apartemen</div>
                 <div className="border-t border-dashed border-gray-300 my-3" />

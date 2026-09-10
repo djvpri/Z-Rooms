@@ -13,7 +13,7 @@ export default function LandingPage() {
             <div className="w-9 h-9 bg-teal-600 rounded-lg flex items-center justify-center">
               <Building className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-semibold text-gray-900">Z-Rooms</span>
+            <span className="text-xl font-semibold text-gray-900">ZXRoom</span>
           </div>
           <Link href="/login" className="btn btn-primary">
             Masuk
@@ -239,7 +239,7 @@ export default function LandingPage() {
                   <span className="text-gray-700">SLA guarantee</span>
                 </li>
               </ul>
-              <a href="https://wa.me/6285752700818?text=Halo,%20saya%20tertarik%20dengan%20paket%20Enterprise%20Z-Rooms" 
+              <a href="https://wa.me/6285752700818?text=Halo,%20saya%20tertarik%20dengan%20paket%20Enterprise%20ZXRoom" 
                  className="btn bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 w-full justify-center"
                  target="_blank" rel="noopener noreferrer">
                 Hubungi Kami
@@ -256,7 +256,7 @@ export default function LandingPage() {
             Siap Tingkatkan Bisnis Properti Anda?
           </h2>
           <p className="text-teal-100 text-lg mb-8">
-            Bergabung dengan ratusan pemilik properti yang sudah mempercayai Z-Rooms
+            Bergabung dengan ratusan pemilik properti yang sudah mempercayai ZXRoom
           </p>
           <Link href="/login" className="btn bg-white text-teal-600 hover:bg-gray-50 text-lg px-8 py-3">
             Mulai Gratis Sekarang →
@@ -267,7 +267,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-gray-100 py-8">
         <div className="max-w-6xl mx-auto px-4 text-center text-gray-600 text-sm">
-          <p>© 2026 Z-Rooms. Sistem Manajemen Properti Sewa Modern.</p>
+          <p>© 2026 ZXRoom. Sistem Manajemen Properti Sewa Modern.</p>
           <p className="mt-2">
             <a href="https://wa.me/6285752700818" target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">
               Hubungi Kami
