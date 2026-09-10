@@ -54,7 +54,16 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">{properti.nama}</h1>
-        <p className="text-sm text-gray-400">{properti.alamat}, {properti.kota} · {formatTanggal(now)}</p>
+        <p className="text-sm text-gray-400">
+          {(() => {
+            // 'alamat, kota' sering kosong / '-' → jangan tampilkan placeholder
+            const lokasi = [properti.alamat, properti.kota]
+              .map((v) => (v || '').trim())
+              .filter((v) => v && v !== '-')
+              .join(', ')
+            return [lokasi, formatTanggal(now)].filter(Boolean).join(' · ')
+          })()}
+        </p>
       </div>
 
       {/* Stat cards */}
