@@ -97,6 +97,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, reactivated: true })
     }
 
+    // Pindah user ke properti (tenant) lain. Di Z-Rooms relasinya lewat
+    // Properti.ownerId (satu properti satu owner), bukan kolom tenantId di User —
+    // jadi "pindah" = ganti owner properti tujuan.
+    if (action === 'moveTenant') {
+      const userId = data?.userId
+      const id = data?.tenantId
+      if (!id) return NextResponse.json({ error: 'tenantId wajib diisi' }, { status: 400 })
+      const properti = await prisma.properti.findUnique({ where: { id }, select: { nama: true } })
+      if (!properti) return NextResponse.json({ error: `Properti dengan id "${id}" tidak ditemukan` }, { status: 404 })
+      const target = userId
+        ? await prisma.user.findUnique({ where: { id: String(userId) }, select: { id: true, name: true, email: true } })
+        : email
+          ? await prisma.user.findUnique({ where: { email: String(email).trim() }, select: { id: true, name: true, email: true } })
+          : null
+      if (!target) {
+        return NextResponse.json({ error: `User "${userId || email}" tidak terdaftar di ZXRoom` }, { status: 404 })
+      }
+      await prisma.properti.update({ where: { id }, data: { ownerId: target.id } })
+      return NextResponse.json({ success: true, moved: true, tenant: { id, name: properti.nama }, owner: target.email })
+    }
+
     if (action === 'updatePlan') {
       // Z-Rooms tidak punya plan tier — abaikan, kembalikan success biar UI tidak error
       return NextResponse.json({ success: true, note: 'Z-Rooms tidak menggunakan plan tier' })
