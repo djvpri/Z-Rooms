@@ -2,7 +2,7 @@
 // app/(dashboard)/booking/page.tsx
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Printer } from 'react-bootstrap-icons'
+import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
 import { formatRupiah } from '@/lib/utils'
 
 type NotaBooking = {
@@ -137,7 +137,10 @@ export default function BookingPage() {
                 activeTab === t ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
               }`}
             >
-              {t === 'INDIVIDU' ? '👤 Individu' : '🏢 Perusahaan / Instansi'}
+              <span className="inline-flex items-center gap-1.5">
+                {t === 'INDIVIDU' ? <PersonFill aria-hidden="true" /> : <BuildingFill aria-hidden="true" />}
+                {t === 'INDIVIDU' ? 'Individu' : 'Perusahaan / Instansi'}
+              </span>
             </button>
           ))}
         </div>
@@ -276,7 +279,7 @@ export default function BookingPage() {
         <div className="flex gap-3 justify-end">
           <button type="button" onClick={() => router.back()} className="btn btn-ghost">Batal</button>
           <button type="submit" disabled={loading} className="btn btn-primary">
-            {loading ? 'Menyimpan...' : '💾 Simpan Booking'}
+            {loading ? 'Menyimpan...' : (<><FloppyFill aria-hidden="true" /> Simpan Booking</>)}
           </button>
         </div>
       </form>

@@ -71,7 +71,9 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="w-full text-left text-xs text-gray-400 hover:text-coral-600 px-1 py-1 transition-colors"
         >
-          Keluar →
+          <span className="inline-flex items-center gap-1.5">
+            <LogOut size={12} aria-hidden="true" /> Keluar
+          </span>
         </button>
       </div>
     </aside>

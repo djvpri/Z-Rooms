@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Camera, Envelope, CheckCircleFill } from 'react-bootstrap-icons'
+import { Camera, Envelope, CheckCircleFill, XCircleFill } from 'react-bootstrap-icons'
 
 export default function QRApproveClient() {
   const searchParams = useSearchParams()
@@ -60,7 +60,10 @@ export default function QRApproveClient() {
 
   if (!sessionId) return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white flex items-center justify-center px-4">
-      <div className="card text-center max-w-sm"><p className="text-red-600">❌ QR code tidak valid. Silakan scan ulang.</p></div>
+      <div className="card text-center max-w-sm">
+        <XCircleFill className="w-12 h-12 text-red-600 mx-auto mb-3" aria-hidden="true" />
+        <p className="text-red-600">QR code tidak valid. Silakan scan ulang.</p>
+      </div>
     </div>
   )
 

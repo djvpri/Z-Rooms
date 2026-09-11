@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
-import { Envelope, Camera, QrCodeScan } from 'react-bootstrap-icons'
+import { Envelope, Camera, QrCodeScan, Phone } from 'react-bootstrap-icons'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -299,8 +299,8 @@ export default function LoginPage() {
               <div className="bg-white border-4 border-teal-600 rounded-lg p-4 inline-block mb-4">
                 <canvas ref={canvasRef} />
               </div>
-              <p className="text-sm text-gray-600 mb-2">
-                📱 Scan QR code dengan HP Anda
+              <p className="text-sm text-gray-600 mb-2 inline-flex items-center gap-1.5">
+                <Phone aria-hidden="true" /> Scan QR code dengan HP Anda
               </p>
               <p className="text-xs text-gray-500">
                 Waiting for approval...

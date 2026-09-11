@@ -71,3 +71,30 @@ export function periodeSewaSingkat(p: string) {
   }
   return map[p] ?? p
 }
+
+// Warna tingkat hunian: hijau hanya bila benar-benar terisi. Hunian rendah =
+// kondisi perlu perhatian, jadi jangan diberi warna "sukses" (menyesatkan).
+export function hunianWarna(pct: number) {
+  if (pct >= 70) return 'text-teal-600'
+  if (pct >= 40) return 'text-amber-400'
+  return 'text-coral-600'
+}
+
+export function hunianBarWarna(pct: number) {
+  if (pct >= 70) return 'bg-teal-500'
+  if (pct >= 40) return 'bg-amber-400'
+  return 'bg-coral-400'
+}
+
+// "2 jam lalu" ala beranda — lebih cepat dibaca dari tanggal penuh.
+export function waktuRelatif(date: Date | string) {
+  const detik = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (detik < 60) return 'baru saja'
+  const menit = Math.floor(detik / 60)
+  if (menit < 60) return `${menit} menit lalu`
+  const jam = Math.floor(menit / 60)
+  if (jam < 24) return `${jam} jam lalu`
+  const hari = Math.floor(jam / 24)
+  if (hari < 30) return `${hari} hari lalu`
+  return formatTanggal(date, { day: 'numeric', month: 'short' })
+}

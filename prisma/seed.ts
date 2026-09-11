@@ -8,7 +8,7 @@ import { addDays, subDays, startOfMonth, endOfMonth } from 'date-fns'
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Seeding Z-Rooms database...')
+  console.log('Seeding Z-Rooms database...')
 
   // ── User pemilik
   const hash = await bcrypt.hash('admin123', 12)
@@ -23,7 +23,7 @@ async function main() {
       isActive: true,
     },
   })
-  console.log('✅ User:', user.email)
+  console.log('User:', user.email)
 
   // ── Properti
   const properti = await prisma.properti.upsert({
@@ -41,7 +41,7 @@ async function main() {
       ownerId: user.id,
     },
   })
-  console.log('✅ Properti:', properti.nama)
+  console.log('Properti:', properti.nama)
 
   // ── 20 Kamar
   const tipeKamar: { tipe: TipeKamar; hariann: number; bulanan: number; tahunan: number }[] = [
@@ -103,7 +103,7 @@ async function main() {
     })
     kamarMap[k.nomor] = kamar.id
   }
-  console.log('✅ 20 Kamar dibuat')
+  console.log('20 Kamar dibuat')
 
   // ── Penyewa
   const penyewaList = [
@@ -140,7 +140,7 @@ async function main() {
     })
     penyewaIds.push(penyewa.id)
   }
-  console.log('✅ 14 Penyewa dibuat')
+  console.log('14 Penyewa dibuat')
 
   // ── Sewa aktif (kamar terisi)
   const now = new Date()
@@ -218,7 +218,7 @@ async function main() {
       }
     }
   }
-  console.log('✅ Sewa & Tagihan dibuat')
+  console.log('Sewa & Tagihan dibuat')
 
   // ── Pengeluaran bulan ini
   const pengeluaranList = [
@@ -240,7 +240,7 @@ async function main() {
       },
     })
   }
-  console.log('✅ Pengeluaran dibuat')
+  console.log('Pengeluaran dibuat')
 
   // ── Notifikasi
   const notifList = [
@@ -255,9 +255,9 @@ async function main() {
       data: { propertiId: properti.id, ...n },
     })
   }
-  console.log('✅ Notifikasi dibuat')
+  console.log('Notifikasi dibuat')
 
-  console.log('\n🎉 Seed selesai!')
+  console.log('\nSeed selesai!')
   console.log('   Login: admin@nusasewa.id / admin123')
 }
 

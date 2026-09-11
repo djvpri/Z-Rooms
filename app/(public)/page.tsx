@@ -1,7 +1,7 @@
 // app/(public)/page.tsx
 'use client'
 import Link from 'next/link'
-import { Building, People, GraphUpArrow, ShieldCheck, ClockFill, BarChartLine, CheckCircleFill } from 'react-bootstrap-icons'
+import { Building, People, GraphUpArrow, ShieldCheck, ClockFill, BarChartLine, CheckCircleFill, RocketTakeoff, ArrowRight } from 'react-bootstrap-icons'
 
 export default function LandingPage() {
   return (
@@ -24,7 +24,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 py-20 text-center">
         <div className="inline-block px-4 py-1.5 bg-teal-50 text-teal-700 text-sm font-medium rounded-full mb-6">
-          🚀 Sistem Manajemen Properti Modern
+          <RocketTakeoff className="inline mr-1.5 -mt-0.5" size={14} aria-hidden="true" />Sistem Manajemen Properti Modern
         </div>
         <h1 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
           Kelola Kos, Kontrakan & Hotel<br/>
@@ -259,7 +259,7 @@ export default function LandingPage() {
             Bergabung dengan ratusan pemilik properti yang sudah mempercayai ZXRoom
           </p>
           <Link href="/login" className="btn bg-white text-teal-600 hover:bg-gray-50 text-lg px-8 py-3">
-            Mulai Gratis Sekarang →
+            Mulai Gratis Sekarang <ArrowRight className="inline ml-1 -mt-0.5" size={18} aria-hidden="true" />
           </Link>
         </div>
       </section>

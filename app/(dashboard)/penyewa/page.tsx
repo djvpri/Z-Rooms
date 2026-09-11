@@ -2,6 +2,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
+import { ArrowRight } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,7 +71,7 @@ export default async function PenyewaPage() {
                   <span>{formatRupiah(s.hargaSewa)}</span>
                 </div>
                 <div className="mt-1 text-xs text-gray-400">
-                  {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} →{' '}
+                  {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} <ArrowRight className="inline" size={10} aria-hidden="true" />{' '}
                   {formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               </div>
@@ -165,7 +166,7 @@ export default async function PenyewaPage() {
                   Kamar <span className="font-medium text-gray-700">{s.kamar.nomor}</span> · {s.periodeSewa.toLowerCase()} · {formatRupiah(s.hargaSewa)}
                 </div>
                 <div className="text-xs text-gray-400 ml-8 mt-0.5">
-                  {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} → {formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} <ArrowRight className="inline" size={10} aria-hidden="true" /> {formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })}
                   <span className={`badge text-[10px] ml-2 ${sumberBadge[s.sumber] ?? 'bg-gray-100 text-gray-500'}`}>
                     {s.sumber === 'LANGSUNG' ? 'Langsung' : s.sumber.replace('_', ' ')}
                   </span>

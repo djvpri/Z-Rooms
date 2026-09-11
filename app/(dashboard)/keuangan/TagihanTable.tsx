@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Printer } from 'react-bootstrap-icons'
+import { Printer, CheckLg } from 'react-bootstrap-icons'
 import { formatRupiah, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 
 export type TagihanRow = {
@@ -151,7 +151,7 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
 
               {printTagihan.status === 'LUNAS' && (
                 <div className="border border-teal-400 rounded text-center text-teal-600 font-bold text-xs py-1 mb-3 tracking-widest">
-                  ✓ LUNAS
+                  <CheckLg className="inline mr-1" aria-hidden="true" />LUNAS
                 </div>
               )}
 

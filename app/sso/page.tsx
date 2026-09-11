@@ -2,6 +2,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
+import { XCircleFill, ArrowLeft } from 'react-bootstrap-icons'
 
 function SsoContent() {
   const searchParams = useSearchParams()
@@ -29,10 +30,12 @@ function SsoContent() {
           </>
         ) : (
           <>
-            <div className="text-4xl mb-4">❌</div>
+            <XCircleFill className="w-10 h-10 text-red-400 mx-auto mb-4" aria-hidden="true" />
             <p className="text-red-400 font-medium mb-2">Gagal Login</p>
             <p className="text-slate-500 text-sm mb-4">{msg}</p>
-            <a href="https://zone.zomet.my.id" className="text-blue-400 text-sm underline">Kembali ke Z One</a>
+            <a href="https://zone.zomet.my.id" className="text-blue-400 text-sm underline inline-flex items-center gap-1">
+              <ArrowLeft size={12} aria-hidden="true" /> Kembali ke Z One
+            </a>
           </>
         )}
       </div>
