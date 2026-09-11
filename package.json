@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack",
     "start": "prisma db push --accept-data-loss && prisma generate && next start",
-    "lint": "next lint",
     "postinstall": "prisma generate",
     "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}}catch(e){console.log('ℹ️ Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
     "prisma:migrate": "prisma migrate dev",
@@ -14,7 +13,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.4.1",
+    "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^5.14.0",
     "@types/qrcode": "^1.5.6",
     "autoprefixer": "^10.5.0",
@@ -23,8 +22,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "jsonwebtoken": "^9.0.3",
-    "next": "^14.2.35",
-    "next-auth": "^5.0.0-beta.19",
+    "next": "^16.3.4",
+    "next-auth": "^5.0.0-beta.32",
     "postcss": "^8.5.15",
     "qrcode": "^1.5.4",
     "react": "^18",
