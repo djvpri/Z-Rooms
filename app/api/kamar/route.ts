@@ -60,6 +60,19 @@ export async function POST(req: NextRequest) {
 
   const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, ...kamarData } = parsed.data
 
+  // Nomor kamar unik per properti (@@unique([propertiId, nomor])). Cek dulu supaya
+  // klien dapat pesan 409 yang terbaca, bukan 500 mentah dari Prisma.
+  const duplikat = await prisma.kamar.findFirst({
+    where: { propertiId: properti.id, nomor: kamarData.nomor },
+    select: { nomor: true },
+  })
+  if (duplikat) {
+    return NextResponse.json(
+      { error: { message: `Kamar ${kamarData.nomor} sudah terdaftar di properti ini.` } },
+      { status: 409 },
+    )
+  }
+
   const kamar = await prisma.kamar.create({
     data: {
       ...kamarData,
