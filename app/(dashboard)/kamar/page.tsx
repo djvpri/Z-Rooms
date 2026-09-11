@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { formatRupiah, statusKamarColor, statusKamarLabel } from '@/lib/utils'
 import Link from 'next/link'
+import KamarTambahModal from '@/components/kamar/KamarTambahModal'
+import { DoorClosedFill } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +44,10 @@ export default async function KamarPage() {
           <h1 className="text-lg font-semibold text-gray-900">Kamar</h1>
           <p className="text-sm text-gray-400">{kamar.length} kamar terdaftar</p>
         </div>
-        <Link href="/booking" className="btn btn-primary">+ Booking baru</Link>
+        <div className="flex items-center gap-2">
+          <KamarTambahModal />
+          <Link href="/booking" className="btn btn-ghost">Booking baru</Link>
+        </div>
       </div>
 
       {/* Legenda */}
@@ -61,6 +66,13 @@ export default async function KamarPage() {
       </div>
 
       {/* Grid kamar */}
+      {kamar.length === 0 ? (
+        <div className="card text-center py-14 mb-8">
+          <DoorClosedFill className="text-4xl text-gray-300 mx-auto mb-3" aria-hidden="true" />
+          <h2 className="text-sm font-semibold text-gray-900">Belum ada kamar</h2>
+          <p className="text-sm text-gray-500 mt-1">Tambahkan kamar pertama untuk mulai mencatat penyewa dan tagihan.</p>
+        </div>
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
           const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
@@ -84,6 +96,7 @@ export default async function KamarPage() {
           )
         })}
       </div>
+      )}
 
       {/* Tabel detail */}
       <div className="card">
