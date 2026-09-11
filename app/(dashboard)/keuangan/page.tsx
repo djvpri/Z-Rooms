@@ -1,7 +1,7 @@
 // app/(dashboard)/keuangan/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, namaPenyewa } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import TagihanTable from './TagihanTable'
 
@@ -160,7 +160,7 @@ export default async function KeuanganPage() {
           status: t.status,
           sewa: {
             kamar: { nomor: t.sewa.kamar.nomor },
-            penyewa: { nama: t.sewa.penyewa.nama },
+            penyewa: { nama: namaPenyewa(t.sewa.penyewa.nama) },
           },
           pembayaran: t.pembayaran.map(p => ({ metodeBayar: p.metodeBayar ?? null })),
         }))}

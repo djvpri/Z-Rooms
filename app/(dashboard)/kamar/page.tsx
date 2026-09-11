@@ -1,7 +1,7 @@
 // app/(dashboard)/kamar/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { formatRupiah, statusKamarColor, statusKamarLabel } from '@/lib/utils'
+import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa } from '@/lib/utils'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import { DoorClosedFill } from 'react-bootstrap-icons'
@@ -90,7 +90,7 @@ export default async function KamarPage() {
                 </p>
               )}
               <p className="text-xs mt-1 opacity-60 truncate">
-                {penyewa ? penyewa.nama : 'Kosong'}
+                {penyewa ? namaPenyewa(penyewa.nama) : 'Kosong'}
               </p>
             </div>
           )
@@ -129,7 +129,7 @@ export default async function KamarPage() {
                     <td className="py-2.5">
                       <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
                     </td>
-                    <td className="py-2.5 text-gray-600">{penyewa?.nama ?? '-'}</td>
+                    <td className="py-2.5 text-gray-600">{penyewa ? namaPenyewa(penyewa.nama) : '-'}</td>
                     <td className="py-2.5 text-gray-400 text-xs">{k.fasilitas.slice(0, 3).join(', ')}{k.fasilitas.length > 3 ? '…' : ''}</td>
                   </tr>
                 )
@@ -155,7 +155,7 @@ export default async function KamarPage() {
                     {hargaBulanan ? ` · ${formatRupiah(hargaBulanan.harga)}/bln` : ''}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
-                    {penyewa?.nama ?? '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
+                    {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
                   </div>
                 </div>
               </div>

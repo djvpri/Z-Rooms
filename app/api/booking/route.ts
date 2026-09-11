@@ -6,10 +6,11 @@ import { z } from 'zod'
 import { addDays, addMonths, addYears } from 'date-fns'
 
 const bookingSchema = z.object({
-  // Penyewa
-  nama: z.string().min(2),
-  nik: z.string().optional(),
-  noHp: z.string().min(10),
+  // Penyewa — nama & noHp opsional (penyewa boleh dicatat dulu tanpa data
+  // lengkap, mis. booking cepat saat calon penyewa belum memberi identitas).
+  nama: z.string().trim().optional(),
+  nik: z.string().trim().optional(),
+  noHp: z.string().trim().optional(),
   pekerjaan: z.string().optional(),
   tipeEntitas: z.enum(['INDIVIDU', 'PERUSAHAAN']).default('INDIVIDU'),
   namaPerusahaan: z.string().optional(),
@@ -54,15 +55,21 @@ export async function POST(req: NextRequest) {
 
   const harga = kamar.harga[0]?.harga ?? 0
 
-  // Buat / temukan penyewa
-  const penyewa = d.nik
+  // Buat / temukan penyewa. Kosong -> null supaya kolom nullable terisi null,
+  // bukan string kosong ('' bikin UI tampil blank dan upsert by nik tak akurat).
+  const kosongJadiNull = (v?: string) => (v && v.trim() ? v.trim() : null)
+  const nama = kosongJadiNull(d.nama)
+  const noHp = kosongJadiNull(d.noHp)
+  const nik = kosongJadiNull(d.nik)
+
+  const penyewa = nik
     ? await prisma.penyewa.upsert({
-        where: { nik: d.nik },
-        update: { nama: d.nama, noHp: d.noHp },
-        create: { nama: d.nama, nik: d.nik, noHp: d.noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
+        where: { nik },
+        update: { nama, noHp },
+        create: { nama, nik, noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
       })
     : await prisma.penyewa.create({
-        data: { nama: d.nama, noHp: d.noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
+        data: { nama, noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
       })
 
   // Transaksi: buat sewa + update status kamar + buat tagihan
@@ -109,7 +116,7 @@ export async function POST(req: NextRequest) {
           propertiId: properti.id,
           tipe: 'CHECKIN_BARU',
           judul: 'Check-in baru',
-          pesan: `${penyewa.nama} masuk ke ${kamar.nomor}. Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`,
+          pesan: `${nama ?? 'Penyewa baru'} masuk ke ${kamar.nomor}. Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`,
         },
       })
     }

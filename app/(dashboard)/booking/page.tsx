@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
-import { formatRupiah } from '@/lib/utils'
+import { formatRupiah, namaPenyewa } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -150,12 +150,12 @@ export default function BookingPage() {
           <h2 className="text-sm font-medium text-gray-700">Data penyewa</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Nama lengkap *</label>
-              <input className="form-input" value={form.nama} onChange={e => set('nama', e.target.value)} required placeholder="Nama sesuai KTP" />
+              <label className="form-label">Nama lengkap</label>
+              <input className="form-input" value={form.nama} onChange={e => set('nama', e.target.value)} placeholder="Nama sesuai KTP" />
             </div>
             <div>
-              <label className="form-label">No. HP *</label>
-              <input className="form-input" value={form.noHp} onChange={e => set('noHp', e.target.value)} required placeholder="08xx-xxxx-xxxx" />
+              <label className="form-label">No. HP</label>
+              <input className="form-input" value={form.noHp} onChange={e => set('noHp', e.target.value)} placeholder="08xx-xxxx-xxxx" />
             </div>
           </div>
 
@@ -311,11 +311,11 @@ export default function BookingPage() {
               <div className="space-y-1 text-xs mb-3">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Penyewa</span>
-                  <span className="font-semibold">{nota.nama}</span>
+                  <span className="font-semibold">{namaPenyewa(nota.nama)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">No. HP</span>
-                  <span>{nota.noHp}</span>
+                  <span>{nota.noHp || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Kamar</span>

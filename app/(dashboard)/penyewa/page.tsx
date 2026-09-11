@@ -1,7 +1,7 @@
 // app/(dashboard)/penyewa/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
+import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel, namaPenyewa } from '@/lib/utils'
 import { ArrowRight } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
@@ -55,8 +55,8 @@ export default async function PenyewaPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="font-medium text-gray-900 text-sm">{s.penyewa.nama}</p>
-                    <p className="text-xs text-gray-400">{s.penyewa.noHp} · {s.penyewa.pekerjaan ?? '-'}</p>
+                    <p className="font-medium text-gray-900 text-sm">{namaPenyewa(s.penyewa.nama)}</p>
+                    <p className="text-xs text-gray-400">{s.penyewa.noHp || '-'} · {s.penyewa.pekerjaan ?? '-'}</p>
                   </div>
                   {tagihan && (
                     <span className={`badge shrink-0 ${statusTagihanColor(tagihan.status)}`}>
@@ -110,7 +110,7 @@ export default async function PenyewaPage() {
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${avatarColors[i % avatarColors.length]}`}>
                           {inisial(s.penyewa.nama)}
                         </div>
-                        <span className="text-gray-800 font-medium">{s.penyewa.nama}</span>
+                        <span className="text-gray-800 font-medium">{namaPenyewa(s.penyewa.nama)}</span>
                       </div>
                     </td>
                     <td className="py-2.5 font-medium text-gray-700">{s.kamar.nomor}</td>
@@ -154,7 +154,7 @@ export default async function PenyewaPage() {
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${avatarColors[i % avatarColors.length]}`}>
                       {inisial(s.penyewa.nama)}
                     </div>
-                    <span className="font-medium text-gray-800 text-sm">{s.penyewa.nama}</span>
+                    <span className="font-medium text-gray-800 text-sm">{namaPenyewa(s.penyewa.nama)}</span>
                   </div>
                   {tagihan && (
                     <span className={`badge text-[10px] shrink-0 ${statusTagihanColor(tagihan.status)}`}>

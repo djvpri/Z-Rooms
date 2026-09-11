@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Printer, CheckLg } from 'react-bootstrap-icons'
-import { formatRupiah, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 
 export type TagihanRow = {
   id: string
@@ -11,7 +11,7 @@ export type TagihanRow = {
   status: string
   sewa: {
     kamar: { nomor: string }
-    penyewa: { nama: string }
+    penyewa: { nama: string | null }
   }
   pembayaran: { metodeBayar: string | null }[]
 }
@@ -49,7 +49,7 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
               {tagihan.map(t => (
                 <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-2.5 font-medium text-gray-800">{t.sewa.kamar.nomor}</td>
-                  <td className="py-2.5 text-gray-600">{t.sewa.penyewa.nama}</td>
+                  <td className="py-2.5 text-gray-600">{namaPenyewa(t.sewa.penyewa.nama)}</td>
                   <td className="py-2.5 text-gray-700 font-medium">{formatRupiah(t.nominal)}</td>
                   <td className="py-2.5 text-gray-500 text-xs">{formatTanggal(t.jatuhTempo, { day: 'numeric', month: 'short' })}</td>
                   <td className="py-2.5">
@@ -81,7 +81,7 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
               <div className="flex items-center justify-between mb-1">
                 <div>
                   <span className="font-medium text-gray-800 text-sm">Kamar {t.sewa.kamar.nomor}</span>
-                  <span className="text-gray-600 text-sm ml-2">{t.sewa.penyewa.nama}</span>
+                  <span className="text-gray-600 text-sm ml-2">{namaPenyewa(t.sewa.penyewa.nama)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPrintTagihan(t)} className="text-gray-400 hover:text-teal-600">
@@ -124,7 +124,7 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Penyewa</span>
-                  <span className="font-semibold">{printTagihan.sewa.penyewa.nama}</span>
+                  <span className="font-semibold">{namaPenyewa(printTagihan.sewa.penyewa.nama)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Jatuh Tempo</span>

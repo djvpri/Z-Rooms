@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   formatRupiah, formatTanggal, statusKamarLabel,
-  hunianWarna, hunianBarWarna, waktuRelatif,
+  hunianWarna, hunianBarWarna, waktuRelatif, namaPenyewa,
 } from '@/lib/utils'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
@@ -247,7 +247,7 @@ export default async function DashboardPage() {
                     return (
                       <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="py-2.5 font-medium text-gray-700">{s.kamar.nomor}</td>
-                        <td className="py-2.5 text-gray-600">{s.penyewa.nama}</td>
+                        <td className="py-2.5 text-gray-600">{namaPenyewa(s.penyewa.nama)}</td>
                         <td className="py-2.5 text-gray-500 capitalize">{s.periodeSewa.toLowerCase()}</td>
                         <td className="py-2.5 text-gray-400 text-xs" title={formatTanggal(s.createdAt)}>{waktuRelatif(s.createdAt)}</td>
                         <td className="py-2.5">
@@ -275,7 +275,7 @@ export default async function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-800 text-sm">{s.kamar.nomor}</span>
-                        <span className="text-gray-600 text-sm">{s.penyewa.nama}</span>
+                        <span className="text-gray-600 text-sm">{namaPenyewa(s.penyewa.nama)}</span>
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {s.periodeSewa.toLowerCase()} · {waktuRelatif(s.createdAt)}

@@ -24,8 +24,14 @@ export function formatTanggal(date: Date | string, opts?: Intl.DateTimeFormatOpt
   }).format(new Date(date))
 }
 
-export function inisial(nama: string) {
-  return nama.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+export function namaPenyewa(nama?: string | null) {
+  return nama?.trim() || 'Tanpa nama'
+}
+
+export function inisial(nama?: string | null) {
+  const n = nama?.trim()
+  if (!n) return '?'
+  return n.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
 export function statusKamarLabel(status: string) {

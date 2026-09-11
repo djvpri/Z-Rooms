@@ -157,9 +157,9 @@ enum PeriodeSewa {
 // ───────────────────────────────────────────────
 model Penyewa {
   id           String     @id @default(cuid())
-  nama         String
+  nama         String?
   nik          String?    @unique
-  noHp         String
+  noHp         String?
   email        String?
   pekerjaan    String?
   alamatAsal   String?
