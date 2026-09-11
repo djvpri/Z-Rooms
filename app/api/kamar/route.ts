@@ -10,9 +10,11 @@ const createKamarSchema = z.object({
   tipe: z.enum(['STANDAR', 'DELUXE', 'VIP', 'SUITE', 'STUDIO']),
   luas: z.number().optional(),
   fasilitas: z.array(z.string()).default([]),
-  hargaBulanan: z.number(),
-  hargaHarian: z.number().optional(),
-  hargaTahunan: z.number().optional(),
+  // Ketiga harga opsional — kamar boleh didaftarkan dulu tanpa harga
+  // (mis. kos baru yang tarifnya belum ditetapkan).
+  hargaBulanan: z.number().positive().optional(),
+  hargaHarian: z.number().positive().optional(),
+  hargaTahunan: z.number().positive().optional(),
   depositBulanan: z.number().optional(),
 })
 
@@ -73,17 +75,23 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Ketiga periode opsional. Hanya periode yang harganya diisi yang dibuat —
+  // kamar tanpa harga sama sekali tetap valid (HargaKamar[] kosong), dan
+  // halaman kamar/booking sudah menangani kasus itu ('-' / "Pilih kamar &
+  // periode dulu"). Deposit default 2x hanya untuk BULANAN.
+  const hargaRows = [
+    ...(hargaBulanan
+      ? [{ periodeSewa: 'BULANAN' as const, harga: hargaBulanan, deposit: depositBulanan ?? hargaBulanan * 2 }]
+      : []),
+    ...(hargaHarian ? [{ periodeSewa: 'HARIAN' as const, harga: hargaHarian, deposit: hargaHarian }] : []),
+    ...(hargaTahunan ? [{ periodeSewa: 'TAHUNAN' as const, harga: hargaTahunan, deposit: hargaTahunan }] : []),
+  ]
+
   const kamar = await prisma.kamar.create({
     data: {
       ...kamarData,
       propertiId: properti.id,
-      harga: {
-        create: [
-          { periodeSewa: 'BULANAN', harga: hargaBulanan, deposit: depositBulanan ?? hargaBulanan * 2 },
-          ...(hargaHarian ? [{ periodeSewa: 'HARIAN' as const, harga: hargaHarian, deposit: hargaHarian }] : []),
-          ...(hargaTahunan ? [{ periodeSewa: 'TAHUNAN' as const, harga: hargaTahunan, deposit: hargaTahunan }] : []),
-        ],
-      },
+      ...(hargaRows.length ? { harga: { create: hargaRows } } : {}),
     },
   })
 

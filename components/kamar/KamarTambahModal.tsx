@@ -51,7 +51,12 @@ export default function KamarTambahModal() {
     setError('')
     const hargaBulanan = Number(f.hargaBulanan)
     if (!f.nomor.trim()) { setError('Nomor kamar wajib diisi.'); return }
-    if (!hargaBulanan || hargaBulanan <= 0) { setError('Harga bulanan wajib diisi dan lebih dari 0.'); return }
+    // Harga bulanan opsional — kamar boleh didaftarkan tanpa tarif dulu.
+    // Kalau diisi, minimal periode lain juga harus masuk akal (server cek > 0).
+    if (hargaBulanan < 0 || Number(f.hargaHarian) < 0 || Number(f.hargaTahunan) < 0) {
+      setError('Harga tidak boleh negatif.')
+      return
+    }
 
     setLoading(true)
     try {
@@ -64,11 +69,12 @@ export default function KamarTambahModal() {
           tipe: f.tipe,
           ...(f.luas ? { luas: Number(f.luas) } : {}),
           fasilitas: f.fasilitas,
-          hargaBulanan,
+          // Tiap harga hanya dikirim kalau terisi; server menolak 0/negatif.
+          ...(hargaBulanan > 0 ? { hargaBulanan } : {}),
           // Kosong = biarkan server pakai default (2x harga bulanan / harga itu sendiri).
           ...(f.depositBulanan ? { depositBulanan: Number(f.depositBulanan) } : {}),
-          ...(f.hargaHarian ? { hargaHarian: Number(f.hargaHarian) } : {}),
-          ...(f.hargaTahunan ? { hargaTahunan: Number(f.hargaTahunan) } : {}),
+          ...(Number(f.hargaHarian) > 0 ? { hargaHarian: Number(f.hargaHarian) } : {}),
+          ...(Number(f.hargaTahunan) > 0 ? { hargaTahunan: Number(f.hargaTahunan) } : {}),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -150,9 +156,9 @@ export default function KamarTambahModal() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Harga / bulan *</label>
+                      <label className="form-label">Harga / bulan (opsional)</label>
                       <input type="number" className="form-input" value={f.hargaBulanan}
-                        onChange={e => set('hargaBulanan', e.target.value)} placeholder="1000000" required />
+                        onChange={e => set('hargaBulanan', e.target.value)} placeholder="—" />
                     </div>
                     <div>
                       <label className="form-label">Deposit</label>
