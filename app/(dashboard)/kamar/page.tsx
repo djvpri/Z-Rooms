@@ -1,6 +1,7 @@
 // app/(dashboard)/kamar/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa } from '@/lib/utils'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
@@ -14,7 +15,7 @@ const tipeKamarLabel: Record<string, string> = {
 
 export default async function KamarPage() {
   const session = await auth()
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session!.user!.id } })
+  const properti = await propertiAktif(session!.user!.id as string)
   if (!properti) return <div className="p-8 text-gray-500">Belum ada properti.</div>
 
   const kamar = await prisma.kamar.findMany({

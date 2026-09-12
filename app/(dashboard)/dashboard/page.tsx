@@ -1,6 +1,7 @@
 // app/(dashboard)/dashboard/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import {
   formatRupiah, formatTanggal, statusKamarLabel,
   hunianWarna, hunianBarWarna, waktuRelatif, namaPenyewa,
@@ -28,7 +29,7 @@ const statusKamar: { status: string; color: string; Icon: BiIcon }[] = [
 
 export default async function DashboardPage() {
   const session = await auth()
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session!.user!.id } })
+  const properti = await propertiAktif(session!.user!.id as string)
 
   // Empty state ber-aksi: properti baru butuh arahan, bukan teks abu tanpa jalan keluar.
   if (!properti) {

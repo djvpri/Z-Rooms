@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { z } from 'zod'
 import { addDays, addMonths, addYears } from 'date-fns'
 
@@ -108,18 +109,17 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Notifikasi
-    const properti = await tx.properti.findFirst({ where: { ownerId: userId } })
-    if (properti) {
-      await tx.notifikasi.create({
-        data: {
-          propertiId: properti.id,
-          tipe: 'CHECKIN_BARU',
-          judul: 'Check-in baru',
-          pesan: `${nama ?? 'Penyewa baru'} masuk ke ${kamar.nomor}. Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`,
-        },
-      })
-    }
+    // Notifikasi — pakai properti milik kamar yang dibooking, BUKAN findFirst.
+    // Kalau owner punya >1 properti, findFirst bisa menaruh notifikasi di
+    // properti yang salah.
+    await tx.notifikasi.create({
+      data: {
+        propertiId: kamar.propertiId,
+        tipe: 'CHECKIN_BARU',
+        judul: 'Check-in baru',
+        pesan: `${nama ?? 'Penyewa baru'} masuk ke ${kamar.nomor}. Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`,
+      },
+    })
 
     return { sewa, tagihan }
   })
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
+  const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json([], { status: 200 })
 
   const sewa = await prisma.sewa.findMany({

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { cn, inisial } from '@/lib/utils'
+import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
   Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell,
@@ -18,7 +19,13 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
 ]
 
-export default function Sidebar({ user }: { user?: { name?: string | null; email?: string | null } }) {
+export default function Sidebar({
+  user, properti = [], propertiAktifId,
+}: {
+  user?: { name?: string | null; email?: string | null }
+  properti?: { id: string; nama: string }[]
+  propertiAktifId?: string
+}) {
   const path = usePathname()
   const router = useRouter()
 
@@ -36,6 +43,13 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
           <span className="font-semibold text-gray-900 text-sm">ZXRoom</span>
         </div>
       </div>
+
+      {/* Pemilih properti — hanya muncul kalau owner punya >1 properti */}
+      {properti.length > 1 && propertiAktifId && (
+        <div className="px-2 pt-3">
+          <PemilihProperti daftar={properti} aktifId={propertiAktifId} />
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5">

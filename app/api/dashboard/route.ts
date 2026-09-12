@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { startOfMonth, endOfMonth } from 'date-fns'
 
 export async function GET() {
@@ -9,10 +10,7 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const userId = session.user.id as string
 
-  const properti = await prisma.properti.findFirst({
-    where: { ownerId: userId },
-    select: { id: true, nama: true, kota: true },
-  })
+  const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
   const now = new Date()

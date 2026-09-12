@@ -1,6 +1,7 @@
 // app/(dashboard)/notifikasi/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { formatTanggal } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
 import {
@@ -35,7 +36,7 @@ async function tandaiSemuaDibaca(propertiId: string) {
 
 export default async function NotifikasiPage() {
   const session = await auth()
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session!.user!.id } })
+  const properti = await propertiAktif(session!.user!.id as string)
   if (!properti) return <div className="p-8 text-gray-500">Belum ada properti.</div>
 
   const notifikasi = await prisma.notifikasi.findMany({

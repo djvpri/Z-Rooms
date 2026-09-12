@@ -1,6 +1,7 @@
 // app/(dashboard)/keuangan/page.tsx
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, namaPenyewa } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import TagihanTable from './TagihanTable'
@@ -14,7 +15,7 @@ const kategoriLabel: Record<string, string> = {
 
 export default async function KeuanganPage() {
   const session = await auth()
-  const properti = await prisma.properti.findFirst({ where: { ownerId: session!.user!.id } })
+  const properti = await propertiAktif(session!.user!.id as string)
   if (!properti) return <div className="p-8 text-gray-500">Belum ada properti.</div>
 
   const now = new Date()

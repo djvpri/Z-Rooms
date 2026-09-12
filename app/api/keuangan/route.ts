@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
 export async function GET(req: NextRequest) {
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const bulan = parseInt(searchParams.get('bulan') ?? '0') // 0 = bulan ini, 1 = bulan lalu, dst
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
+  const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
 
   const targetBulan = subMonths(new Date(), bulan)

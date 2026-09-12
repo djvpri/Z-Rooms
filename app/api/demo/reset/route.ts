@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { propertiAktif } from "@/lib/properti";
 import { resetDemoData, seedDemoData } from "@/app/lib/demo-seed";
 
 export async function GET() {
@@ -20,10 +21,7 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const properti = await prisma.properti.findFirst({
-    where: { ownerId: session.user.id },
-    select: { id: true, isDemo: true },
-  });
+  const properti = await propertiAktif(session.user.id);
 
   if (!properti?.isDemo) {
     return NextResponse.json({ error: "Bukan akun demo" }, { status: 403 });

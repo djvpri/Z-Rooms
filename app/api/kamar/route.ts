@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { propertiAktif } from '@/lib/properti'
 import { z } from 'zod'
 
 const createKamarSchema = z.object({
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
+  const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
   const kamar = await prisma.kamar.findMany({
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
   const parsed = createKamarSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
-  const properti = await prisma.properti.findFirst({ where: { ownerId: userId } })
+  const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
   const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, ...kamarData } = parsed.data
