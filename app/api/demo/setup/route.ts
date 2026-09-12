@@ -19,21 +19,41 @@ export async function POST(request: NextRequest) {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3)`);
 
-    // Clean existing demo properti first
-    const existingDemo = await prisma.properti.findFirst({
-      where: { isDemo: true },
-      orderBy: { createdAt: "desc" },
-    });
-    if (existingDemo) {
-      const { resetDemoData } = await import("@/app/lib/demo-seed");
-      await resetDemoData(existingDemo.id);
+    // Owner bisa ditentukan lewat body ({ ownerEmail } / { ownerId }).
+    // Tanpa itu, pakai user pertama — endpoint ini dipanggil server-to-server
+    // (bukan dari session), jadi tidak ada user login untuk dijadikan acuan.
+    const body = await request.json().catch(() => ({} as any));
+    const owner = body?.ownerId
+      ? await prisma.user.findUnique({ where: { id: String(body.ownerId) } })
+      : body?.ownerEmail
+        ? await prisma.user.findUnique({ where: { email: String(body.ownerEmail) } })
+        : await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+
+    if (!owner) {
+      return NextResponse.json(
+        { error: "Tidak ada user untuk dijadikan owner properti demo." },
+        { status: 400 }
+      );
     }
 
-    // Seed fresh demo data
-    const result = await seedDemoData();
+    // Bersihkan SEMUA properti demo yang sudah ada (bukan cuma yang terbaru —
+    // sisa seed sebelumnya bisa menumpuk dan ikut dihitung).
+    const demoLama = await prisma.properti.findMany({
+      where: { isDemo: true },
+      select: { id: true, nama: true },
+    });
+    const { resetDemoData } = await import("@/app/lib/demo-seed");
+    for (const p of demoLama) {
+      await resetDemoData(p.id);
+    }
+
+    // Seed fresh demo data untuk owner tersebut
+    const result = await seedDemoData(owner.id);
 
     return NextResponse.json({
       success: true,
+      owner: { id: owner.id, email: owner.email },
+      dibersihkan: demoLama.map((p) => p.nama),
       properti: { id: result.propertiId },
       data: result,
     });

@@ -8,10 +8,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ isDemo: false });
 
-  const properti = await prisma.properti.findFirst({
-    where: { ownerId: session.user.id },
-    select: { isDemo: true },
-  });
+  const properti = await propertiAktif(session.user.id);
   return NextResponse.json({ isDemo: !!properti?.isDemo });
 }
 
@@ -27,7 +24,9 @@ export async function POST() {
     return NextResponse.json({ error: "Bukan akun demo" }, { status: 403 });
   }
 
+  // Seed ulang atas nama pemilik properti ini (session.user.id), bukan akun
+  // demo hardcoded — kalau tidak, hasil reset nyasar ke akun lain.
   await resetDemoData(properti.id);
-  const result = await seedDemoData();
+  const result = await seedDemoData(session.user.id);
   return NextResponse.json({ ok: true, propertiId: result.propertiId });
 }

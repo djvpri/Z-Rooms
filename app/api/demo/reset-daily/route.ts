@@ -17,14 +17,17 @@ export async function POST(request: NextRequest) {
 
     const demos = await prisma.properti.findMany({
       where: { isDemo: true },
-      select: { id: true, nama: true },
+      select: { id: true, nama: true, ownerId: true },
     });
 
     const direset: string[] = [];
     for (const properti of demos) {
       try {
         await resetDemoData(properti.id);
-        await seedDemoData();
+        // Seed untuk owner properti ini (bukan akun demo hardcoded), dan
+        // hanya sekali per properti — sebelumnya dipanggil di dalam loop
+        // sehingga tiap properti demo menambah properti baru lagi.
+        await seedDemoData(properti.ownerId);
         direset.push(properti.nama);
       } catch (err: any) {
         console.error(`reset-daily error for ${properti.nama}:`, err);

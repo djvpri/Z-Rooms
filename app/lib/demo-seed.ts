@@ -10,26 +10,21 @@ interface SeedResult {
   tagihanIds: string[];
 }
 
-export async function seedDemoData(): Promise<SeedResult> {
-  const demoEmail = "demo@zomet.my.id";
-  const demoExpiresAt = addDays(new Date(), 30);
+/**
+ * Isi data contoh untuk sebuah properti demo.
+ *
+ * @param ownerId  Pemilik properti. WAJIB eksplisit — sebelumnya fungsi ini
+ *   hardcode `demo@zomet.my.id`, sehingga pemanggil mana pun (termasuk tombol
+ *   "Reset Demo" milik user lain) menaruh hasil seed di akun yang bukan
+ *   pemiliknya. Data jadi nyasar lintas tenant.
+ */
+export async function seedDemoData(ownerId: string): Promise<SeedResult> {
+  const demoExpiresAt = addDays(new Date(), 30)
 
-  // 1. Create or get demo user
-  let user = await prisma.user.findUnique({
-    where: { email: demoEmail },
-  });
+  const user = await prisma.user.findUnique({ where: { id: ownerId } })
+  if (!user) throw new Error(`seedDemoData: user ${ownerId} tidak ditemukan`)
 
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: demoEmail,
-        name: "Demo User",
-        role: "USER",
-      },
-    });
-  }
-
-  // 2. Create demo properti (property)
+  // 1. Create demo properti (property)
   const properti = await prisma.properti.create({
     data: {
       nama: "Demo Kos Sejahtera",
