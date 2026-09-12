@@ -37,9 +37,15 @@ export async function POST(req: NextRequest) {
 
   const d = parsed.data
 
-  // Cek kamar tersedia
-  const kamar = await prisma.kamar.findUnique({
-    where: { id: d.kamarId },
+  // Cek kamar tersedia — SEKALIGUS pastikan kamar ini milik properti si pemanggil.
+  // Tanpa filter properti, siapa pun yang tahu kamarId bisa membooking kamar
+  // tenant lain (sewa/tagihan/notifikasi ikut nyasar ke properti korban).
+  // Dikembalikan 404 (bukan 403) supaya tidak membocorkan keberadaan kamar.
+  const properti = await propertiAktif(userId)
+  if (!properti) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
+
+  const kamar = await prisma.kamar.findFirst({
+    where: { id: d.kamarId, propertiId: properti.id },
     include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } },
   })
   if (!kamar) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
