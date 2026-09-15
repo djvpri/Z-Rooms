@@ -9,7 +9,7 @@
 // tsx yang mengimpor .ts: jalankan `npm run check` (pakai tsx), BUKAN `node`
 // polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
-import { tglJam } from '../lib/utils.ts'
+import { tglJam, tglJamSingkat } from '../lib/utils.ts'
 
 // Gabungan tanggal + jam seperti di handleSubmit.
 const gabung = (tgl, jam) => new Date(`${tgl}T${jam}:00+07:00`)
@@ -49,4 +49,29 @@ assert.ok(!/am|pm/i.test(tglJam(m1.toISOString())), 'struk tak boleh memakai AM/
 assert.ok(tglJam(gabung('2026-09-15', '15:30').toISOString()).includes('15.30'), 'sore harus 15.30, bukan 03.30')
 assert.ok(tglJam(gabung('2026-09-15', '09:05').toISOString()).includes('09.05'), 'pagi harus 09.05')
 
-console.log('OK — check-struk-jam: 13 blok assertion lulus')
+// 9. tglJamSingkat dipakai tab Kamar untuk "Kosong 16 Sep, 12:00". Formatnya
+//    HARUS 24 jam dan ber-WIB, sama seperti tglJam — kalau tidak, kasir melihat
+//    jam tersedia yang beda dari jam di struk untuk kamar yang sama.
+{
+  const b = new Date('2026-09-16T05:00:00Z')   // 12:00 WIB
+  const s = tglJamSingkat(b)
+  assert.ok(s.includes('16'), `tanggal harus 16, dapat "${s}"`)
+  assert.ok(s.includes('Sep'), `bulan singkat, dapat "${s}"`)
+  assert.ok(s.includes('12:00'), `jam 24 jam 12:00, dapat "${s}"`)
+  assert.ok(!/am|pm/i.test(s), `tak boleh AM/PM, dapat "${s}"`)
+
+  // Sore harus 15:xx, bukan 03:xx PM.
+  const sore = tglJamSingkat(new Date('2026-09-16T08:30:00Z'))   // 15:30 WIB
+  assert.ok(sore.includes('15:30'), `15:30 WIB, dapat "${sore}"`)
+
+  // Pagi 09:05 tetap dua digit — bukan "9:05".
+  const pagi = tglJamSingkat(new Date('2026-09-16T02:05:00Z'))   // 09:05 WIB
+  assert.ok(pagi.includes('09:05'), `09:05 WIB, dapat "${pagi}"`)
+
+  // Dini hari WIB tetap tanggal yang sama (bukan mundur sehari).
+  const dini = tglJamSingkat(new Date('2026-09-15T19:00:00Z'))   // 16 Sep 02:00 WIB
+  assert.ok(dini.includes('16'), `dini hari harus 16, dapat "${dini}"`)
+  assert.ok(dini.includes('02:00'), `02:00 WIB, dapat "${dini}"`)
+}
+
+console.log('OK — check-struk-jam: 19 blok assertion lulus')

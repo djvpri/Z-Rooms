@@ -2,8 +2,8 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
-import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa } from '@/lib/utils'
-import { cekLewat, labelLewat } from '@/lib/checkout'
+import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa, tglJamSingkat } from '@/lib/utils'
+import { cekLewat, labelLewat, batasCheckout } from '@/lib/checkout'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
@@ -157,6 +157,13 @@ export default async function KamarPage() {
               <p className="text-xs mt-1 opacity-60 truncate">
                 {penyewa ? namaPenyewa(penyewa.nama) : 'Kosong'}
               </p>
+              {/* Kapan kamar ini tersedia lagi. Dihitung dari tanggal keluar +
+                  jam check-out properti, bukan jam masuk + 24 jam. */}
+              {sewaAktif && (
+                <p className="text-[10px] mt-0.5 opacity-75">
+                  Kosong {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
+                </p>
+              )}
               {(() => {
                 const lebih = sewaAktif ? cekLewat(sewaAktif.tanggalKeluar, aturan, sekarang).menitLebih : 0
                 return lebih > 0 ? (
@@ -192,6 +199,7 @@ export default async function KamarPage() {
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Harga/bln</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Status</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Penyewa</th>
+                <th className="text-left py-2 text-xs font-medium text-gray-400">Kosong</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Fasilitas</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400"></th>
               </tr>
@@ -211,6 +219,9 @@ export default async function KamarPage() {
                       <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
                     </td>
                     <td className="py-2.5 text-gray-600">{penyewa ? namaPenyewa(penyewa.nama) : '-'}</td>
+                    <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                      {sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : '-'}
+                    </td>
                     <td className="py-2.5 text-gray-400 text-xs">{k.fasilitas.slice(0, 3).join(', ')}{k.fasilitas.length > 3 ? '…' : ''}</td>
                     <td className="py-2.5 w-px">
                       {sewaAktif && (
@@ -249,6 +260,11 @@ export default async function KamarPage() {
                   <div className="text-xs text-gray-400 mt-0.5">
                     {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
                   </div>
+                  {sewaAktif && (
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Kosong {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
+                    </div>
+                  )}
                 </div>
                 {sewaAktif && (
                   <div className="w-24 shrink-0 ml-2">

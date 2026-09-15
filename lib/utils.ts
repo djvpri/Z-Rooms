@@ -35,6 +35,17 @@ export function tglJam(iso: string) {
   })
 }
 
+// "16 Sep 12:00" — kapan sebuah kamar akan tersedia lagi. Dipakai tab Kamar
+// supaya kasir tahu kapan bisa menerima penyewa berikutnya. Zona eksplisit
+// seperti tglJam: server jalan di UTC, tanpa ini jamnya bergeser 7 jam.
+export function tglJamSingkat(date: Date | string) {
+  return new Date(date).toLocaleString('id-ID', {
+    day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  }).replace(/\./g, ':')
+}
+
 export function namaPenyewa(nama?: string | null) {
   return nama?.trim() || 'Tanpa nama'
 }

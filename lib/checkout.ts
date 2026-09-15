@@ -30,19 +30,33 @@ export function jamKeMenit(jam: string): number {
   return h * 60 + m
 }
 
+/** Offset WIB terhadap UTC, menit. WIB tak punya DST, jadi konstan. */
+const WIB_MENIT = 7 * 60
+
 /**
  * Batas waktu check-out: kapan sewa ini mulai dianggap lewat.
- * = hari terakhir pada jam jamCheckout + toleransi.
+ * = hari terakhir pada jam jamCheckout + toleransi, waktu WIB.
+ *
+ * Jamnya dipasang lewat UTC, bukan setHours/setMinutes. Container produksi
+ * jalan dengan TZ=UTC, jadi setHours memasang jam UTC — "12:00" jadi 12:00 UTC
+ * (19:00 WIB) dan kasir melihat batas 7 jam lebih lambat dari seharusnya.
+ * Dihitung di UTC supaya hasilnya sama di mesin mana pun.
  */
 export function batasCheckout(
   tanggalKeluar: Date,
   aturan: AturanCheckout,
 ): Date {
-  const batas = new Date(tanggalKeluar)
-  // Jam dinding lokal, bukan UTC — tanggalKeluar disimpan sebagai tengah malam.
-  batas.setHours(0, 0, 0, 0)
-  batas.setMinutes(jamKeMenit(aturan.jamCheckout) + Math.max(0, aturan.toleransiCheckout))
-  return batas
+  // Tanggal keluar disimpan sebagai tengah malam UTC; ambil komponen Y/M/D-nya
+  // apa adanya supaya tanggal tak bergeser saat dikonversi ke WIB.
+  const hari = new Date(Date.UTC(
+    tanggalKeluar.getUTCFullYear(),
+    tanggalKeluar.getUTCMonth(),
+    tanggalKeluar.getUTCDate(),
+  ))
+  const menit = jamKeMenit(aturan.jamCheckout) + Math.max(0, aturan.toleransiCheckout)
+  // Waktu WIB = UTC + 7 jam, jadi batas dalam UTC = tengah malam hari itu
+  // dikurangi offset, lalu ditambah menit batas.
+  return new Date(hari.getTime() - WIB_MENIT * 60000 + menit * 60000)
 }
 
 export interface StatusLewat {
