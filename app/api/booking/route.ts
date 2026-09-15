@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
   }
 
   const masuk = new Date(d.tanggalMasuk)
+  if (isNaN(masuk.getTime())) {
+    return NextResponse.json({ error: 'Tanggal masuk tidak valid' }, { status: 400 })
+  }
   const keluar = d.periodeSewa === 'HARIAN'
     ? addDays(masuk, d.durasi)
     : d.periodeSewa === 'BULANAN'
