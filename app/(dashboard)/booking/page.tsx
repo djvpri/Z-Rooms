@@ -35,7 +35,7 @@ export default function BookingPage() {
   const [form, setForm] = useState({
     nama: '', nik: '', noHp: '', pekerjaan: 'Mahasiswa',
     namaPerusahaan: '', npwp: '',
-    kamarId: '', periodeSewa: 'BULANAN', tanggalMasuk: '', durasi: 1,
+    kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
     deposit: '', sumber: 'LANGSUNG', catatan: '',
   })
 
@@ -69,7 +69,7 @@ export default function BookingPage() {
           ...form,
           tipeEntitas: activeTab,
           durasi: Number(form.durasi),
-          deposit: Number(form.deposit) || hargaNum * 2,
+          deposit: Number(form.deposit) || 0,
         }),
       })
       if (!res.ok) {
@@ -94,7 +94,7 @@ export default function BookingPage() {
         tanggalMasuk: form.tanggalMasuk,
         durasi: Number(form.durasi),
         harga: hargaNum,
-        deposit: Number(form.deposit) || hargaNum * 2,
+        deposit: Number(form.deposit) || 0,
         sumber: form.sumber,
         catatan: form.catatan,
         tanggalCetak: new Date().toISOString(),
@@ -230,8 +230,8 @@ export default function BookingPage() {
               </div>
             </div>
             <div>
-              <label className="form-label">Deposit (kosongkan = 2x sewa)</label>
-              <input type="number" className="form-input" value={form.deposit} onChange={e => set('deposit', e.target.value)} placeholder={hargaNum > 0 ? String(hargaNum * 2) : '0'} />
+              <label className="form-label">Deposit (kosongkan = 0)</label>
+              <input type="number" className="form-input" value={form.deposit} onChange={e => set('deposit', e.target.value)} placeholder="0" />
             </div>
           </div>
 
@@ -260,11 +260,11 @@ export default function BookingPage() {
               </div>
               <div className="flex justify-between text-teal-700">
                 <span>Deposit</span>
-                <span>{formatRupiah(Number(form.deposit) || hargaNum * 2)}</span>
+                <span>{formatRupiah(Number(form.deposit) || 0)}</span>
               </div>
               <div className="flex justify-between font-semibold text-teal-900 pt-1 border-t border-teal-200">
                 <span>Total dibayar pertama</span>
-                <span>{formatRupiah(hargaNum + (Number(form.deposit) || hargaNum * 2))}</span>
+                <span>{formatRupiah(hargaNum + (Number(form.deposit) || 0))}</span>
               </div>
             </div>
           </div>
