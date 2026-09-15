@@ -15,14 +15,19 @@ async function simpanPengaturan(formData: FormData) {
   const properti = await propertiAktif(session.user.id as string)
   if (!properti) return
 
-  const jam = String(formData.get('jamCheckout') ?? '')
+  const jam = String(formData.get('jamCheckout') ?? '').trim()
   const toleransi = Number(formData.get('toleransiCheckout') ?? 0)
-  if (!/^\d{1,2}:\d{2}$/.test(jam)) return
+  // Format 24 jam "HH:mm". Rentang dijaga di sini juga (bukan cuma di pattern
+  // HTML) supaya nilai di luar 00:00-23:59 tak pernah masuk DB — jamKeMenit
+  // diam-diam fallback ke 12:00 dan kasir tak akan sadar salah ketik.
+  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(jam)) return
   if (!Number.isFinite(toleransi) || toleransi < 0 || toleransi > 720) return
+  const [hj, mj] = jam.split(':')
+  const jam24 = `${hj.padStart(2, '0')}:${mj}`
 
   await prisma.properti.update({
     where: { id: properti.id },
-    data: { jamCheckout: jam.padStart(5, '0'), toleransiCheckout: Math.floor(toleransi) },
+    data: { jamCheckout: jam24, toleransiCheckout: Math.floor(toleransi) },
   })
   revalidatePath('/pengaturan')
 }
@@ -73,10 +78,15 @@ export default async function PengaturanPage() {
               <input
                 id="jamCheckout"
                 name="jamCheckout"
-                type="time"
+                type="text"
+                inputMode="numeric"
+                pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+                maxLength={5}
+                placeholder="HH:mm"
                 defaultValue={`${jj}:${mm}`}
                 required
                 className="form-input"
+                title="Format 24 jam, contoh 14:30"
               />
             </div>
             <div>
