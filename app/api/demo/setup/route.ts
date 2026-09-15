@@ -1,37 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { seedDemoData } from "@/app/lib/demo-seed";
-
-const SECRET_PREFIX = "zrooms-demo-";
+import { cekDemoSecret } from "@/app/lib/demo-auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing auth" }, { status: 401 });
-    }
-    const token = authHeader.substring(7);
-    if (!token.startsWith(SECRET_PREFIX)) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 403 });
+    if (!cekDemoSecret(request)) {
+      return NextResponse.json({ error: "Missing or invalid auth" }, { status: 401 });
     }
 
     // Ensure demo columns exist
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "isDemo" BOOLEAN NOT NULL DEFAULT false`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Properti" ADD COLUMN IF NOT EXISTS "demoExpiresAt" TIMESTAMP(3)`);
 
-    // Owner bisa ditentukan lewat body ({ ownerEmail } / { ownerId }).
-    // Tanpa itu, pakai user pertama — endpoint ini dipanggil server-to-server
-    // (bukan dari session), jadi tidak ada user login untuk dijadikan acuan.
+    // Owner WAJIB eksplisit lewat body ({ ownerEmail } / { ownerId }).
+    // Sebelumnya tanpa body endpoint ini jatuh ke user pertama
+    // (`findFirst orderBy createdAt asc`), sehingga properti demo ikut
+    // ditempelkan ke akun produksi pemiliknya — user itu lalu melihat dua
+    // properti di dashboard tanpa pernah memintanya.
     const body = await request.json().catch(() => ({} as any));
     const owner = body?.ownerId
       ? await prisma.user.findUnique({ where: { id: String(body.ownerId) } })
       : body?.ownerEmail
         ? await prisma.user.findUnique({ where: { email: String(body.ownerEmail) } })
-        : await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+        : null;
 
     if (!owner) {
       return NextResponse.json(
-        { error: "Tidak ada user untuk dijadikan owner properti demo." },
+        { error: "ownerEmail atau ownerId wajib dikirim di body." },
         { status: 400 }
       );
     }
