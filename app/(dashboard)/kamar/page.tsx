@@ -47,6 +47,35 @@ export default async function KamarPage() {
     PEMELIHARAAN: kamar.filter(k => k.status === 'PEMELIHARAAN'),
   }
 
+  // Bentuk data untuk CheckoutModal. Diekstrak karena dipakai di tiga tempat
+  // (grid, tabel desktop, kartu mobile) — sebelumnya disalin-tempel.
+  type KamarBaris = (typeof kamar)[number]
+  type SewaBaris = NonNullable<KamarBaris['sewa'][number]>
+  const ringkasSewa = (k: KamarBaris, s: SewaBaris) => ({
+    id: s.id,
+    kamarNomor: k.nomor,
+    penyewaNama: s.penyewa?.nama ?? null,
+    tanggalKeluar: s.tanggalKeluar.toISOString(),
+    deposit: Number(s.deposit),
+    sisaTagihan: s.tagihan.reduce((a, t) => a + Number(t.nominal), 0),
+    jumlahTagihan: s.tagihan.length,
+    periodeSewa: s.periodeSewa as string,
+  })
+  // Kandidat kamar tujuan pindah: kamar TERSEDIA selain kamar asal.
+  const kamarTersediaUntuk = (asalId: string) =>
+    kamar
+      .filter(x => x.status === 'TERSEDIA' && x.id !== asalId)
+      .map(x => {
+        const hb = x.harga.find(h => h.periodeSewa === 'BULANAN')
+        return {
+          id: x.id,
+          nomor: x.nomor,
+          tipe: tipeKamarLabel[x.tipe],
+          hargaBulanan: hb ? Number(hb.harga) : null,
+          deposit: hb?.deposit != null ? Number(hb.deposit) : null,
+        }
+      })
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-4 md:mb-6">
@@ -105,15 +134,8 @@ export default async function KamarPage() {
               </p>
               {sewaAktif && (
                 <CheckoutModal
-                  sewa={{
-                    id: sewaAktif.id,
-                    kamarNomor: k.nomor,
-                    penyewaNama: penyewa?.nama ?? null,
-                    tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
-                    deposit: Number(sewaAktif.deposit),
-                    sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
-                    jumlahTagihan: sewaAktif.tagihan.length,
-                  }}
+                  sewa={ringkasSewa(k, sewaAktif)}
+                  kamarTersedia={kamarTersediaUntuk(k.id)}
                 />
               )}
             </div>
@@ -161,15 +183,8 @@ export default async function KamarPage() {
                       {sewaAktif && (
                         <div className="w-28">
                           <CheckoutModal
-                            sewa={{
-                              id: sewaAktif.id,
-                              kamarNomor: k.nomor,
-                              penyewaNama: penyewa?.nama ?? null,
-                              tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
-                              deposit: Number(sewaAktif.deposit),
-                              sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
-                              jumlahTagihan: sewaAktif.tagihan.length,
-                            }}
+                            sewa={ringkasSewa(k, sewaAktif)}
+                            kamarTersedia={kamarTersediaUntuk(k.id)}
                           />
                         </div>
                       )}
@@ -205,15 +220,8 @@ export default async function KamarPage() {
                 {sewaAktif && (
                   <div className="w-24 shrink-0 ml-2">
                     <CheckoutModal
-                      sewa={{
-                        id: sewaAktif.id,
-                        kamarNomor: k.nomor,
-                        penyewaNama: penyewa?.nama ?? null,
-                        tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
-                        deposit: Number(sewaAktif.deposit),
-                        sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
-                        jumlahTagihan: sewaAktif.tagihan.length,
-                      }}
+                      sewa={ringkasSewa(k, sewaAktif)}
+                      kamarTersedia={kamarTersediaUntuk(k.id)}
                     />
                   </div>
                 )}
