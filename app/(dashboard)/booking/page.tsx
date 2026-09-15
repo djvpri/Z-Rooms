@@ -25,7 +25,6 @@ type PenyewaHasil = {
   nama: string | null
   nik: string | null
   noHp: string | null
-  pekerjaan: string | null
   namaPerusahaan: string | null
   npwp: string | null
   tipeEntitas: 'INDIVIDU' | 'PERUSAHAAN'
@@ -34,7 +33,6 @@ type PenyewaHasil = {
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
-const PEKERJAAN = ['Mahasiswa', 'Karyawan Swasta', 'PNS / ASN', 'Wirausaha', 'Pensiunan', 'Lainnya']
 
 export default function BookingPage() {
   const router = useRouter()
@@ -51,7 +49,7 @@ export default function BookingPage() {
   const [penyewaNama, setPenyewaNama] = useState('')
 
   const [form, setForm] = useState({
-    nama: '', nik: '', noHp: '', pekerjaan: 'Mahasiswa',
+    nama: '', nik: '', noHp: '',
     namaPerusahaan: '', npwp: '',
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
@@ -84,7 +82,6 @@ export default function BookingPage() {
     setForm(f => ({
       ...f,
       nama: p.nama ?? '', nik: p.nik ?? '', noHp: p.noHp ?? '',
-      pekerjaan: p.pekerjaan || 'Mahasiswa',
       namaPerusahaan: p.namaPerusahaan ?? '', npwp: p.npwp ?? '',
     }))
     setCari(''); setHasil([])
@@ -94,7 +91,7 @@ export default function BookingPage() {
     setPenyewaId(''); setPenyewaNama('')
     setForm(f => ({
       ...f, nama: '', nik: '', noHp: '',
-      pekerjaan: 'Mahasiswa', namaPerusahaan: '', npwp: '',
+      namaPerusahaan: '', npwp: '',
     }))
   }
 
@@ -273,12 +270,6 @@ export default function BookingPage() {
               <div>
                 <label className="form-label">NIK (opsional)</label>
                 <input className="form-input" value={form.nik} onChange={e => set('nik', e.target.value)} placeholder="16 digit NIK" maxLength={16} />
-              </div>
-              <div>
-                <label className="form-label">Pekerjaan</label>
-                <select className="form-input" value={form.pekerjaan} onChange={e => set('pekerjaan', e.target.value)}>
-                  {PEKERJAAN.map(p => <option key={p}>{p}</option>)}
-                </select>
               </div>
             </div>
           ) : (
