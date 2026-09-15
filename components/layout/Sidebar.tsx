@@ -6,7 +6,7 @@ import { cn, inisial } from '@/lib/utils'
 import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
-  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear, Building,
 } from 'react-bootstrap-icons'
 import type { ComponentType } from 'react'
 
@@ -17,7 +17,8 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   { href: '/booking',      label: 'Booking Baru',Icon: CalendarPlus },
   { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
   { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
-  { href: '/pengaturan',   label: 'Pengaturan',  Icon: Gear },
+  { href: '/pengaturan',          label: 'Pengaturan', Icon: Gear },
+  { href: '/pengaturan/properti', label: 'Properti',   Icon: Building },
 ]
 
 export default function Sidebar({

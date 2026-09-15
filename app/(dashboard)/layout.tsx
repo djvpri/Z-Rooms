@@ -2,7 +2,7 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
-import { daftarProperti, propertiAktif } from '@/lib/properti'
+import { daftarPropertiAktif, propertiAktif } from '@/lib/properti'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -10,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const userId = session.user.id as string
   const [properti, aktif] = await Promise.all([
-    daftarProperti(userId),
+    daftarPropertiAktif(userId),
     propertiAktif(userId),
   ])
 

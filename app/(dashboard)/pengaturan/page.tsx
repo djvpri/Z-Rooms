@@ -1,5 +1,6 @@
 // app/(dashboard)/pengaturan/page.tsx
 import { auth } from '@/lib/auth'
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { revalidatePath } from 'next/cache'
@@ -41,6 +42,21 @@ export default async function PengaturanPage() {
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Pengaturan</h1>
         <p className="text-sm text-gray-400">{properti.nama}</p>
+      </div>
+
+      <div className="flex gap-1 mb-4 border-b border-gray-100">
+        <Link
+          href="/pengaturan"
+          className="px-3 py-2 text-sm font-medium text-teal-700 border-b-2 border-teal-600 -mb-px"
+        >
+          Umum
+        </Link>
+        <Link
+          href="/pengaturan/properti"
+          className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border-b-2 border-transparent -mb-px"
+        >
+          Properti
+        </Link>
       </div>
 
       <form action={simpanPengaturan} className="space-y-4">
