@@ -46,6 +46,8 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
   const [catatan, setCatatan] = useState('')
   const [tujuanId, setTujuanId] = useState('')
   const [durasi, setDurasi] = useState('1')
+  const [lunasi, setLunasi] = useState(false)
+  const [metodeBayar, setMetodeBayar] = useState('TUNAI')
 
   const tujuan = kamarTersedia.find(k => k.id === tujuanId) ?? null
   // Deposit yang ikut pindah = deposit titipan sewa lama; kekurangannya ditagih.
@@ -62,6 +64,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
     setPerlakuan('PENUH'); setKembali(''); setCatatan('')
     setTanggal(new Date().toISOString().slice(0, 10))
     setMode('KELUAR'); setTujuanId(''); setDurasi('1')
+    setLunasi(false); setMetodeBayar('TUNAI')
   }
 
   async function kirimPindah(paksa: boolean) {
@@ -119,6 +122,8 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
           depositKembali: perlakuan === 'SEBAGIAN' ? kembaliNum : 0,
           tanggalKeluarAktual: new Date(`${tanggal}T00:00:00`).toISOString(),
           ...(catatan.trim() ? { catatan: catatan.trim() } : {}),
+          lunasi,
+          metodeBayar,
           paksa,
         }),
       })
@@ -212,14 +217,42 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                   </div>
                 </div>
 
-                {/* Peringatan tagihan belum lunas */}
+                {/* Tagihan belum lunas: tawarkan lunasi di sini atau biarkan
+                    menggantung (non-blokir, keputusan produk). Saat lunasi
+                    dicentang, peringatan "tetap check-out" tak perlu muncul. */}
                 {(peringatan || sewa.sisaTagihan > 0) && (
                   <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5 text-xs text-amber-800 flex gap-2">
                     <ExclamationTriangle className="shrink-0 mt-0.5" aria-hidden="true" />
                     <span>
                       {peringatan || `Masih ada ${sewa.jumlahTagihan} tagihan belum lunas (${formatRupiah(sewa.sisaTagihan)}).`}
-                      {' '}Check-out tetap bisa dilanjutkan, tagihan tetap tercatat sebagai belum lunas.
+                      {lunasi
+                        ? ' Akan dilunasi sekarang saat check-out.'
+                        : ' Check-out tetap bisa dilanjutkan, tagihan tetap tercatat sebagai belum lunas.'}
                     </span>
+                  </div>
+                )}
+
+                {mode === 'KELUAR' && sewa.sisaTagihan > 0 && (
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5" checked={lunasi}
+                        onChange={e => { setLunasi(e.target.checked); setPeringatan('') }} />
+                      <span className="text-xs text-gray-700">
+                        Lunasi tagihan {formatRupiah(sewa.sisaTagihan)} sekarang
+                        <span className="text-gray-400"> — tercatat sebagai pemasukan</span>
+                      </span>
+                    </label>
+                    {lunasi && (
+                      <div>
+                        <label className="form-label">Metode pembayaran</label>
+                        <select className="form-input" value={metodeBayar} onChange={e => setMetodeBayar(e.target.value)}>
+                          <option value="TUNAI">Tunai</option>
+                          <option value="TRANSFER">Transfer</option>
+                          <option value="QRIS">QRIS</option>
+                          <option value="LAINNYA">Lainnya</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -283,7 +316,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
 
                     <div className="flex gap-2 pt-1">
                       <button type="button" onClick={tutup} className="btn btn-ghost flex-1">Batal</button>
-                      {peringatan ? (
+                      {peringatan && !lunasi ? (
                         <button type="button" onClick={() => kirim(true)} disabled={loading}
                           className="btn btn-primary flex-1">
                           {loading ? 'Memproses…' : 'Tetap check-out'}
@@ -291,7 +324,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                       ) : (
                         <button type="button" onClick={() => kirim(false)} disabled={loading}
                           className="btn btn-primary flex-1">
-                          {loading ? 'Memproses…' : 'Check-out'}
+                          {loading ? 'Memproses…' : lunasi ? 'Check-out & lunasi' : 'Check-out'}
                         </button>
                       )}
                     </div>

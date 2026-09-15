@@ -21,6 +21,11 @@ const checkoutSchema = z.object({
   catatan: z.string().optional(),
   // Set true kalau masih ada tagihan belum lunas tapi user tetap mau check-out.
   paksa: z.boolean().default(false),
+  // Lunasi semua tagihan berjalan sebelum sewa ditutup, dalam transaksi yang
+  // sama. Pembayaran sebagian belum didukung (keputusan produk): lunas atau
+  // tidak sama sekali.
+  lunasi: z.boolean().default(false),
+  metodeBayar: z.enum(['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA']).default('TUNAI'),
 })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,7 +62,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const sisaTagihan = sewa.tagihan.reduce((s, t) => s + Number(t.nominal), 0)
 
   // Tagihan belum lunas tidak memblokir (keputusan produk), tapi harus disengaja.
-  if (sisaTagihan > 0 && !d.paksa) {
+  // Kalau user memilih "bayar saat checkout", tagihan ini justru dilunasi —
+  // jadi tak perlu konfirmasi paksa.
+  if (sisaTagihan > 0 && !d.paksa && !d.lunasi) {
     return NextResponse.json(
       {
         error: 'MASIH_ADA_TAGIHAN',
@@ -102,6 +109,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       await tx.kamar.update({ where: { id: sewa.kamar.id }, data: { status: 'TERSEDIA' } })
+
+      // Lunasi tagihan berjalan di dalam transaksi yang sama. Di luar transaksi,
+      // kegagalan panggilan kedua meninggalkan tagihan menggantung padahal uang
+      // sudah diterima kasir. status WAJIB diubah ke LUNAS: laporan pemasukan
+      // (app/api/keuangan/route.ts) menjumlahkan Tagihan berstatus LUNAS, bukan
+      // menjumlahkan baris Pembayaran — tanpa ini uangnya tak muncul di laporan.
+      const tagihanDilunasi: string[] = []
+      if (d.lunasi && sewa.tagihan.length > 0) {
+        for (const t of sewa.tagihan) {
+          await tx.pembayaran.create({
+            data: {
+              tagihanId: t.id,
+              nominal: Number(t.nominal),
+              metodeBayar: d.metodeBayar,
+              catatan: 'Dibayar saat check-out',
+              dibayarPada: keluarAktual,
+            },
+          })
+          await tx.tagihan.update({ where: { id: t.id }, data: { status: 'LUNAS' } })
+          tagihanDilunasi.push(t.id)
+        }
+      }
 
       // Deposit dikembalikan -> uang keluar, catat di Pengeluaran (bukan
       // potong pendapatan) supaya laporan laba tetap bersih.
@@ -153,11 +182,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             `${sewa.penyewa?.nama ?? 'Penyewa'} keluar dari ${sewa.kamar.nomor}. ` +
             `Deposit ${labelDeposit(deposit)}: kembali ${labelDeposit(kembali)}` +
             `${hangus > 0 ? `, hangus ${labelDeposit(hangus)}` : ''}.` +
-            `${sisaTagihan > 0 ? ` Tagihan belum lunas ${labelDeposit(sisaTagihan)}.` : ''}`,
+            `${tagihanDilunasi.length > 0 ? ` ${tagihanDilunasi.length} tagihan dilunasi saat check-out.` : ''}` +
+            `${sisaTagihan > 0 && tagihanDilunasi.length === 0 ? ` Tagihan belum lunas ${labelDeposit(sisaTagihan)}.` : ''}`,
         },
       })
 
-      return { deposit, kembali, hangus, sisaTagihan }
+      return { deposit, kembali, hangus, sisaTagihan, dilunasi: tagihanDilunasi.length }
     })
 
     return NextResponse.json({ ok: true, ...result })
