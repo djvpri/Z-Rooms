@@ -9,6 +9,7 @@ import { addDays, addMonths, addYears } from 'date-fns'
 const bookingSchema = z.object({
   // Penyewa — nama & noHp opsional (penyewa boleh dicatat dulu tanpa data
   // lengkap, mis. booking cepat saat calon penyewa belum memberi identitas).
+  penyewaId: z.string().optional(), // pilih penyewa lama; identitas by id
   nama: z.string().trim().optional(),
   nik: z.string().trim().optional(),
   noHp: z.string().trim().optional(),
@@ -71,15 +72,37 @@ export async function POST(req: NextRequest) {
   const noHp = kosongJadiNull(d.noHp)
   const nik = kosongJadiNull(d.nik)
 
-  const penyewa = nik
-    ? await prisma.penyewa.upsert({
-        where: { nik },
-        update: { nama, noHp },
-        create: { nama, nik, noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
-      })
-    : await prisma.penyewa.create({
-        data: { nama, noHp, pekerjaan: d.pekerjaan, tipeEntitas: d.tipeEntitas, namaPerusahaan: d.namaPerusahaan, npwp: d.npwp },
-      })
+  // Data penyewa yang boleh diperbarui. Dipakai di dua jalur supaya penyewa
+  // lama tidak menyimpan versi data yang sudah dikoreksi di form.
+  const dataPenyewa = {
+    nama, noHp, nik,
+    pekerjaan: d.pekerjaan,
+    tipeEntitas: d.tipeEntitas,
+    namaPerusahaan: d.namaPerusahaan,
+    npwp: d.npwp,
+  }
+
+  let penyewa
+  if (d.penyewaId) {
+    // Jalur pilih-dari-daftar: identitas by id, bukan by nik. Menutup lubang
+    // penyewa tanpa NIK yang selalu bikin baris baru, dan NIK salah ketik yang
+    // bikin orang yang sama tercatat dua kali.
+    const lama = await prisma.penyewa.findUnique({ where: { id: d.penyewaId } })
+    if (!lama) return NextResponse.json({ error: 'Penyewa tidak ditemukan' }, { status: 404 })
+    penyewa = await prisma.penyewa.update({ where: { id: d.penyewaId }, data: dataPenyewa })
+  } else if (nik) {
+    // NIK milik penyewa lain -> tolak, jangan diam-diam pindahkan identitas.
+    const pemilikNik = await prisma.penyewa.findUnique({ where: { nik } })
+    if (pemilikNik) {
+      return NextResponse.json(
+        { error: `NIK ${nik} sudah terdaftar atas nama ${pemilikNik.nama ?? 'penyewa lain'}. Pilih penyewa itu, atau kosongkan NIK.` },
+        { status: 409 },
+      )
+    }
+    penyewa = await prisma.penyewa.create({ data: dataPenyewa })
+  } else {
+    penyewa = await prisma.penyewa.create({ data: { ...dataPenyewa, nik: null } })
+  }
 
   // Transaksi: buat sewa + update status kamar + buat tagihan
   let result

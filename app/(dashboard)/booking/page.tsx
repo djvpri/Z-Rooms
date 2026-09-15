@@ -20,6 +20,18 @@ type Kamar = {
   harga: { periodeSewa: string; harga: string }[]
 }
 
+type PenyewaHasil = {
+  id: string
+  nama: string | null
+  nik: string | null
+  noHp: string | null
+  pekerjaan: string | null
+  namaPerusahaan: string | null
+  npwp: string | null
+  tipeEntitas: 'INDIVIDU' | 'PERUSAHAAN'
+  jumlahSewa: number
+}
+
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 const PEKERJAAN = ['Mahasiswa', 'Karyawan Swasta', 'PNS / ASN', 'Wirausaha', 'Pensiunan', 'Lainnya']
@@ -31,6 +43,12 @@ export default function BookingPage() {
   const [nota, setNota] = useState<NotaBooking | null>(null)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'INDIVIDU' | 'PERUSAHAAN'>('INDIVIDU')
+
+  // Pencarian penyewa lama. `penyewaId` kosong = penyewa baru.
+  const [cari, setCari] = useState('')
+  const [hasil, setHasil] = useState<PenyewaHasil[]>([])
+  const [penyewaId, setPenyewaId] = useState('')
+  const [penyewaNama, setPenyewaNama] = useState('')
 
   const [form, setForm] = useState({
     nama: '', nik: '', noHp: '', pekerjaan: 'Mahasiswa',
@@ -44,6 +62,41 @@ export default function BookingPage() {
       .then(r => r.json())
       .then(setKamarList)
   }, [])
+
+  // Cari penyewa lama. Dibatasi >=2 huruf supaya tak menarik seluruh tabel,
+  // dan di-debounce 300ms supaya tiap ketikan tidak jadi satu request.
+  useEffect(() => {
+    const q = cari.trim()
+    if (q.length < 2) { setHasil([]); return }
+    const t = setTimeout(() => {
+      fetch(`/api/penyewa?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(d => setHasil(d.data ?? []))
+        .catch(() => setHasil([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [cari])
+
+  function pilihPenyewa(p: PenyewaHasil) {
+    setPenyewaId(p.id)
+    setPenyewaNama(p.nama ?? '')
+    setActiveTab(p.tipeEntitas)
+    setForm(f => ({
+      ...f,
+      nama: p.nama ?? '', nik: p.nik ?? '', noHp: p.noHp ?? '',
+      pekerjaan: p.pekerjaan || 'Mahasiswa',
+      namaPerusahaan: p.namaPerusahaan ?? '', npwp: p.npwp ?? '',
+    }))
+    setCari(''); setHasil([])
+  }
+
+  function penyewaBaru() {
+    setPenyewaId(''); setPenyewaNama('')
+    setForm(f => ({
+      ...f, nama: '', nik: '', noHp: '',
+      pekerjaan: 'Mahasiswa', namaPerusahaan: '', npwp: '',
+    }))
+  }
 
   const kamarDipilih = kamarList.find(k => k.id === form.kamarId)
   const hargaKamar = kamarDipilih?.harga.find(h => h.periodeSewa === form.periodeSewa)
@@ -71,6 +124,7 @@ export default function BookingPage() {
           durasi: Number(form.durasi),
           deposit: Number(form.deposit) || 0,
           bayarSekarang: form.bayarSekarang,
+          penyewaId: penyewaId || undefined,
         }),
       })
       if (!res.ok) {
@@ -101,6 +155,11 @@ export default function BookingPage() {
         catatan: form.catatan,
         tanggalCetak: new Date().toISOString(),
       })
+      // Reset pilihan penyewa: kalau tidak, booking berikutnya ikut memakai
+      // penyewa lama tanpa kasir menyadarinya.
+      penyewaBaru()
+      setForm(f => ({ ...f, kamarId: '', catatan: '', deposit: '' }))
+      fetch('/api/kamar?status=TERSEDIA').then(r => r.json()).then(setKamarList)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -145,6 +204,54 @@ export default function BookingPage() {
               </span>
             </button>
           ))}
+        </div>
+
+        {/* Pilih penyewa lama — sekali klik, data terisi; tak perlu ketik ulang. */}
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-700">Penyewa</h2>
+            {penyewaNama && (
+              <button type="button" onClick={penyewaBaru}
+                className="text-xs text-teal-700 hover:underline">
+                Ganti ke penyewa baru
+              </button>
+            )}
+          </div>
+
+          {penyewaNama ? (
+            <div className="flex items-center justify-between rounded-lg bg-teal-50 px-3 py-2">
+              <span className="text-sm text-teal-900">
+                <PersonFill aria-hidden="true" className="inline mr-1.5" />
+                Penyewa terdaftar: <strong>{penyewaNama}</strong>
+              </span>
+              <span className="text-xs text-teal-700">Riwayat sewa disatukan</span>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                className="form-input"
+                value={cari}
+                onChange={e => setCari(e.target.value)}
+                placeholder="Ketik nama / NIK / no. HP penyewa lama, atau isi data baru di bawah"
+              />
+              {hasil.length > 0 && (
+                <ul className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {hasil.map(p => (
+                    <li key={p.id}>
+                      <button type="button" onClick={() => pilihPenyewa(p)}
+                        className="w-full px-3 py-2 text-left hover:bg-teal-50">
+                        <div className="text-sm text-gray-900">{p.nama ?? '(tanpa nama)'}</div>
+                        <div className="text-xs text-gray-500">
+                          {[p.noHp, p.nik ? `NIK ${p.nik}` : null, `${p.jumlahSewa} sewa`]
+                            .filter(Boolean).join(' · ')}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Data penyewa */}
