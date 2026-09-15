@@ -1,6 +1,6 @@
 // prisma/seed.ts
 import { PrismaClient, TipeProperti, TipeKamar, StatusKamar, PeriodeSewa,
-  TipeEntitas, StatusSewa, SumberBooking, StatusTagihan, MetodeBayar,
+  TipeEntitas, StatusSewa, StatusTagihan, MetodeBayar,
   KategoriBeban, TipeNotifikasi, Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { addDays, subDays, startOfMonth, endOfMonth } from 'date-fns'
@@ -145,21 +145,21 @@ async function main() {
   // ── Sewa aktif (kamar terisi)
   const now = new Date()
   const sewaData = [
-    { nomor: 'K.01', penyewaIdx: 0,  periode: PeriodeSewa.HARIAN,  masuk: subDays(now,1),  keluar: addDays(now,2),  harga: 80000,   deposit: 80000,   sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.03', penyewaIdx: 1,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-10'), keluar: new Date('2026-07-10'), harga: 1200000, deposit: 2400000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.05', penyewaIdx: 2,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1200000, deposit: 2400000, sumber: SumberBooking.MAMIKOS },
-    { nomor: 'K.06', penyewaIdx: 3,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.07', penyewaIdx: 4,  periode: PeriodeSewa.TAHUNAN, masuk: new Date('2026-01-01'), keluar: new Date('2027-01-01'), harga: 18000000,deposit: 18000000,sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.08', penyewaIdx: 5,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.10', penyewaIdx: 6,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1200000, deposit: 2400000, sumber: SumberBooking.TRAVELOKA },
-    { nomor: 'K.12', penyewaIdx: 7,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-05-15'), keluar: new Date('2026-06-15'), harga: 1500000, deposit: 3000000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.15', penyewaIdx: 8,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-16'), keluar: new Date('2026-07-16'), harga: 1200000, deposit: 2400000, sumber: SumberBooking.MAMIKOS },
-    { nomor: 'K.17', penyewaIdx: 9,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.18', penyewaIdx: 10, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 2500000, deposit: 5000000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.19', penyewaIdx: 11, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, sumber: SumberBooking.LANGSUNG },
-    { nomor: 'K.20', penyewaIdx: 12, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1800000, deposit: 3600000, sumber: SumberBooking.LANGSUNG },
+    { nomor: 'K.01', penyewaIdx: 0,  periode: PeriodeSewa.HARIAN,  masuk: subDays(now,1),  keluar: addDays(now,2),  harga: 80000,   deposit: 80000,   metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.03', penyewaIdx: 1,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-10'), keluar: new Date('2026-07-10'), harga: 1200000, deposit: 2400000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.05', penyewaIdx: 2,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1200000, deposit: 2400000, metodeBayar: MetodeBayar.TRANSFER },
+    { nomor: 'K.06', penyewaIdx: 3,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.07', penyewaIdx: 4,  periode: PeriodeSewa.TAHUNAN, masuk: new Date('2026-01-01'), keluar: new Date('2027-01-01'), harga: 18000000,deposit: 18000000,metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.08', penyewaIdx: 5,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.10', penyewaIdx: 6,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1200000, deposit: 2400000, metodeBayar: MetodeBayar.QRIS },
+    { nomor: 'K.12', penyewaIdx: 7,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-05-15'), keluar: new Date('2026-06-15'), harga: 1500000, deposit: 3000000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.15', penyewaIdx: 8,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-16'), keluar: new Date('2026-07-16'), harga: 1200000, deposit: 2400000, metodeBayar: MetodeBayar.TRANSFER },
+    { nomor: 'K.17', penyewaIdx: 9,  periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.18', penyewaIdx: 10, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 2500000, deposit: 5000000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.19', penyewaIdx: 11, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 800000,  deposit: 1600000, metodeBayar: MetodeBayar.TUNAI },
+    { nomor: 'K.20', penyewaIdx: 12, periode: PeriodeSewa.BULANAN, masuk: new Date('2026-06-01'), keluar: new Date('2026-07-01'), harga: 1800000, deposit: 3600000, metodeBayar: MetodeBayar.TUNAI },
     // K.14 pending
-    { nomor: 'K.14', penyewaIdx: 13, periode: PeriodeSewa.BULANAN, masuk: addDays(now,3), keluar: addDays(now,33), harga: 2500000, deposit: 5000000, sumber: SumberBooking.BOOKING_COM, status: StatusSewa.PENDING },
+    { nomor: 'K.14', penyewaIdx: 13, periode: PeriodeSewa.BULANAN, masuk: addDays(now,3), keluar: addDays(now,33), harga: 2500000, deposit: 5000000, metodeBayar: MetodeBayar.LAINNYA, status: StatusSewa.PENDING },
   ]
 
   for (const s of sewaData) {
@@ -173,7 +173,7 @@ async function main() {
         hargaSewa: s.harga,
         deposit: s.deposit,
         statusSewa: (s as any).status ?? StatusSewa.AKTIF,
-        sumber: s.sumber,
+        metodeBayar: s.metodeBayar,
       },
     })
 

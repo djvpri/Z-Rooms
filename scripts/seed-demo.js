@@ -97,7 +97,7 @@ async function main() {
       data: {
         kamarId: k.id, penyewaId: p.id, periodeSewa: 'BULANAN',
         tanggalMasuk, tanggalKeluar, hargaSewa: k.harga, deposit: k.harga,
-        statusSewa: 'AKTIF', sumber: pick(['LANGSUNG', 'LANGSUNG', 'MAMIKOS', 'TRAVELOKA']),
+        statusSewa: 'AKTIF', metodeBayar: pick(['TUNAI', 'TUNAI', 'TRANSFER', 'QRIS']),
       },
     })
     await prisma.kamar.update({ where: { id: k.id }, data: { status: 'TERISI' } })
@@ -143,7 +143,7 @@ async function main() {
       data: {
         kamarId: k.id, penyewaId: p.id, periodeSewa: 'BULANAN',
         tanggalMasuk, tanggalKeluar, hargaSewa: k.harga, deposit: k.harga,
-        statusSewa: 'SELESAI', sumber: 'LANGSUNG',
+        statusSewa: 'SELESAI', metodeBayar: 'TUNAI',
       },
     })
     sewaCount++

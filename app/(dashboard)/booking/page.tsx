@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, metodeBayarLabel } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
   periodeSewa: string; tanggalMasuk: string; durasi: number
-  harga: number; deposit: number; sumber: string; catatan: string
+  harga: number; deposit: number; metodeBayar: string; catatan: string
   tanggalCetak: string
 }
 
@@ -21,7 +21,7 @@ type Kamar = {
 }
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
-const SUMBER = ['LANGSUNG', 'MAMIKOS', 'TRAVELOKA', 'BOOKING_COM', 'TOKOPEDIA', 'ONLINE_LAIN']
+const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 const PEKERJAAN = ['Mahasiswa', 'Karyawan Swasta', 'PNS / ASN', 'Wirausaha', 'Pensiunan', 'Lainnya']
 
 export default function BookingPage() {
@@ -36,7 +36,7 @@ export default function BookingPage() {
     nama: '', nik: '', noHp: '', pekerjaan: 'Mahasiswa',
     namaPerusahaan: '', npwp: '',
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
-    deposit: '', sumber: 'LANGSUNG', catatan: '',
+    deposit: '', metodeBayar: 'TUNAI', catatan: '',
   })
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function BookingPage() {
         durasi: Number(form.durasi),
         harga: hargaNum,
         deposit: Number(form.deposit) || 0,
-        sumber: form.sumber,
+        metodeBayar: form.metodeBayar,
         catatan: form.catatan,
         tanggalCetak: new Date().toISOString(),
       })
@@ -237,9 +237,9 @@ export default function BookingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Sumber booking</label>
-              <select className="form-input" value={form.sumber} onChange={e => set('sumber', e.target.value)}>
-                {SUMBER.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+              <label className="form-label">Pembayaran</label>
+              <select className="form-input" value={form.metodeBayar} onChange={e => set('metodeBayar', e.target.value)}>
+                {METODE_BAYAR.map(m => <option key={m} value={m}>{metodeBayarLabel(m)}</option>)}
               </select>
             </div>
             <div>
@@ -334,8 +334,8 @@ export default function BookingPage() {
                   <span>{nota.durasi} {nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Sumber</span>
-                  <span>{nota.sumber.replace('_', ' ')}</span>
+                  <span className="text-gray-500">Pembayaran</span>
+                  <span>{metodeBayarLabel(nota.metodeBayar)}</span>
                 </div>
                 {nota.catatan && (
                   <div className="flex justify-between">

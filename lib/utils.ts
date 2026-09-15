@@ -71,6 +71,14 @@ export function statusTagihanLabel(status: string) {
   return map[status] ?? status
 }
 
+export function metodeBayarLabel(m: string) {
+  const map: Record<string, string> = {
+    TUNAI: 'Tunai', TRANSFER: 'Transfer', QRIS: 'QRIS',
+    VA_BCA: 'VA BCA', VA_BRI: 'VA BRI', VA_MANDIRI: 'VA Mandiri', LAINNYA: 'Lainnya',
+  }
+  return map[m] ?? m
+}
+
 export function periodeSewaSingkat(p: string) {
   const map: Record<string, string> = {
     HARIAN: '/hari', MINGGUAN: '/minggu', BULANAN: '/bulan', TAHUNAN: '/tahun',

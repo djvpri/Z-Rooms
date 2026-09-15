@@ -22,7 +22,7 @@ const bookingSchema = z.object({
   tanggalMasuk: z.string(),
   durasi: z.number().min(1).default(1), // jumlah hari/bulan/tahun
   deposit: z.number().default(0),
-  sumber: z.enum(['LANGSUNG', 'MAMIKOS', 'TRAVELOKA', 'BOOKING_COM', 'TOKOPEDIA', 'ONLINE_LAIN']).default('LANGSUNG'),
+  metodeBayar: z.enum(['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA']).default('TUNAI'),
   catatan: z.string().optional(),
 })
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         hargaSewa: Number(harga),
         deposit: d.deposit,
         statusSewa: 'AKTIF',
-        sumber: d.sumber,
+        metodeBayar: d.metodeBayar,
         catatan: d.catatan,
       },
     })

@@ -2,7 +2,7 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
-import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel, namaPenyewa } from '@/lib/utils'
+import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel, namaPenyewa, metodeBayarLabel } from '@/lib/utils'
 import { ArrowRight } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
@@ -98,11 +98,11 @@ export default async function PenyewaPage() {
             <tbody>
               {sewa.map((s, i) => {
                 const tagihan = s.tagihan[0]
-                const sumberBadge: Record<string, string> = {
-                  LANGSUNG: 'bg-gray-100 text-gray-500',
-                  MAMIKOS: 'bg-teal-50 text-teal-700',
-                  TRAVELOKA: 'bg-purple-50 text-purple-600',
-                  BOOKING_COM: 'bg-blue-50 text-blue-600',
+                const bayarBadge: Record<string, string> = {
+                  TUNAI: 'bg-gray-100 text-gray-500',
+                  TRANSFER: 'bg-teal-50 text-teal-700',
+                  QRIS: 'bg-purple-50 text-purple-600',
+                  LAINNYA: 'bg-blue-50 text-blue-600',
                 }
                 return (
                   <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
@@ -120,8 +120,8 @@ export default async function PenyewaPage() {
                     <td className="py-2.5 text-gray-500 text-xs">{formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: '2-digit' })}</td>
                     <td className="py-2.5 text-gray-700">{formatRupiah(s.hargaSewa)}</td>
                     <td className="py-2.5">
-                      <span className={`badge text-xs ${sumberBadge[s.sumber] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {s.sumber === 'LANGSUNG' ? 'Langsung' : s.sumber.replace('_', ' ')}
+                      <span className={`badge text-xs ${bayarBadge[s.metodeBayar] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {metodeBayarLabel(s.metodeBayar)}
                       </span>
                     </td>
                     <td className="py-2.5">
@@ -142,11 +142,11 @@ export default async function PenyewaPage() {
         <div className="md:hidden space-y-2">
           {sewa.map((s, i) => {
             const tagihan = s.tagihan[0]
-            const sumberBadge: Record<string, string> = {
-              LANGSUNG: 'bg-gray-100 text-gray-500',
-              MAMIKOS: 'bg-teal-50 text-teal-700',
-              TRAVELOKA: 'bg-purple-50 text-purple-600',
-              BOOKING_COM: 'bg-blue-50 text-blue-600',
+            const bayarBadge: Record<string, string> = {
+              TUNAI: 'bg-gray-100 text-gray-500',
+              TRANSFER: 'bg-teal-50 text-teal-700',
+              QRIS: 'bg-purple-50 text-purple-600',
+              LAINNYA: 'bg-blue-50 text-blue-600',
             }
             return (
               <div key={s.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
@@ -168,8 +168,8 @@ export default async function PenyewaPage() {
                 </div>
                 <div className="text-xs text-gray-400 ml-8 mt-0.5">
                   {formatTanggal(s.tanggalMasuk, { day: 'numeric', month: 'short' })} <ArrowRight className="inline" size={10} aria-hidden="true" /> {formatTanggal(s.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })}
-                  <span className={`badge text-[10px] ml-2 ${sumberBadge[s.sumber] ?? 'bg-gray-100 text-gray-500'}`}>
-                    {s.sumber === 'LANGSUNG' ? 'Langsung' : s.sumber.replace('_', ' ')}
+                  <span className={`badge text-[10px] ml-2 ${bayarBadge[s.metodeBayar] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {metodeBayarLabel(s.metodeBayar)}
                   </span>
                 </div>
               </div>
