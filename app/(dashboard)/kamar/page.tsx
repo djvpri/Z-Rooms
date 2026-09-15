@@ -5,6 +5,7 @@ import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa } from '@/lib/utils'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
+import CheckoutModal from '@/components/kamar/CheckoutModal'
 import { DoorClosedFill } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,15 @@ export default async function KamarPage() {
       harga: { where: { aktif: true } },
       sewa: {
         where: { statusSewa: 'AKTIF' },
-        include: { penyewa: { select: { nama: true, noHp: true } } },
+        include: {
+          penyewa: { select: { nama: true, noHp: true } },
+          // Sisa tagihan dipakai modal check-out untuk memperingatkan kasir
+          // sebelum kamar dikosongkan dengan tunggakan masih berjalan.
+          tagihan: {
+            where: { status: { in: ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'] } },
+            select: { nominal: true },
+          },
+        },
         take: 1,
       },
     },
@@ -77,11 +86,12 @@ export default async function KamarPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
           const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
-          const penyewa = k.sewa[0]?.penyewa
+          const sewaAktif = k.sewa[0]
+          const penyewa = sewaAktif?.penyewa
           return (
             <div
               key={k.id}
-              className={`rounded-xl border p-3 text-center cursor-pointer hover:scale-105 transition-transform ${statusKamarColor(k.status)}`}
+              className={`rounded-xl border p-3 text-center ${statusKamarColor(k.status)}`}
             >
               <p className="font-semibold text-sm">{k.nomor}</p>
               <p className="text-xs mt-0.5 opacity-75">{tipeKamarLabel[k.tipe]}</p>
@@ -93,6 +103,19 @@ export default async function KamarPage() {
               <p className="text-xs mt-1 opacity-60 truncate">
                 {penyewa ? namaPenyewa(penyewa.nama) : 'Kosong'}
               </p>
+              {sewaAktif && (
+                <CheckoutModal
+                  sewa={{
+                    id: sewaAktif.id,
+                    kamarNomor: k.nomor,
+                    penyewaNama: penyewa?.nama ?? null,
+                    tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
+                    deposit: Number(sewaAktif.deposit),
+                    sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
+                    jumlahTagihan: sewaAktif.tagihan.length,
+                  }}
+                />
+              )}
             </div>
           )
         })}
@@ -115,12 +138,14 @@ export default async function KamarPage() {
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Status</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Penyewa</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Fasilitas</th>
+                <th className="text-left py-2 text-xs font-medium text-gray-400"></th>
               </tr>
             </thead>
             <tbody>
               {kamar.map(k => {
                 const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
-                const penyewa = k.sewa[0]?.penyewa
+                const sewaAktif = k.sewa[0]
+                const penyewa = sewaAktif?.penyewa
                 return (
                   <tr key={k.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="py-2.5 font-medium text-gray-800">{k.nomor}</td>
@@ -132,6 +157,23 @@ export default async function KamarPage() {
                     </td>
                     <td className="py-2.5 text-gray-600">{penyewa ? namaPenyewa(penyewa.nama) : '-'}</td>
                     <td className="py-2.5 text-gray-400 text-xs">{k.fasilitas.slice(0, 3).join(', ')}{k.fasilitas.length > 3 ? '…' : ''}</td>
+                    <td className="py-2.5 w-px">
+                      {sewaAktif && (
+                        <div className="w-28">
+                          <CheckoutModal
+                            sewa={{
+                              id: sewaAktif.id,
+                              kamarNomor: k.nomor,
+                              penyewaNama: penyewa?.nama ?? null,
+                              tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
+                              deposit: Number(sewaAktif.deposit),
+                              sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
+                              jumlahTagihan: sewaAktif.tagihan.length,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
@@ -143,7 +185,8 @@ export default async function KamarPage() {
         <div className="md:hidden space-y-2">
           {kamar.map(k => {
             const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
-            const penyewa = k.sewa[0]?.penyewa
+            const sewaAktif = k.sewa[0]
+            const penyewa = sewaAktif?.penyewa
             return (
               <div key={k.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
                 <div className="min-w-0 flex-1">
@@ -159,6 +202,21 @@ export default async function KamarPage() {
                     {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
                   </div>
                 </div>
+                {sewaAktif && (
+                  <div className="w-24 shrink-0 ml-2">
+                    <CheckoutModal
+                      sewa={{
+                        id: sewaAktif.id,
+                        kamarNomor: k.nomor,
+                        penyewaNama: penyewa?.nama ?? null,
+                        tanggalKeluar: sewaAktif.tanggalKeluar.toISOString(),
+                        deposit: Number(sewaAktif.deposit),
+                        sisaTagihan: sewaAktif.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
+                        jumlahTagihan: sewaAktif.tagihan.length,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )
           })}
