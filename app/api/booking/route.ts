@@ -23,6 +23,8 @@ const bookingSchema = z.object({
   durasi: z.number().min(1).default(1), // jumlah hari/bulan/tahun
   deposit: z.number().default(0),
   metodeBayar: z.enum(['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA']).default('TUNAI'),
+  // Bayar penuh saat booking. false = tagihan BELUM_BAYAR (jatuh tempo +3 hari).
+  bayarSekarang: z.boolean().default(false),
   catatan: z.string().optional(),
 })
 
@@ -111,9 +113,24 @@ export async function POST(req: NextRequest) {
         periodeDari: masuk,
         periodeHingga: keluar,
         jatuhTempo,
-        status: 'BELUM_BAYAR',
+        status: d.bayarSekarang ? 'LUNAS' : 'BELUM_BAYAR',
       },
     })
+
+    // Bayar saat booking: tulis Pembayaran DAN set status LUNAS di transaksi yang
+    // sama. Status wajib, bukan opsional — app/api/keuangan/route.ts menjumlahkan
+    // Tagihan berstatus LUNAS, jadi Pembayaran tanpa LUNAS = uang tak muncul di
+    // laporan dan tagihan tetap tampil belum bayar.
+    if (d.bayarSekarang) {
+      await tx.pembayaran.create({
+        data: {
+          tagihanId: tagihan.id,
+          nominal: Number(harga),
+          metodeBayar: d.metodeBayar,
+          catatan: 'Dibayar saat booking',
+        },
+      })
+    }
 
     // Notifikasi — pakai properti milik kamar yang dibooking, BUKAN findFirst.
     // Kalau owner punya >1 properti, findFirst bisa menaruh notifikasi di
@@ -123,7 +140,10 @@ export async function POST(req: NextRequest) {
         propertiId: kamar.propertiId,
         tipe: 'CHECKIN_BARU',
         judul: 'Check-in baru',
-        pesan: `${nama ?? 'Penyewa baru'} masuk ke ${kamar.nomor}. Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`,
+        pesan: `${nama ?? 'Penyewa baru'} masuk ke ${kamar.nomor}. ` +
+          (d.bayarSekarang
+            ? `Lunas Rp ${Number(harga).toLocaleString('id-ID')} saat booking.`
+            : `Tagihan Rp ${Number(harga).toLocaleString('id-ID')} jatuh tempo ${jatuhTempo.toLocaleDateString('id-ID')}.`),
       },
     })
 

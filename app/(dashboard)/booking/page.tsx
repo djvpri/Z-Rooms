@@ -8,8 +8,8 @@ import { formatRupiah, namaPenyewa, metodeBayarLabel } from '@/lib/utils'
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
   periodeSewa: string; tanggalMasuk: string; durasi: number
-  harga: number; deposit: number; metodeBayar: string; catatan: string
-  tanggalCetak: string
+  harga: number; deposit: number; metodeBayar: string; bayarSekarang: boolean
+  catatan: string; tanggalCetak: string
 }
 
 type Kamar = {
@@ -36,7 +36,7 @@ export default function BookingPage() {
     nama: '', nik: '', noHp: '', pekerjaan: 'Mahasiswa',
     namaPerusahaan: '', npwp: '',
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
-    deposit: '', metodeBayar: 'TUNAI', catatan: '',
+    deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
   })
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function BookingPage() {
   const hargaKamar = kamarDipilih?.harga.find(h => h.periodeSewa === form.periodeSewa)
   const hargaNum = hargaKamar ? Number(hargaKamar.harga) : 0
 
-  function set(key: string, val: string | number) {
+  function set(key: string, val: string | number | boolean) {
     setForm(f => ({ ...f, [key]: val }))
   }
 
@@ -70,6 +70,7 @@ export default function BookingPage() {
           tipeEntitas: activeTab,
           durasi: Number(form.durasi),
           deposit: Number(form.deposit) || 0,
+          bayarSekarang: form.bayarSekarang,
         }),
       })
       if (!res.ok) {
@@ -96,6 +97,7 @@ export default function BookingPage() {
         harga: hargaNum,
         deposit: Number(form.deposit) || 0,
         metodeBayar: form.metodeBayar,
+        bayarSekarang: form.bayarSekarang,
         catatan: form.catatan,
         tanggalCetak: new Date().toISOString(),
       })
@@ -238,7 +240,7 @@ export default function BookingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Pembayaran</label>
-              <select className="form-input" value={form.metodeBayar} onChange={e => set('metodeBayar', e.target.value)}>
+              <select className="form-input" value={form.metodeBayar} onChange={e => set('metodeBayar', e.target.value)} disabled={!form.bayarSekarang}>
                 {METODE_BAYAR.map(m => <option key={m} value={m}>{metodeBayarLabel(m)}</option>)}
               </select>
             </div>
@@ -246,6 +248,31 @@ export default function BookingPage() {
               <label className="form-label">Catatan</label>
               <input className="form-input" value={form.catatan} onChange={e => set('catatan', e.target.value)} placeholder="Motor, kebutuhan khusus, dll." />
             </div>
+          </div>
+
+          {/* Bayar sekarang / bayar nanti. Bukan toggle: dua pilihan yang saling
+              meniadakan, dan "bayar nanti" adalah perilaku default lama. */}
+          <div className="space-y-2">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="radio" name="bayarSekarang" className="mt-1" checked={form.bayarSekarang}
+                onChange={() => set('bayarSekarang', true)} />
+              <span className="text-sm text-gray-700">
+                Bayar sekarang
+                <span className="block text-xs text-gray-400">
+                  {hargaNum > 0 ? `${formatRupiah(hargaNum)} langsung tercatat lunas` : 'Tagihan langsung tercatat lunas'}
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="radio" name="bayarSekarang" className="mt-1" checked={!form.bayarSekarang}
+                onChange={() => set('bayarSekarang', false)} />
+              <span className="text-sm text-gray-700">
+                Bayar saat check-out
+                <span className="block text-xs text-gray-400">
+                  Tagihan jatuh tempo 3 hari setelah masuk, dilunasi lewat modal check-out kamar
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 
@@ -263,8 +290,13 @@ export default function BookingPage() {
                 <span>{formatRupiah(Number(form.deposit) || 0)}</span>
               </div>
               <div className="flex justify-between font-semibold text-teal-900 pt-1 border-t border-teal-200">
-                <span>Total dibayar pertama</span>
+                <span>{form.bayarSekarang ? 'Total dibayar' : 'Total dibayar pertama'}</span>
                 <span>{formatRupiah(hargaNum + (Number(form.deposit) || 0))}</span>
+              </div>
+              <div className="text-xs text-teal-600 pt-1">
+                {form.bayarSekarang
+                  ? 'Sewa langsung tercatat lunas. Deposit diselesaikan saat check-out.'
+                  : 'Tagihan sewa belum lunas — bisa dilunasi kapan saja atau saat check-out.'}
               </div>
             </div>
           </div>
@@ -335,7 +367,7 @@ export default function BookingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Pembayaran</span>
-                  <span>{metodeBayarLabel(nota.metodeBayar)}</span>
+                  <span>{nota.bayarSekarang ? metodeBayarLabel(nota.metodeBayar) : 'Bayar saat check-out'}</span>
                 </div>
                 {nota.catatan && (
                   <div className="flex justify-between">
@@ -360,6 +392,14 @@ export default function BookingPage() {
               <div className="flex justify-between font-bold text-sm mb-3 pt-1 border-t border-dashed border-gray-300">
                 <span>TOTAL BAYAR PERTAMA</span>
                 <span>{formatRupiah(nota.harga + nota.deposit)}</span>
+              </div>
+
+              <div className="text-center text-xs mb-3">
+                {nota.bayarSekarang ? (
+                  <span className="text-teal-700 font-semibold">SEWA LUNAS</span>
+                ) : (
+                  <span className="text-gray-500">Sewa belum dibayar — dilunasi saat check-out</span>
+                )}
               </div>
 
               <div className="border-t border-dashed border-gray-300 my-3" />
