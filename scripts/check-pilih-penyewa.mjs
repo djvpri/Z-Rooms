@@ -11,20 +11,22 @@ const assert = (ok, pesan) => { if (!ok) throw new Error(`GAGAL: ${pesan}`) }
 // Cermin cabang penyewa di route. `db` = tabel Penyewa yang sudah ada.
 // Route menormalisasi '' -> null DULU (kosongJadiNull) sebelum cabang, jadi
 // cermin ini melakukan hal yang sama di depan.
-function pilihPenyewa({ penyewaId, nik, nama }, db = []) {
+function pilihPenyewa({ penyewaId, nik, nama, alamatAsal }, db = []) {
   nik = nik && nik.trim() ? nik.trim() : null
+  // alamatAsal normalisasi sama seperti kolom nullable lain: '' -> null.
+  alamatAsal = alamatAsal && alamatAsal.trim() ? alamatAsal.trim() : null
   if (penyewaId) {
     const lama = db.find(p => p.id === penyewaId)
     if (!lama) return { aksi: 'TOLAK_404' }
     // Jalur id: NIK boleh berubah, tapi tidak boleh menabrak milik baris lain.
     if (nik && db.some(p => p.nik === nik && p.id !== penyewaId)) return { aksi: 'TOLAK_409' }
-    return { aksi: 'UPDATE', id: penyewaId, nik: nik ?? null }
+    return { aksi: 'UPDATE', id: penyewaId, nik: nik ?? null, alamatAsal }
   }
   if (nik) {
     if (db.some(p => p.nik === nik)) return { aksi: 'TOLAK_409' }
-    return { aksi: 'CREATE', nik }
+    return { aksi: 'CREATE', nik, alamatAsal }
   }
-  return { aksi: 'CREATE', nik: null }
+  return { aksi: 'CREATE', nik: null, alamatAsal }
 }
 
 const DB = [
@@ -100,4 +102,16 @@ const DB = [
   assert(hasil.every(h => h.aksi !== 'DELETE'), 'tak boleh ada jalur menghapus penyewa')
 }
 
-console.log('OK — check-pilih-penyewa: 10 blok assertion lulus')
+// 11. Alamat ikut tersimpan di kedua jalur, dan '' jadi null (bukan string kosong).
+{
+  const lama = pilihPenyewa({ penyewaId: 'p1', nik: '111', alamatAsal: 'Jl. Melati 5' }, DB)
+  assert(lama.alamatAsal === 'Jl. Melati 5', 'alamat harus tersimpan saat update penyewa lama')
+  const baru = pilihPenyewa({ penyewaId: null, nik: '999', alamatAsal: 'Jl. Kenanga 2' }, DB)
+  assert(baru.alamatAsal === 'Jl. Kenanga 2', 'alamat harus tersimpan saat buat penyewa baru')
+  const tanpaAlamat = pilihPenyewa({ penyewaId: 'p1', nik: '111' }, DB)
+  assert(tanpaAlamat.alamatAsal === null, 'alamat kosong harus jadi null, bukan string kosong')
+  const spasi = pilihPenyewa({ penyewaId: 'p1', nik: '111', alamatAsal: '   ' }, DB)
+  assert(spasi.alamatAsal === null, 'alamat berisi spasi saja harus jadi null')
+}
+
+console.log('OK — check-pilih-penyewa: 11 blok assertion lulus')

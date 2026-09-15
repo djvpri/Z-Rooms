@@ -25,6 +25,7 @@ type PenyewaHasil = {
   nama: string | null
   nik: string | null
   noHp: string | null
+  alamatAsal: string | null
   namaPerusahaan: string | null
   npwp: string | null
   tipeEntitas: 'INDIVIDU' | 'PERUSAHAAN'
@@ -49,7 +50,7 @@ export default function BookingPage() {
   const [penyewaNama, setPenyewaNama] = useState('')
 
   const [form, setForm] = useState({
-    nama: '', nik: '', noHp: '',
+    nama: '', nik: '', noHp: '', alamatAsal: '',
     namaPerusahaan: '', npwp: '',
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
@@ -82,6 +83,7 @@ export default function BookingPage() {
     setForm(f => ({
       ...f,
       nama: p.nama ?? '', nik: p.nik ?? '', noHp: p.noHp ?? '',
+      alamatAsal: p.alamatAsal ?? '',
       namaPerusahaan: p.namaPerusahaan ?? '', npwp: p.npwp ?? '',
     }))
     setCari(''); setHasil([])
@@ -90,7 +92,7 @@ export default function BookingPage() {
   function penyewaBaru() {
     setPenyewaId(''); setPenyewaNama('')
     setForm(f => ({
-      ...f, nama: '', nik: '', noHp: '',
+      ...f, nama: '', nik: '', noHp: '', alamatAsal: '',
       namaPerusahaan: '', npwp: '',
     }))
   }
@@ -239,7 +241,7 @@ export default function BookingPage() {
                         className="w-full px-3 py-2 text-left hover:bg-teal-50">
                         <div className="text-sm text-gray-900">{p.nama ?? '(tanpa nama)'}</div>
                         <div className="text-xs text-gray-500">
-                          {[p.noHp, p.nik ? `NIK ${p.nik}` : null, `${p.jumlahSewa} sewa`]
+                          {[p.noHp, p.nik ? `NIK ${p.nik}` : null, p.alamatAsal, `${p.jumlahSewa} sewa`]
                             .filter(Boolean).join(' · ')}
                         </div>
                       </button>
@@ -270,6 +272,10 @@ export default function BookingPage() {
               <div>
                 <label className="form-label">NIK (opsional)</label>
                 <input className="form-input" value={form.nik} onChange={e => set('nik', e.target.value)} placeholder="16 digit NIK" maxLength={16} />
+              </div>
+              <div>
+                <label className="form-label">Alamat (opsional)</label>
+                <input className="form-input" value={form.alamatAsal} onChange={e => set('alamatAsal', e.target.value)} placeholder="Alamat asal sesuai KTP" />
               </div>
             </div>
           ) : (

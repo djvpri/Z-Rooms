@@ -124,7 +124,7 @@ export default async function PenyewaPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Nama', 'Kontak', 'NIK', 'Sewa', 'Terakhir', 'Status terakhir'].map(h => (
+                  {['Nama', 'Kontak', 'NIK', 'Alamat', 'Sewa', 'Terakhir', 'Status terakhir'].map(h => (
                     <th key={h} className="text-left py-2 text-xs font-medium text-gray-400">{h}</th>
                   ))}
                 </tr>
@@ -148,6 +148,9 @@ export default async function PenyewaPage() {
                         {wa ? <a href={wa} target="_blank" rel="noreferrer" className="hover:text-teal-600">{p.noHp}</a> : '-'}
                       </td>
                       <td className="py-2.5 text-gray-400 text-xs">{p.nik || '-'}</td>
+                      <td className="py-2.5 text-gray-500 text-xs max-w-[14rem] truncate" title={p.alamatAsal ?? ''}>
+                        {p.alamatAsal || '-'}
+                      </td>
                       <td className="py-2.5 text-gray-500 text-xs">
                         {p.sewa.length > 0 ? `${p.sewa.length}x` : '-'}
                       </td>
@@ -202,6 +205,9 @@ export default async function PenyewaPage() {
                       Terakhir kamar <span className="font-medium text-gray-700">{terakhir.kamar.nomor}</span> ·{' '}
                       {formatTanggal(terakhir.tanggalMasuk, { day: 'numeric', month: 'short', year: '2-digit' })}
                     </div>
+                  )}
+                  {p.alamatAsal && (
+                    <div className="text-xs text-gray-400 ml-8 mt-0.5 truncate">{p.alamatAsal}</div>
                   )}
                 </div>
               )

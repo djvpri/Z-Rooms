@@ -13,6 +13,7 @@ const bookingSchema = z.object({
   nama: z.string().trim().optional(),
   nik: z.string().trim().optional(),
   noHp: z.string().trim().optional(),
+  alamatAsal: z.string().trim().optional(),
   pekerjaan: z.string().optional(),
   tipeEntitas: z.enum(['INDIVIDU', 'PERUSAHAAN']).default('INDIVIDU'),
   namaPerusahaan: z.string().optional(),
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
   // lama tidak menyimpan versi data yang sudah dikoreksi di form.
   const dataPenyewa = {
     nama, noHp, nik,
+    alamatAsal: kosongJadiNull(d.alamatAsal),
     pekerjaan: d.pekerjaan,
     tipeEntitas: d.tipeEntitas,
     namaPerusahaan: d.namaPerusahaan,
