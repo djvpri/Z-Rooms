@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return { sewa, tagihan }
+    return { sewa, tagihan, masuk: masuk.toISOString(), keluar: keluar.toISOString() }
   })
   } catch (err: any) {
     console.error('[booking] transaction error:', err)

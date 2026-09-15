@@ -7,7 +7,8 @@ import { formatRupiah, namaPenyewa, metodeBayarLabel } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
-  periodeSewa: string; tanggalMasuk: string; durasi: number
+  periodeSewa: string; tanggalMasuk: string; jamMasuk: string; tanggalKeluar: string
+  durasi: number
   harga: number; deposit: number; metodeBayar: string; bayarSekarang: boolean
   catatan: string; tanggalCetak: string
 }
@@ -35,6 +36,14 @@ type PenyewaHasil = {
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
+// Tanggal + jam (WIB). Zona ditulis eksplisit: server bisa jalan di UTC,
+// dan tanpa ini jam yang diketik kasir bergeser 7 jam di struk.
+const tglJam = (iso: string) =>
+  new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
+  })
+
 export default function BookingPage() {
   const router = useRouter()
   const [kamarList, setKamarList] = useState<Kamar[]>([])
@@ -52,7 +61,7 @@ export default function BookingPage() {
   const [form, setForm] = useState({
     nama: '', nik: '', noHp: '', alamatAsal: '',
     namaPerusahaan: '', npwp: '',
-    kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', durasi: 1,
+    kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', jamMasuk: '', durasi: 1,
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
   })
 
@@ -107,8 +116,16 @@ export default function BookingPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.kamarId || !form.tanggalMasuk) {
-      setError('Pilih kamar dan tanggal masuk.')
+    if (!form.kamarId || !form.tanggalMasuk || !form.jamMasuk) {
+      setError('Pilih kamar, tanggal masuk, dan jam masuk.')
+      return
+    }
+    // Gabung tanggal + jam jadi satu waktu. Server simpan apa adanya, jadi
+    // offset WIB (+07:00) ditulis eksplisit di sini supaya jam yang diketik
+    // kasir utuh — `new Date('2026-09-15')` saja = 00:00 UTC = 07:00 WIB.
+    const masuk = new Date(`${form.tanggalMasuk}T${form.jamMasuk}:00+07:00`)
+    if (isNaN(masuk.getTime())) {
+      setError('Tanggal atau jam masuk tidak valid.')
       return
     }
     setLoading(true)
@@ -119,6 +136,7 @@ export default function BookingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          tanggalMasuk: masuk.toISOString(),
           tipeEntitas: activeTab,
           durasi: Number(form.durasi),
           deposit: Number(form.deposit) || 0,
@@ -139,13 +157,18 @@ export default function BookingPage() {
         }
         throw new Error(msg)
       }
+      // Pakai waktu yang DIKEMBALIKAN server, bukan hitung ulang di klien —
+      // kalau tidak, struk bisa beda dengan yang tersimpan di DB.
+      const hasil = await res.json()
       setNota({
         nama: form.nama,
         noHp: form.noHp,
         kamarNomor: kamarDipilih?.nomor ?? '',
         kamarTipe: kamarDipilih?.tipe ?? '',
         periodeSewa: form.periodeSewa,
-        tanggalMasuk: form.tanggalMasuk,
+        tanggalMasuk: hasil.masuk ?? masuk.toISOString(),
+        jamMasuk: form.jamMasuk,
+        tanggalKeluar: hasil.keluar ?? '',
         durasi: Number(form.durasi),
         harga: hargaNum,
         deposit: Number(form.deposit) || 0,
@@ -323,6 +346,10 @@ export default function BookingPage() {
               <input type="date" className="form-input" value={form.tanggalMasuk} onChange={e => set('tanggalMasuk', e.target.value)} required />
             </div>
             <div>
+              <label className="form-label">Jam masuk *</label>
+              <input type="time" className="form-input" value={form.jamMasuk} onChange={e => set('jamMasuk', e.target.value)} required />
+            </div>
+            <div>
               <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>
               <input type="number" min={1} max={36} className="form-input" value={form.durasi} onChange={e => set('durasi', Number(e.target.value))} />
             </div>
@@ -462,8 +489,12 @@ export default function BookingPage() {
                   <span>{PERIODE_LABEL[nota.periodeSewa] ?? nota.periodeSewa}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Tanggal Masuk</span>
-                  <span>{new Date(nota.tanggalMasuk).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  <span className="text-gray-500">Masuk</span>
+                  <span>{tglJam(nota.tanggalMasuk)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Keluar</span>
+                  <span>{nota.tanggalKeluar ? tglJam(nota.tanggalKeluar) : '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Durasi</span>
