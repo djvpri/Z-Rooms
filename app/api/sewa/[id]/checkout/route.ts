@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { hitungDeposit } from '@/lib/deposit'
 import { z } from 'zod'
 
 const checkoutSchema = z.object({
@@ -78,18 +79,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Normalisasi: PENUH selalu mengembalikan seluruh deposit; HANGUS nol;
   // SEBAGIAN memakai nominal dari form, dijepit ke rentang deposit.
-  let kembali: number
-  if (d.deposit === 'PENUH') kembali = deposit
-  else if (d.deposit === 'HANGUS') kembali = 0
-  else kembali = Math.min(Math.max(d.depositKembali, 0), deposit)
-
-  if (d.deposit === 'SEBAGIAN' && (d.depositKembali <= 0 || d.depositKembali >= deposit)) {
-    return NextResponse.json(
-      { error: `Nominal sebagian harus di antara 1 dan ${deposit - 1}` },
-      { status: 400 },
-    )
+  // Perhitungannya ada di lib/deposit.ts supaya bisa diuji tanpa route ini.
+  const keputusan = hitungDeposit(deposit, d.deposit, d.depositKembali)
+  if (!keputusan.ok) {
+    return NextResponse.json({ error: keputusan.error }, { status: 400 })
   }
-  const hangus = deposit - kembali
+  const { kembali, hangus } = keputusan.hasil
   const keluarAktual = d.tanggalKeluarAktual ? new Date(d.tanggalKeluarAktual) : new Date()
   if (Number.isNaN(keluarAktual.getTime())) {
     return NextResponse.json({ error: 'tanggalKeluarAktual tidak valid' }, { status: 400 })

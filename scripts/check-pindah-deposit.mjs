@@ -1,18 +1,24 @@
 // scripts/check-pindah-deposit.mjs
 //
-// Self-check logika perpindahan deposit saat pindah kamar. Jalankan:
-//   node scripts/check-pindah-deposit.mjs
+// Self-check logika perpindahan deposit saat pindah kamar. Jalankan: npm run check
 //
-// Salinan logika dari app/api/sewa/[id]/pindah-kamar/route.ts. Kalau salah satu
-// diubah, ubah keduanya — self-check ini mengunci invariannya, bukan angkanya.
+// Sebelumnya berkas ini MENYALIN logika dari
+// app/api/sewa/[id]/pindah-kamar/route.ts. Sekarang kekurangan deposit dihitung
+// oleh lib/deposit.ts dan diimpor langsung, jadi route dan test tak bisa
+// berbeda diam-diam.
+//
+// tsx yang mengimpor .ts: jalankan `npm run check` (pakai tsx), BUKAN `node`
+// polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
+import { kekuranganDeposit } from '../lib/deposit.ts'
 
 // Deposit yang ikut pindah selalu deposit titipan sewa lama; kekurangan ditagih.
-function hitungDeposit(depositLama, depositDiminta) {
-  const pindah = depositLama
-  const kurang = Math.max((depositDiminta ?? depositLama) - depositLama, 0)
-  return { pindah, kurang }
-}
+// `pindah` bukan hasil fungsi karena route memang menyalinnya apa adanya —
+// yang diuji di sini hanya besaran tagihannya.
+const hitungDeposit = (depositLama, depositDiminta) => ({
+  pindah: depositLama,
+  kurang: kekuranganDeposit(depositLama, depositDiminta),
+})
 
 // Invarian inti: uang titipan tidak berubah jumlah hanya karena kamarnya pindah.
 {
@@ -58,4 +64,11 @@ for (const [lama, diminta] of [[1_000_000, 1_500_000], [2_000_000, 800_000], [0,
     `titipan awal ${lama} + tagihan ${kurang} harus setara titipan target`)
 }
 
-console.log('OK — 6 blok assertion lulus')
+// Nilai tak wajar dari form/DB: NaN tidak boleh lolos jadi tagihan NaN.
+// (Sebelumnya: Math.max(NaN - lama, 0) = NaN -> tagihan nominal NaN di DB.)
+{
+  assert.equal(kekuranganDeposit(1_000_000, NaN), 0, 'depositDiminta NaN -> anggap tak ada kekurangan')
+  assert.equal(kekuranganDeposit(1_000_000, Infinity), 0, 'Infinity -> tak dianggap selisih')
+}
+
+console.log('OK — check-pindah-deposit: 8 blok assertion lulus')

@@ -5,6 +5,17 @@
 //
 // Menyalin cabang pemilihan penyewa. Kalau route diubah, ubah juga di sini —
 // invarian yang dijaga tertulis di komentar tiap blok.
+//
+// ─────────────────────────────────────────────────────────────────────────
+// PERINGATAN: berkas ini MENYALIN alur dari route, bukan mengimpornya.
+// Mengubah route TIDAK membuat test ini gagal. Ia menjaga INVARIAN (kontrak
+// yang disepakati), bukan implementasi — berguna untuk menahan keputusan
+// produk berubah diam-diam, tapi jangan percaya ia membuktikan route benar.
+//
+// Mengapa belum diperbaiki seperti check-jam-checkout.mjs: logika yang diuji
+// tersebar di dalam prisma.$transaction, jadi mengimpornya butuh memisahkan
+// orkestrasi transaksi dari Prisma — refactor besar pada jalur uang.
+// ─────────────────────────────────────────────────────────────────────────
 
 const assert = (ok, pesan) => { if (!ok) throw new Error(`GAGAL: ${pesan}`) }
 

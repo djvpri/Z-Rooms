@@ -24,6 +24,17 @@ export function formatTanggal(date: Date | string, opts?: Intl.DateTimeFormatOpt
   }).format(new Date(date))
 }
 
+// Tanggal + jam (WIB) untuk struk/nota. Zona ditulis eksplisit: server bisa
+// jalan di UTC, dan tanpa ini jam yang diketik kasir bergeser 7 jam di struk.
+// Dipakai lewat impor (bukan disalin) supaya skrip check-struk-jam.mjs
+// benar-benar menguji format yang tampil, bukan salinannya.
+export function tglJam(iso: string) {
+  return new Date(iso).toLocaleString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
+  })
+}
+
 export function namaPenyewa(nama?: string | null) {
   return nama?.trim() || 'Tanpa nama'
 }

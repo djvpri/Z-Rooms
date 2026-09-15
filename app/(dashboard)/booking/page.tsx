@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa, metodeBayarLabel } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -35,14 +35,6 @@ type PenyewaHasil = {
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
-
-// Tanggal + jam (WIB). Zona ditulis eksplisit: server bisa jalan di UTC,
-// dan tanpa ini jam yang diketik kasir bergeser 7 jam di struk.
-const tglJam = (iso: string) =>
-  new Date(iso).toLocaleString('id-ID', {
-    day: 'numeric', month: 'long', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
-  })
 
 export default function BookingPage() {
   const router = useRouter()

@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { kekuranganDeposit } from '@/lib/deposit'
 import { addDays, addMonths, addYears } from 'date-fns'
 import { z } from 'zod'
 
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // uangnya tidak berpindah tangan.
       const depositLama = Number(sewa.deposit)
       const depositDiminta = tujuan.harga[0]?.deposit != null ? Number(tujuan.harga[0].deposit) : depositLama
-      const kurangDeposit = Math.max(depositDiminta - depositLama, 0)
+      const kurangDeposit = kekuranganDeposit(depositLama, depositDiminta)
 
       const sewaBaru = await tx.sewa.create({
         data: {

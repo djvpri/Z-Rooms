@@ -1,42 +1,19 @@
 // scripts/check-jam-checkout.mjs
 //
-// Self-check logika lib/checkout.ts. Jalankan: node scripts/check-jam-checkout.mjs
+// Self-check logika lib/checkout.ts. Jalankan: npm run check
 //
-// Menyalin perhitungan batas check-out. Lib-nya TypeScript dan murni (tak
-// sentuh DB), tapi tak bisa diimpor dari .mjs tanpa build — jadi rumusnya
-// dicerminkan di sini. Kalau lib/checkout.ts diubah, ubah juga di sini.
-// Invarian yang dijaga tertulis di komentar tiap blok.
-
+// Sebelumnya berkas ini MENYALIN rumus dari lib/checkout.ts, jadi mengubah
+// lib-nya tidak membuat test gagal — sudah dibuktikan: fallback jam diubah
+// 12:00 -> 11:00 dan 11 blok assertion tetap "lulus". Sekarang mengimpor
+// langsung lewat tsx (ada di devDependencies) supaya satu-satunya sumber
+// kebenaran tetap lib/checkout.ts.
+//
+// tsx yang mengimpor .ts: jalankan `npm run check` (yang memakai tsx), BUKAN
+// `node` polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
-
-const jamKeMenit = (jam) => {
-  const cocok = /^(\d{1,2}):(\d{2})$/.exec(String(jam ?? '').trim())
-  if (!cocok) return 12 * 60
-  const h = Number(cocok[1]), m = Number(cocok[2])
-  if (h > 23 || m > 59) return 12 * 60
-  return h * 60 + m
-}
-
-const batasCheckout = (tanggalKeluar, { jamCheckout, toleransiCheckout }) => {
-  const batas = new Date(tanggalKeluar)
-  batas.setHours(0, 0, 0, 0)
-  batas.setMinutes(jamKeMenit(jamCheckout) + Math.max(0, toleransiCheckout))
-  return batas
-}
-
-const cekLewat = (tanggalKeluar, aturan, sekarang) => {
-  const selisih = sekarang.getTime() - batasCheckout(tanggalKeluar, aturan).getTime()
-  return selisih <= 0 ? { lewat: false, menitLebih: 0 }
-                      : { lewat: true, menitLebih: Math.floor(selisih / 60000) }
-}
-
-const labelLewat = (menit) => {
-  if (menit < 60) return `${menit} menit`
-  const jam = Math.floor(menit / 60)
-  if (jam < 24) return `${jam} jam`
-  const hari = Math.floor(jam / 24), sisaJam = jam % 24
-  return sisaJam === 0 ? `${hari} hari` : `${hari} hari ${sisaJam} jam`
-}
+import {
+  jamKeMenit, batasCheckout, cekLewat, labelLewat,
+} from '../lib/checkout.ts'
 
 const ATURAN = { jamCheckout: '12:00', toleransiCheckout: 120 }   // 12:00 + 2 jam
 const hari = (t, j = 0, m = 0) => new Date(2026, 8, t, j, m, 0, 0)  // September 2026

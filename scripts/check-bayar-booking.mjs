@@ -3,6 +3,19 @@
 // Self-check logika "bayar sekarang saat booking" di app/api/booking/route.ts.
 // Jalankan: node scripts/check-bayar-booking.mjs
 //
+// ─────────────────────────────────────────────────────────────────────────
+// PERINGATAN: berkas ini MENYALIN alur dari route, bukan mengimpornya.
+// Mengubah route TIDAK membuat test ini gagal. Ia menjaga INVARIAN (kontrak
+// yang disepakati), bukan implementasi — jadi ia tetap berguna untuk menahan
+// keputusan produk berubah diam-diam, tapi jangan percaya ia membuktikan
+// route masih benar.
+//
+// Mengapa belum diperbaiki seperti check-jam-checkout.mjs: logika yang diuji
+// di sini tersebar di dalam prisma.$transaction, jadi mengimpornya butuh
+// memisahkan orkestrasi transaksi dari Prisma — refactor besar pada jalur
+// uang. Dikerjakan hanya kalau bagian ini memang perlu sering diubah.
+// ─────────────────────────────────────────────────────────────────────────
+//
 // Salinan logika cabang bayarSekarang (route memilih status tagihan + apakah
 // menulis baris Pembayaran). Kalau route diubah, ubah juga di sini — invarian
 // yang dijaga ada di komentar atas tiap blok.

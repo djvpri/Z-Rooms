@@ -10,7 +10,11 @@
     "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}}catch(e){console.log('ℹ️ Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "check": "for f in scripts/check-*.mjs; do echo \"── $f\"; tsx \"$f\" || exit 1; done",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bash scripts/smoke-deploy.sh",
+    "verify": "npm run typecheck && npm run check && npm run build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
