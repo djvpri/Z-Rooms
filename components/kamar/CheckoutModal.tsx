@@ -29,6 +29,8 @@ export interface SewaAktif {
   sisaTagihan: number
   jumlahTagihan: number
   periodeSewa: string
+  /** Menit lewat batas check-out. 0 = belum lewat. Dipakai badge peringatan. */
+  menitLebih?: number
 }
 
 export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif; kamarTersedia: KamarTersedia[] }) {

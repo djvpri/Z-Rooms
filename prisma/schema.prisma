@@ -75,6 +75,11 @@ model Properti {
   deskripsi   String?
   fasilitas   String[]      @default([])
   aktif       Boolean       @default(true)
+  // Jam acuan habis sewa (HH:mm, jam dinding lokal). Sewa HARIAN habis di jam
+  // ini pada hari terakhir, bukan jam masuk + 24 jam — supaya checkout serempak.
+  // ToleransiCheckout = menit kelonggaran sebelum ditandai lewat (120 = 2 jam).
+  jamCheckout         String  @default("12:00")
+  toleransiCheckout   Int     @default(120)
   isDemo      Boolean       @default(false)
   demoExpiresAt DateTime?
   createdAt   DateTime      @default(now())

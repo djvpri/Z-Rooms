@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa } from '@/lib/utils'
+import { cekLewat, labelLewat } from '@/lib/checkout'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
@@ -51,6 +52,15 @@ export default async function KamarPage() {
   // (grid, tabel desktop, kartu mobile) — sebelumnya disalin-tempel.
   type KamarBaris = (typeof kamar)[number]
   type SewaBaris = NonNullable<KamarBaris['sewa'][number]>
+  // Opsi A: dihitung saat halaman dibuka, tanpa cron. `sekarang` diambil sekali
+  // supaya semua kamar dinilai pada titik waktu yang sama.
+  const sekarang = new Date()
+  const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
+  const jumlahLewat = kamar.filter(k => {
+    const s = k.sewa[0]
+    return s ? cekLewat(s.tanggalKeluar, aturan, sekarang).lewat : false
+  }).length
+
   const ringkasSewa = (k: KamarBaris, s: SewaBaris) => ({
     id: s.id,
     kamarNomor: k.nomor,
@@ -60,6 +70,7 @@ export default async function KamarPage() {
     sisaTagihan: s.tagihan.reduce((a, t) => a + Number(t.nominal), 0),
     jumlahTagihan: s.tagihan.length,
     periodeSewa: s.periodeSewa as string,
+    menitLebih: cekLewat(s.tanggalKeluar, aturan, sekarang).menitLebih,
   })
   // Kandidat kamar tujuan pindah: kamar TERSEDIA selain kamar asal.
   const kamarTersediaUntuk = (asalId: string) =>
@@ -88,6 +99,20 @@ export default async function KamarPage() {
           <Link href="/booking" className="btn btn-ghost">Booking baru</Link>
         </div>
       </div>
+
+      {/* Peringatan lewat check-out. Dihitung saat halaman dibuka (tanpa cron),
+          jadi angkanya sebanding dengan keadaan saat ini — bukan sisa kemarin. */}
+      {jumlahLewat > 0 && (
+        <div className="rounded-lg border-l-4 border-l-coral-400 bg-coral-50 text-coral-600 p-4 mb-5">
+          <p className="text-sm font-medium">
+            {jumlahLewat} kamar lewat jam check-out
+          </p>
+          <p className="text-xs mt-0.5">
+            Sewa sudah melewati jam {properti.jamCheckout} + toleransi {properti.toleransiCheckout} menit.
+            Kamar tidak dikosongkan otomatis — periksa lalu check-out seperti biasa.
+          </p>
+        </div>
+      )}
 
       {/* Legenda */}
       <div className="flex gap-4 mb-5 flex-wrap">
@@ -132,6 +157,14 @@ export default async function KamarPage() {
               <p className="text-xs mt-1 opacity-60 truncate">
                 {penyewa ? namaPenyewa(penyewa.nama) : 'Kosong'}
               </p>
+              {(() => {
+                const lebih = sewaAktif ? cekLewat(sewaAktif.tanggalKeluar, aturan, sekarang).menitLebih : 0
+                return lebih > 0 ? (
+                  <p className="text-[10px] font-semibold mt-1 px-1.5 py-0.5 rounded bg-coral-100 text-coral-700 inline-block">
+                    Lewat {labelLewat(lebih)}
+                  </p>
+                ) : null
+              })()}
               {sewaAktif && (
                 <CheckoutModal
                   sewa={ringkasSewa(k, sewaAktif)}
