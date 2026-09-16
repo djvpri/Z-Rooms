@@ -78,16 +78,25 @@ export default function BookingPage() {
   // Penyewa lama yang NIK-nya sama dengan hasil bacaan. Kasir yang memutuskan
   // mau memakai data lama atau tetap membuat yang baru.
   const [ktpDuplikat, setKtpDuplikat] = useState<{ id: string; nama: string | null; noHp: string | null; alamatAsal: string | null } | null>(null)
-  // Satu input file dipakai kamera dan pemilih berkas. `capture` harus
-  // dipasang/dilepas tepat sebelum klik: kalau selalu terpasang, tombol
-  // "Pilih File" pun memaksa kamera di HP.
-  const inputKtp = useRef<HTMLInputElement>(null)
+  // Dua tombol, dua input terpisah. Yang "Kamera" punya `capture="environment"`
+  // yang ditulis langsung di JSX; yang "Pilih File" tidak punya sama sekali.
+  //
+  // Kenapa bukan satu input saja: `setAttribute('capture', ...)` menulis
+  // atribut mentah, dan WebKit/Blink memutuskan buka kamera atau tidak saat
+  // elemen dibuat — atribut yang disuntik setelahnya tak dianggap. Mengosongkan
+  // atribut (`removeAttribute`) pun hanya aman kalau inputnya belum pernah
+  // difoto: sesudah `value` terisi, input yang sama tak membuka apa pun.
+  // Dua elemen menghindari dua jebakan itu sekaligus.
+  const inputKamera = useRef<HTMLInputElement>(null)
+  const inputBerkas = useRef<HTMLInputElement>(null)
 
   const ambilDari = (sumber: 'kamera' | 'berkas') => {
-    const el = inputKtp.current
+    const el = sumber === 'kamera' ? inputKamera.current : inputBerkas.current
     if (!el) return
-    if (sumber === 'kamera') el.setAttribute('capture', 'environment')
-    else el.removeAttribute('capture')
+    // Input file mengingat berkas terakhir. Kalau tak dikosongkan, memilih
+    // foto yang sama dua kali tak memicu `change` — kasir mengira tombolnya
+    // rusak. Dikosongkan di sini, sebelum klik.
+    el.value = ''
     el.click()
   }
 
@@ -452,12 +461,20 @@ export default function BookingPage() {
                 </button>
               </div>
 
-              {/* Satu input dipakai dua-duanya; `capture` dipasang dan dilepas
-                  tepat sebelum klik. HEIC ikut di `accept` karena server
-                  menerimanya (lib/ktp.ts MIME_DIIZINKAN) dan foto iPhone
-                  berformat itu — tanpa ini berkasnya tampak abu di iOS. */}
+              {/* Dua input terpisah, bukan satu yang atributnya diubah saat
+                  diklik: `capture` hanya dibaca browser saat elemen dibuat,
+                  jadi menyuntiknya lewat setAttribute tak berpengaruh. */}
               <input
-                ref={inputKtp}
+                ref={inputKamera}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                capture="environment"
+                className="sr-only"
+                disabled={bacaKtpLoading}
+                onChange={bacaKtpDariFoto}
+              />
+              <input
+                ref={inputBerkas}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
                 className="sr-only"
