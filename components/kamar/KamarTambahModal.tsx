@@ -6,10 +6,11 @@
 // Tipe kamar kini master data dari /pengaturan/tipe-kamar, bukan daftar lokal.
 // Daftar lokal dulu memuat 'STUDIO' yang tak ada di enum Prisma, sehingga
 // menambah kamar Studio selalu gagal 500.
+//
+// Harga tidak diisi di sini — tarif melekat pada tipe (Pengaturan → Tipe kamar).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, PlusLg, Check2, InfoCircle } from 'react-bootstrap-icons'
-import { formatRupiah } from '@/lib/utils'
 import { SARAN_FASILITAS } from '@/lib/tipeKamar'
 
 export type TipeRingkas = { id: string; nama: string; fasilitas: string[] }
@@ -23,8 +24,7 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
 
   const [f, setF] = useState({
     nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '',
-    fasilitas: [] as string[], hargaBulanan: '', depositBulanan: '',
-    hargaHarian: '', hargaTahunan: '',
+    fasilitas: [] as string[],
   })
 
   function set<K extends keyof typeof f>(k: K, v: (typeof f)[K]) {
@@ -45,7 +45,7 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
   }
 
   function reset() {
-    setF({ nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '', fasilitas: [], hargaBulanan: '', depositBulanan: '', hargaHarian: '', hargaTahunan: '' })
+    setF({ nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '', fasilitas: [] })
     setError('')
   }
 
@@ -56,14 +56,10 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const hargaBulanan = Number(f.hargaBulanan)
     if (!f.nomor.trim()) { setError('Nomor kamar wajib diisi.'); return }
-    // Harga bulanan opsional — kamar boleh didaftarkan tanpa tarif dulu.
-    // Kalau diisi, minimal periode lain juga harus masuk akal (server cek > 0).
-    if (hargaBulanan < 0 || Number(f.hargaHarian) < 0 || Number(f.hargaTahunan) < 0) {
-      setError('Harga tidak boleh negatif.')
-      return
-    }
+    // Tipe wajib kini: harga sewa melekat pada tipe, jadi kamar tanpa tipe tak
+    // bisa dihargai. Server juga menolaknya — cek di sini supaya pesannya jelas.
+    if (!f.tipeId) { setError('Tipe kamar wajib dipilih. Tambahkan tipe dulu di Pengaturan → Tipe kamar.'); return }
 
     setLoading(true)
     try {
@@ -73,15 +69,9 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
         body: JSON.stringify({
           nomor: f.nomor.trim(),
           lantai: Number(f.lantai) || 1,
-          ...(f.tipeId ? { tipeId: f.tipeId } : {}),
+          tipeId: f.tipeId,
           ...(f.luas ? { luas: Number(f.luas) } : {}),
           fasilitas: f.fasilitas,
-          // Tiap harga hanya dikirim kalau terisi; server menolak 0/negatif.
-          ...(hargaBulanan > 0 ? { hargaBulanan } : {}),
-          // Kosong = biarkan server pakai default (2x harga bulanan / harga itu sendiri).
-          ...(f.depositBulanan ? { depositBulanan: Number(f.depositBulanan) } : {}),
-          ...(Number(f.hargaHarian) > 0 ? { hargaHarian: Number(f.hargaHarian) } : {}),
-          ...(Number(f.hargaTahunan) > 0 ? { hargaTahunan: Number(f.hargaTahunan) } : {}),
         }),
       })
       const data = await res.json().catch(() => null)
@@ -105,9 +95,6 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
       setLoading(false)
     }
   }
-
-  const hargaNum = Number(f.hargaBulanan) || 0
-  const depositEfektif = f.depositBulanan ? Number(f.depositBulanan) : hargaNum * 2
 
   return (
     <>
@@ -166,38 +153,11 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
                     <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
                       <InfoCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
                       <span>
-                        Belum ada tipe kamar. Tambahkan dulu di Pengaturan → Tipe kamar;
-                        kamar tetap bisa disimpan tanpa tipe.
+                        Belum ada tipe kamar. Tambahkan dulu di Pengaturan → Tipe kamar —
+                        kamar baru wajib punya tipe karena harga sewanya ikut tipe.
                       </span>
                     </p>
                   )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label">Harga / bulan (opsional)</label>
-                      <input type="number" className="form-input" value={f.hargaBulanan}
-                        onChange={e => set('hargaBulanan', e.target.value)} placeholder="—" />
-                    </div>
-                    <div>
-                      <label className="form-label">Deposit</label>
-                      <input type="number" className="form-input" value={f.depositBulanan}
-                        onChange={e => set('depositBulanan', e.target.value)}
-                        placeholder={hargaNum ? String(hargaNum * 2) : '2x sewa'} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label">Harga / hari (opsional)</label>
-                      <input type="number" className="form-input" value={f.hargaHarian}
-                        onChange={e => set('hargaHarian', e.target.value)} placeholder="—" />
-                    </div>
-                    <div>
-                      <label className="form-label">Harga / tahun (opsional)</label>
-                      <input type="number" className="form-input" value={f.hargaTahunan}
-                        onChange={e => set('hargaTahunan', e.target.value)} placeholder="—" />
-                    </div>
-                  </div>
 
                   <div>
                     <label className="form-label">Fasilitas</label>
@@ -215,12 +175,6 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
                       })}
                     </div>
                   </div>
-
-                  {hargaNum > 0 && (
-                    <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                      Harga {formatRupiah(hargaNum)}/bulan · deposit {formatRupiah(depositEfektif)}
-                    </p>
-                  )}
 
                   {error && (
                     <div className="bg-coral-50 text-coral-600 border border-coral-100 rounded-lg px-3 py-2 text-sm">

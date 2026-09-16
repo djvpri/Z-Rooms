@@ -78,16 +78,16 @@ export async function seedDemoData(ownerId: string): Promise<SeedResult> {
     )
   );
 
-  // 4. Create pricing for each kamar
+  // 4. Harga melekat pada tipe kamar, bukan per kamar — satu baris per tipe.
   const hargaPerTipe: Record<string, number> = { Standar: 1000000, Deluxe: 1200000, VIP: 1500000 }
   await Promise.all(
-    kamars.map((kamar, i) =>
-      prisma.hargaKamar.create({
+    Object.entries(hargaPerTipe).map(([nama, harga]) =>
+      prisma.hargaTipe.create({
         data: {
-          kamarId: kamar.id,
+          tipeKamarId: tipeId(nama),
           periodeSewa: "BULANAN",
-          harga: hargaPerTipe[kamarData[i].tipe],
-          deposit: hargaPerTipe[kamarData[i].tipe],
+          harga,
+          deposit: harga,
           aktif: true,
         },
       })
@@ -290,11 +290,12 @@ export async function resetDemoData(propertiId: string): Promise<void> {
       await prisma.penyewa.deleteMany({ where: { id: { in: penyewaIds } } });
     }
 
-    await prisma.hargaKamar.deleteMany({ where: { kamarId: { in: kamarIds } } });
     await prisma.kamar.deleteMany({ where: { propertiId } });
   }
 
   // Tipe kamar menunjuk properti; kamar sudah dihapus di atas, jadi FK aman.
+  // HargaTipe menunjuk tipe, jadi harus dihapus lebih dulu.
+  await prisma.hargaTipe.deleteMany({ where: { tipeKamar: { propertiId } } });
   await prisma.tipeKamar.deleteMany({ where: { propertiId } });
   await prisma.pengeluaran.deleteMany({ where: { propertiId } });
   await prisma.notifikasi.deleteMany({ where: { propertiId } });

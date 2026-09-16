@@ -16,9 +16,10 @@ type NotaBooking = {
 type Kamar = {
   id: string
   nomor: string
-  tipe: string
+  // Tipe kini objek master data (bukan string enum) dan membawa harga — tarif
+  // sewa melekat pada tipe, bukan per kamar.
+  tipe: { id: string; nama: string; harga: { periodeSewa: string; harga: string }[] } | null
   luas: number | null
-  harga: { periodeSewa: string; harga: string }[]
 }
 
 type PenyewaHasil = {
@@ -118,7 +119,8 @@ export default function BookingPage() {
   }
 
   const kamarDipilih = kamarList.find(k => k.id === form.kamarId)
-  const hargaKamar = kamarDipilih?.harga.find(h => h.periodeSewa === form.periodeSewa)
+  // Tarif datang dari tipe kamar, bukan dari kamar langsung.
+  const hargaKamar = kamarDipilih?.tipe?.harga.find(h => h.periodeSewa === form.periodeSewa)
   const hargaNum = hargaKamar ? Number(hargaKamar.harga) : 0
 
   function set(key: string, val: string | number | boolean) {
@@ -185,7 +187,7 @@ export default function BookingPage() {
         nama: form.nama,
         noHp: form.noHp,
         kamarNomor: kamarDipilih?.nomor ?? '',
-        kamarTipe: kamarDipilih?.tipe ?? '',
+        kamarTipe: kamarDipilih?.tipe?.nama ?? '',
         periodeSewa: form.periodeSewa,
         tanggalMasuk: hasil.masuk ?? masuk.toISOString(),
         jamMasuk: form.jamMasuk,
@@ -346,7 +348,7 @@ export default function BookingPage() {
                 <option value="">-- Pilih kamar --</option>
                 {kamarList.map(k => (
                   <option key={k.id} value={k.id}>
-                    {k.nomor} — {k.tipe.charAt(0) + k.tipe.slice(1).toLowerCase()}{k.luas ? ` (${k.luas}m²)` : ''}
+                    {k.nomor} — {k.tipe?.nama ?? 'Tanpa tipe'}{k.luas ? ` (${k.luas}m²)` : ''}
                   </option>
                 ))}
               </select>
@@ -445,7 +447,7 @@ export default function BookingPage() {
             <h2 className="text-sm font-medium text-teal-800 mb-2">Ringkasan transaksi</h2>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-teal-700">
-                <span>Kamar {kamarDipilih.nomor} ({kamarDipilih.tipe.toLowerCase()})</span>
+                <span>Kamar {kamarDipilih.nomor} ({kamarDipilih.tipe?.nama ?? 'Tanpa tipe'})</span>
                 <span>{formatRupiah(hargaNum)} × {form.durasi}</span>
               </div>
               <div className="flex justify-between text-teal-700">

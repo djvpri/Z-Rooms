@@ -119,15 +119,16 @@ model Kamar {
   updatedAt   DateTime     @updatedAt
 
   // Tipe kamar kini master data (model TipeKamar), bukan enum — pemilik bisa
-  // menambah tipe sendiri (Studio, Family, ...). Nullable karena baris lama
-  // bisa punya tipe yang sudah dihapus; UI memperlakukannya sebagai "tanpa tipe".
-  tipeId      String?
-  tipe        TipeKamar?   @relation(fields: [tipeId], references: [id], onDelete: SetNull)
+  // menambah tipe sendiri (Studio, Family, ...). WAJIB diisi: harga sewa
+  // melekat pada tipe (lihat HargaTipe), jadi kamar tanpa tipe tak bisa
+  // dihargai. Baris lama yang null ditautkan ke tipe bawaan saat deploy
+  // (lihat scripts/rapikan-tipe-kamar.mjs di start command).
+  tipeId      String
+  tipe        TipeKamar    @relation(fields: [tipeId], references: [id])
 
   propertiId  String
   properti    Properti     @relation(fields: [propertiId], references: [id])
 
-  harga       HargaKamar[]
   sewa        Sewa[]
 
   @@unique([propertiId, nomor])
@@ -137,6 +138,7 @@ model Kamar {
 // Tipe kamar per properti. Fasilitas di sini adalah BAWAAN tipe — kamar yang
 // belum diisi fasilitas sendiri mewarisinya. Kamar yang sudah punya fasilitas
 // sendiri TIDAK ditimpa, supaya kamar yang berbeda dari tipe-nya tetap aman.
+// Harga juga melekat di sini (lihat HargaTipe) — satu tipe, satu daftar harga.
 model TipeKamar {
   id          String    @id @default(cuid())
   nama        String
@@ -150,6 +152,7 @@ model TipeKamar {
   properti    Properti  @relation(fields: [propertiId], references: [id])
 
   kamar       Kamar[]
+  harga       HargaTipe[]
 
   @@unique([propertiId, nama])
   @@index([propertiId])
@@ -162,17 +165,20 @@ enum StatusKamar {
   DIPESAN
 }
 
-model HargaKamar {
+// Harga sewa melekat pada TIPE kamar, bukan per kamar: mengubah tarif Standar
+// cukup satu tempat, bukan 12 kamar satu per satu. Persis pola fasilitas.
+model HargaTipe {
   id          String      @id @default(cuid())
-  kamarId     String
+  tipeKamarId String
   periodeSewa PeriodeSewa
   harga       Decimal     @db.Decimal(12, 0)
   deposit     Decimal?    @db.Decimal(12, 0)
   aktif       Boolean     @default(true)
 
-  kamar       Kamar       @relation(fields: [kamarId], references: [id])
+  tipeKamar   TipeKamar   @relation(fields: [tipeKamarId], references: [id], onDelete: Cascade)
 
-  @@unique([kamarId, periodeSewa])
+  @@unique([tipeKamarId, periodeSewa])
+  @@index([tipeKamarId])
 }
 
 enum PeriodeSewa {

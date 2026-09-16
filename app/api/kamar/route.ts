@@ -1,4 +1,10 @@
 // app/api/kamar/route.ts
+//
+// Daftar & tambah kamar. Harga sewa TIDAK lagi disimpan per kamar — melekat
+// pada tipe (lihat model HargaTipe), jadi endpoint ini cuma menautkan kamar ke
+// tipe dan pemanggil membaca tarifnya lewat `hargaRingkas(kamar)`.
+//
+// `tipeId` wajib: kamar tanpa tipe tak punya tarif, jadi tak bisa disewakan.
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -8,19 +14,12 @@ import { z } from 'zod'
 const createKamarSchema = z.object({
   nomor: z.string().min(1),
   lantai: z.number().default(1),
-  // Tipe kini master data (model TipeKamar), bukan enum — pemilik bisa
-  // menambah tipe sendiri. Opsional: kamar boleh didaftarkan sebelum tipenya
-  // diatur. Dulu di sini ada enum dengan 'STUDIO' yang tak dikenal Prisma,
-  // sehingga menambah kamar Studio selalu gagal 500.
-  tipeId: z.string().min(1).optional(),
+  // Tipe kini master data (model TipeKamar) dan WAJIB. Dulu di sini ada enum
+  // dengan 'STUDIO' yang tak dikenal Prisma, sehingga menambah kamar Studio
+  // selalu gagal 500.
+  tipeId: z.string().min(1, 'Tipe kamar wajib dipilih.'),
   luas: z.number().optional(),
   fasilitas: z.array(z.string()).default([]),
-  // Ketiga harga opsional — kamar boleh didaftarkan dulu tanpa harga
-  // (mis. kos baru yang tarifnya belum ditetapkan).
-  hargaBulanan: z.number().positive().optional(),
-  hargaHarian: z.number().positive().optional(),
-  hargaTahunan: z.number().positive().optional(),
-  depositBulanan: z.number().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -40,7 +39,9 @@ export async function GET(req: NextRequest) {
       ...(status ? { status: status as any } : {}),
     },
     include: {
-      harga: { where: { aktif: true } },
+      // Harga tidak lagi milik kamar — diambil lewat tipe. Pemanggil (booking,
+      // /kamar) memakai `hargaRingkas` untuk membacanya.
+      tipe: { include: { harga: { where: { aktif: true } } } },
       sewa: {
         where: { statusSewa: 'AKTIF' },
         include: { penyewa: { select: { nama: true, noHp: true } } },
@@ -60,26 +61,29 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const parsed = createKamarSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { message: parsed.error.issues[0]?.message ?? 'Data kamar tidak valid.' } },
+      { status: 400 },
+    )
+  }
 
   const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
-  const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, tipeId, ...kamarData } = parsed.data
+  const { tipeId, ...kamarData } = parsed.data
 
   // TipeId milik properti aktif, bukan properti lain — id karangan atau tipe
   // properti lain ditolak, bukan diam-diam tersimpan.
-  if (tipeId) {
-    const tipe = await prisma.tipeKamar.findFirst({
-      where: { id: tipeId, propertiId: properti.id },
-      select: { id: true },
-    })
-    if (!tipe) {
-      return NextResponse.json(
-        { error: { message: 'Tipe kamar tidak ditemukan di properti ini.' } },
-        { status: 400 },
-      )
-    }
+  const tipe = await prisma.tipeKamar.findFirst({
+    where: { id: tipeId, propertiId: properti.id },
+    select: { id: true },
+  })
+  if (!tipe) {
+    return NextResponse.json(
+      { error: { message: 'Tipe kamar tidak ditemukan di properti ini.' } },
+      { status: 400 },
+    )
   }
 
   // Nomor kamar unik per properti (@@unique([propertiId, nomor])). Cek dulu supaya
@@ -95,24 +99,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Ketiga periode opsional. Hanya periode yang harganya diisi yang dibuat —
-  // kamar tanpa harga sama sekali tetap valid (HargaKamar[] kosong), dan
-  // halaman kamar/booking sudah menangani kasus itu ('-' / "Pilih kamar &
-  // periode dulu"). Deposit default 2x hanya untuk BULANAN.
-  const hargaRows = [
-    ...(hargaBulanan
-      ? [{ periodeSewa: 'BULANAN' as const, harga: hargaBulanan, deposit: depositBulanan ?? hargaBulanan * 2 }]
-      : []),
-    ...(hargaHarian ? [{ periodeSewa: 'HARIAN' as const, harga: hargaHarian, deposit: hargaHarian }] : []),
-    ...(hargaTahunan ? [{ periodeSewa: 'TAHUNAN' as const, harga: hargaTahunan, deposit: hargaTahunan }] : []),
-  ]
-
+  // Harga TIDAK diisi di sini — tarifnya ikut tipe kamar yang dipilih.
   const kamar = await prisma.kamar.create({
     data: {
       ...kamarData,
       propertiId: properti.id,
-      ...(tipeId ? { tipeId } : {}),
-      ...(hargaRows.length ? { harga: { create: hargaRows } } : {}),
+      tipeId,
     },
     include: { tipe: { select: { id: true, nama: true } } },
   })

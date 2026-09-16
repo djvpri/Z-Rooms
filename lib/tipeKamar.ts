@@ -89,3 +89,76 @@ export function namaTipe(tipe: { nama?: string | null } | null | undefined): str
   const nama = tipe?.nama?.trim()
   return nama && nama.length > 0 ? nama : 'Tanpa tipe'
 }
+
+// ───────────────────────────────────────────────
+// HARGA
+// ───────────────────────────────────────────────
+//
+// Harga sewa melekat pada TIPE kamar (model HargaTipe), bukan per kamar. Dulu
+// tiap kamar punya baris HargaKamar sendiri, jadi menaikkan tarif Standar
+// berarti mengedit 12 kamar satu per satu — dan rawan tak sinkron. Sekarang
+// kamar mewarisi harga tipe-nya.
+
+export const PERIODE_SEWA = ['HARIAN', 'MINGGUAN', 'BULANAN', 'TAHUNAN'] as const
+export type PeriodeSewa = (typeof PERIODE_SEWA)[number]
+
+/** Label Indonesia untuk tiap periode, dipakai di form & tabel. */
+export const LABEL_PERIODE: Record<PeriodeSewa, string> = {
+  HARIAN: 'Harian',
+  MINGGUAN: 'Mingguan',
+  BULANAN: 'Bulanan',
+  TAHUNAN: 'Tahunan',
+}
+
+/** Batas atas harga & deposit (rupiah). Guard bodoh terhadap salah ketik. */
+export const HARGA_MAKS = 9_999_999_999
+
+type BarisHarga = { periodeSewa?: string | null; harga?: unknown; aktif?: boolean | null }
+type KamarHarga = { tipe?: { harga?: BarisHarga[] | null } | null } | null | undefined
+
+/**
+ * Harga satu periode untuk sebuah kamar, diambil dari tipe kamarnya.
+ * Mengembalikan 0 kalau tipe kamar belum punya tarif untuk periode itu —
+ * pemanggil menampilkannya sebagai '-' atau menghalangi booking.
+ *
+ * Hanya baris `aktif` yang dihitung; baris nonaktif dianggap tak ada supaya
+ * tarif lama bisa disimpan tanpa ikut terpakai.
+ */
+export function hargaEfektif(kamar: KamarHarga, periode: PeriodeSewa): number {
+  const baris = kamar?.tipe?.harga?.find(h => h.periodeSewa === periode && h.aktif !== false)
+  if (!baris) return 0
+  const angka = Number(baris.harga)
+  return Number.isFinite(angka) && angka > 0 ? angka : 0
+}
+
+/** Deposit satu periode, 0 kalau tak diisi. */
+export function depositEfektif(kamar: KamarHarga, periode: PeriodeSewa): number {
+  const baris = kamar?.tipe?.harga?.find(h => h.periodeSewa === periode && h.aktif !== false)
+  if (!baris) return 0
+  const angka = Number((baris as { deposit?: unknown }).deposit)
+  return Number.isFinite(angka) && angka > 0 ? angka : 0
+}
+
+/**
+ * Semua periode yang punya tarif aktif untuk kamar ini, urut PERIODE_SEWA.
+ * Dipakai /kamar untuk memilih kolom harga mana yang ditampilkan.
+ */
+export function periodeTersedia(kamar: KamarHarga): PeriodeSewa[] {
+  const daftar = kamar?.tipe?.harga ?? []
+  return PERIODE_SEWA.filter(p => daftar.some(h => h.periodeSewa === p && h.aktif !== false))
+}
+
+/**
+ * Bentuk harga yang dikirim ke klien (booking & /kamar). Sengaja array datar
+ * dengan nama `harga` supaya bentuknya sama seperti tipe yang di-`include`,
+ * hanya saja rasa harganya sudah diwarisi dari tipe.
+ */
+export type HargaRingkas = { periodeSewa: PeriodeSewa; harga: number; deposit: number }
+
+export function hargaRingkas(kamar: KamarHarga): HargaRingkas[] {
+  return periodeTersedia(kamar).map(p => ({
+    periodeSewa: p,
+    harga: hargaEfektif(kamar, p),
+    deposit: depositEfektif(kamar, p),
+  }))
+}

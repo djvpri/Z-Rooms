@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
-    "start": "prisma db push --accept-data-loss && prisma generate && next start",
+    "start": "node scripts/rapikan-tipe-kamar.mjs sebelum && prisma db push --accept-data-loss && prisma generate && (node scripts/rapikan-tipe-kamar.mjs sesudah || echo 'PERINGATAN: pindah harga kamar->tipe gagal, tarif lama perlu diisi ulang manual di Pengaturan > Tipe kamar') && next start",
     "postinstall": "prisma generate",
     "seed:prod": "node -e \"const{PrismaClient}=require('@prisma/client');const bcrypt=require('bcryptjs');const prisma=new PrismaClient();(async()=>{try{const count=await prisma.user.count();if(count===0){await prisma.user.create({data:{name:'Admin',email:'admin@nusasewa.id',password:await bcrypt.hash('admin123',10),role:'ADMIN',isActive:true}});console.log('✅ Admin user seeded')}else{console.log('✅ Users exist, skipping seed')}}catch(e){console.log('ℹ️ Seed error:',e.message)}finally{await prisma.$disconnect()}})()\"",
     "prisma:migrate": "prisma migrate dev",

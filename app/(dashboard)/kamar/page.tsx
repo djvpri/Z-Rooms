@@ -5,7 +5,7 @@ import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa, tglJamSingkat, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 import { cekLewat, labelLewat, batasCheckout } from '@/lib/checkout'
 import { ringkasBayar } from '@/lib/bayar'
-import { namaTipe, fasilitasEfektif } from '@/lib/tipeKamar'
+import { namaTipe, fasilitasEfektif, hargaEfektif, depositEfektif } from '@/lib/tipeKamar'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
@@ -21,10 +21,9 @@ export default async function KamarPage() {
   const kamar = await prisma.kamar.findMany({
     where: { propertiId: properti.id },
     include: {
-      // Tipe master data: kamar menunjuk ke sini, dan fasilitas tipe dipakai
-      // sebagai bawaan untuk kamar yang belum diisi fasilitas sendiri.
-      tipe: { select: { id: true, nama: true, fasilitas: true } },
-      harga: { where: { aktif: true } },
+      // Tipe master data: kamar menunjuk ke sini. Dua hal diwarisi dari tipe —
+      // fasilitas (untuk kamar yang belum diisi sendiri) dan harga sewa.
+      tipe: { select: { id: true, nama: true, fasilitas: true, harga: { where: { aktif: true } } } },
       sewa: {
         where: { statusSewa: 'AKTIF' },
         include: {
@@ -88,13 +87,14 @@ export default async function KamarPage() {
     kamar
       .filter(x => x.status === 'TERSEDIA' && x.id !== asalId)
       .map(x => {
-        const hb = x.harga.find(h => h.periodeSewa === 'BULANAN')
+        // Tarif Bulanan untuk kamar tujuan pindah — diwarisi dari tipenya.
+        const hb = hargaEfektif(x, 'BULANAN')
         return {
           id: x.id,
           nomor: x.nomor,
           tipe: namaTipe(x.tipe),
-          hargaBulanan: hb ? Number(hb.harga) : null,
-          deposit: hb?.deposit != null ? Number(hb.deposit) : null,
+          hargaBulanan: hb > 0 ? hb : null,
+          deposit: hb > 0 ? depositEfektif(x, 'BULANAN') : null,
         }
       })
 
@@ -150,7 +150,7 @@ export default async function KamarPage() {
       ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
-          const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
+          const hargaBulanan = hargaEfektif(k, 'BULANAN')
           const sewaAktif = k.sewa[0]
           const penyewa = sewaAktif?.penyewa
           return (
@@ -160,9 +160,9 @@ export default async function KamarPage() {
             >
               <p className="font-semibold text-sm">{k.nomor}</p>
               <p className="text-xs mt-0.5 opacity-75">{namaTipe(k.tipe)}</p>
-              {hargaBulanan && (
+              {hargaBulanan > 0 && (
                 <p className="text-xs mt-1 font-medium">
-                  {formatRupiah(hargaBulanan.harga)}<span className="opacity-60">/bln</span>
+                  {formatRupiah(hargaBulanan)}<span className="opacity-60">/bln</span>
                 </p>
               )}
               <p className="text-xs mt-1 opacity-60 truncate">
@@ -227,7 +227,7 @@ export default async function KamarPage() {
             </thead>
             <tbody>
               {kamar.map(k => {
-                const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
+                const hargaBulanan = hargaEfektif(k, 'BULANAN')
                 const sewaAktif = k.sewa[0]
                 const penyewa = sewaAktif?.penyewa
                 return (
@@ -235,7 +235,7 @@ export default async function KamarPage() {
                     <td className="py-2.5 font-medium text-gray-800">{k.nomor}</td>
                     <td className="py-2.5 text-gray-600">{namaTipe(k.tipe)}</td>
                     <td className="py-2.5 text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</td>
-                    <td className="py-2.5 text-gray-700">{hargaBulanan ? formatRupiah(hargaBulanan.harga) : '-'}</td>
+                    <td className="py-2.5 text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</td>
                     <td className="py-2.5">
                       <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
                     </td>
@@ -274,7 +274,7 @@ export default async function KamarPage() {
         {/* Mobile cards */}
         <div className="md:hidden space-y-2">
           {kamar.map(k => {
-            const hargaBulanan = k.harga.find(h => h.periodeSewa === 'BULANAN')
+            const hargaBulanan = hargaEfektif(k, 'BULANAN')
             const sewaAktif = k.sewa[0]
             const penyewa = sewaAktif?.penyewa
             return (
@@ -294,7 +294,7 @@ export default async function KamarPage() {
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {namaTipe(k.tipe)}{k.luas ? ` · ${k.luas}m²` : ''}
-                    {hargaBulanan ? ` · ${formatRupiah(hargaBulanan.harga)}/bln` : ''}
+                    {hargaBulanan > 0 ? ` · ${formatRupiah(hargaBulanan)}/bln` : ''}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {(() => { const f = fasilitasEfektif(k); return f.slice(0, 2).join(', ') + (f.length > 2 ? '…' : '') })()}

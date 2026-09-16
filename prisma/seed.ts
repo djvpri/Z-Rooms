@@ -60,7 +60,18 @@ async function main() {
     const baris = await prisma.tipeKamar.upsert({
       where: { propertiId_nama: { propertiId: properti.id, nama: t.nama } },
       update: {},
-      create: { nama: t.nama, urutan: i, fasilitas: t.fasilitas, propertiId: properti.id },
+      create: {
+        nama: t.nama, urutan: i, fasilitas: t.fasilitas, propertiId: properti.id,
+        // Harga melekat pada tipe (HargaTipe), bukan per kamar — kamar bertipe
+        // sama otomatis memakai tarif ini.
+        harga: {
+          create: [
+            { periodeSewa: PeriodeSewa.HARIAN,  harga: t.hariann, deposit: t.hariann },
+            { periodeSewa: PeriodeSewa.BULANAN, harga: t.bulanan, deposit: t.bulanan * 2 },
+            { periodeSewa: PeriodeSewa.TAHUNAN, harga: t.tahunan, deposit: t.tahunan },
+          ],
+        },
+      },
     })
     tipeMap[t.nama] = baris.id
   }
@@ -104,13 +115,6 @@ async function main() {
         fasilitas: [],
         status: k.status,
         propertiId: properti.id,
-        harga: {
-          create: [
-            { periodeSewa: PeriodeSewa.HARIAN,  harga: info.hariann, deposit: info.hariann },
-            { periodeSewa: PeriodeSewa.BULANAN,  harga: info.bulanan, deposit: info.bulanan * 2 },
-            { periodeSewa: PeriodeSewa.TAHUNAN,  harga: info.tahunan, deposit: info.tahunan },
-          ],
-        },
       },
     })
     kamarMap[k.nomor] = kamar.id

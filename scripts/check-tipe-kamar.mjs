@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict'
 import {
   fasilitasEfektif, namaTipe, rapikanFasilitas, kunciNama, TIPE_BAWAAN,
+  hargaEfektif, depositEfektif, periodeTersedia, hargaRingkas,
 } from '../lib/tipeKamar.ts'
 
 let lulus = 0
@@ -99,6 +100,61 @@ blok('TIPE_BAWAAN: tiap tipe punya fasilitas bersih & ada isinya', () => {
     assert.deepEqual(bersih, t.fasilitas, `${t.nama}: fasilitas tidak bersih`)
     assert.ok(bersih.length > 0, `${t.nama}: fasilitas kosong`)
   }
+})
+
+// ── Harga: melekat pada tipe, dibaca lewat helper warisan
+const kmr = (harga) => ({ tipe: harga ? { harga } : null })
+
+blok('hargaEfektif membaca tarif tipe', () => {
+  const k = kmr([{ periodeSewa: 'BULANAN', harga: 1200000, deposit: 2400000 }])
+  assert.equal(hargaEfektif(k, 'BULANAN'), 1200000)
+  assert.equal(depositEfektif(k, 'BULANAN'), 2400000)
+})
+
+blok('periode tanpa tarif -> 0, bukan NaN', () => {
+  const k = kmr([{ periodeSewa: 'BULANAN', harga: 1200000 }])
+  assert.equal(hargaEfektif(k, 'HARIAN'), 0)
+  assert.equal(hargaEfektif(k, 'TAHUNAN'), 0)
+})
+
+blok('kamar tanpa tipe / tanpa harga -> 0', () => {
+  assert.equal(hargaEfektif(kmr(null), 'BULANAN'), 0)
+  assert.equal(hargaEfektif(null, 'BULANAN'), 0)
+  assert.equal(hargaEfektif({}, 'BULANAN'), 0)
+})
+
+blok('baris nonaktif diabaikan', () => {
+  const k = kmr([{ periodeSewa: 'BULANAN', harga: 999, aktif: false }])
+  assert.equal(hargaEfektif(k, 'BULANAN'), 0)
+})
+
+blok('harga Decimal-as-string tetap terbaca', () => {
+  // Prisma mengembalikan Decimal; sesudah lewat JSON bentuknya string.
+  const k = kmr([{ periodeSewa: 'BULANAN', harga: '1500000' }])
+  assert.equal(hargaEfektif(k, 'BULANAN'), 1500000)
+})
+
+blok('harga/tarif tak masuk akal -> 0', () => {
+  assert.equal(hargaEfektif(kmr([{ periodeSewa: 'BULANAN', harga: 'abc' }]), 'BULANAN'), 0)
+  assert.equal(hargaEfektif(kmr([{ periodeSewa: 'BULANAN', harga: -5 }]), 'BULANAN'), 0)
+  assert.equal(hargaEfektif(kmr([{ periodeSewa: 'BULANAN', harga: 0 }]), 'BULANAN'), 0)
+})
+
+blok('periodeTersedia hanya periode bertarif, urut PERIODE_SEWA', () => {
+  const k = kmr([
+    { periodeSewa: 'TAHUNAN', harga: 1000 },
+    { periodeSewa: 'HARIAN', harga: 100 },
+    { periodeSewa: 'MINGGUAN', harga: 500, aktif: false },
+  ])
+  assert.deepEqual(periodeTersedia(k), ['HARIAN', 'TAHUNAN'])
+})
+
+blok('hargaRingkas sejajar periodeTersedia', () => {
+  const k = kmr([{ periodeSewa: 'HARIAN', harga: 80000, deposit: 80000 }])
+  const r = hargaRingkas(k)
+  assert.deepEqual(r.map(x => x.periodeSewa), periodeTersedia(k))
+  assert.equal(r[0].harga, 80000)
+  assert.equal(r[0].deposit, 80000)
 })
 
 if (process.exitCode) console.error('\nADA YANG GAGAL')

@@ -1,19 +1,24 @@
 'use client'
 // app/(dashboard)/pengaturan/tipe-kamar/page.tsx
 //
-// Atur tipe kamar dan fasilitas tiap tipe.
+// Atur tipe kamar, fasilitas, dan HARGA tiap tipe.
 //
 // Fasilitas di sini adalah BAWAAN: kamar yang belum diisi fasilitas sendiri
 // memakainya. Kamar yang sudah punya fasilitas sendiri tidak ditimpa — di data
 // lama, kamar bertipe sama memang beda isinya, jadi menimpanya akan menghapus
 // keterangan yang benar.
+//
+// Harga juga melekat pada tipe (HargaTipe), bukan per kamar. Kolom harga yang
+// dibiarkan kosong berarti periode itu tidak disewakan untuk tipe ini.
 import { useEffect, useState } from 'react'
 import {
   PlusLg, PencilSquare, Trash3, Check2, CheckCircleFill,
   ExclamationTriangleFill, DoorClosed, InfoCircle,
 } from 'react-bootstrap-icons'
 import TabPengaturan from '@/components/pengaturan/TabPengaturan'
-import { SARAN_FASILITAS } from '@/lib/tipeKamar'
+import { SARAN_FASILITAS, PERIODE_SEWA, LABEL_PERIODE, type PeriodeSewa } from '@/lib/tipeKamar'
+
+type BarisHarga = { periodeSewa: PeriodeSewa; harga: number | string; deposit: number | string | null; aktif: boolean }
 
 type Tipe = {
   id: string
@@ -22,6 +27,22 @@ type Tipe = {
   fasilitas: string[]
   urutan: number
   _count: { kamar: number }
+  harga: BarisHarga[]
+}
+
+/** Rupiah tanpa desimal — harga selalu bulat. */
+function rp(n: number) {
+  return 'Rp' + n.toLocaleString('id-ID')
+}
+
+/** Nilai harga awal untuk form: '' kalau periode itu belum punya tarif. */
+function hargaAwal(t: Tipe | null): Record<PeriodeSewa, string> {
+  const keluar = {} as Record<PeriodeSewa, string>
+  for (const p of PERIODE_SEWA) keluar[p] = ''
+  for (const h of t?.harga ?? []) {
+    if (h.aktif !== false) keluar[h.periodeSewa] = String(Number(h.harga))
+  }
+  return keluar
 }
 
 export default function TipeKamarPage() {
@@ -33,7 +54,7 @@ export default function TipeKamarPage() {
 
   const [buka, setBuka] = useState(false)
   const [edit, setEdit] = useState<Tipe | null>(null)
-  const [f, setF] = useState({ nama: '', keterangan: '', fasilitas: [] as string[] })
+  const [f, setF] = useState({ nama: '', keterangan: '', fasilitas: [] as string[], harga: hargaAwal(null) })
   const [simpan, setSimpan] = useState(false)
 
   async function muat() {
@@ -53,14 +74,23 @@ export default function TipeKamarPage() {
 
   function bukaTambah() {
     setEdit(null)
-    setF({ nama: '', keterangan: '', fasilitas: [] })
+    setF({ nama: '', keterangan: '', fasilitas: [], harga: hargaAwal(null) })
     setBuka(true); setError(''); setPesan('')
   }
 
   function bukaEdit(t: Tipe) {
     setEdit(t)
-    setF({ nama: t.nama, keterangan: t.keterangan ?? '', fasilitas: [...t.fasilitas] })
+    setF({ nama: t.nama, keterangan: t.keterangan ?? '', fasilitas: [...t.fasilitas], harga: hargaAwal(t) })
     setBuka(true); setError(''); setPesan('')
+  }
+
+  /**
+   * Ubah satu kolom harga. Hanya digit yang diterima supaya tak perlu membersihkan
+   * titik/koma yang diketik kasir. String kosong = periode itu tidak disewakan.
+   */
+  function setHarga(p: PeriodeSewa, nilai: string) {
+    const digit = nilai.replace(/\D/g, '').slice(0, 10)
+    setF((prev) => ({ ...prev, harga: { ...prev.harga, [p]: digit } }))
   }
 
   function toggleFasilitas(nama: string) {
@@ -78,6 +108,12 @@ export default function TipeKamarPage() {
 
     setSimpan(true); setError('')
     try {
+      // Kirim hanya periode yang diisi; yang kosong tidak ikut, dan server
+      // menghapus tarif periode itu (artinya periode tak disewakan).
+      const harga = PERIODE_SEWA
+        .filter((p) => f.harga[p] !== '')
+        .map((p) => ({ periodeSewa: p, harga: Number(f.harga[p]), aktif: true }))
+
       const res = await fetch('/api/tipe-kamar', {
         method: edit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,6 +122,7 @@ export default function TipeKamarPage() {
           nama: f.nama.trim(),
           keterangan: f.keterangan.trim(),
           fasilitas: f.fasilitas,
+          harga,
         }),
       })
       const data = await res.json().catch(() => null)
@@ -107,7 +144,7 @@ export default function TipeKamarPage() {
     const pakai = t._count.kamar
     const lanjut = confirm(
       pakai > 0
-        ? `Hapus tipe "${t.nama}"? ${pakai} kamar yang memakainya akan jadi "Tanpa tipe" (kamarnya TIDAK terhapus).`
+        ? `Hapus tipe "${t.nama}"? ${pakai} kamar yang memakainya akan dipindahkan ke tipe lain (kamarnya TIDAK terhapus).`
         : `Hapus tipe "${t.nama}"?`,
     )
     if (!lanjut) return
@@ -117,8 +154,8 @@ export default function TipeKamarPage() {
       const res = await fetch(`/api/tipe-kamar?id=${encodeURIComponent(t.id)}`, { method: 'DELETE' })
       const data = await res.json().catch(() => null)
       if (!res.ok) { setError(data?.error?.message ?? data?.error ?? 'Gagal menghapus tipe.'); return }
-      const n = data?.kamarTerdampak ?? 0
-      setPesan(n > 0 ? `Tipe ${t.nama} dihapus. ${n} kamar kini tanpa tipe.` : `Tipe ${t.nama} dihapus.`)
+      const n = data?.kamarDipindah ?? 0
+      setPesan(n > 0 ? `Tipe ${t.nama} dihapus. ${n} kamar dipindahkan ke ${data.keTipe}.` : `Tipe ${t.nama} dihapus.`)
       await muat()
     } catch {
       setError('Gagal menghapus tipe.')
@@ -190,6 +227,20 @@ export default function TipeKamarPage() {
                   ) : (
                     <p className="text-xs text-gray-400 mt-2">Belum ada fasilitas bawaan.</p>
                   )}
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                    {PERIODE_SEWA.map((p) => {
+                      const baris = t.harga.find((h) => h.periodeSewa === p && h.aktif !== false)
+                      return (
+                        <div key={p} className="text-xs">
+                          <span className="text-gray-400">{LABEL_PERIODE[p]}</span>{' '}
+                          <span className={baris ? 'font-medium text-gray-900' : 'text-gray-300'}>
+                            {baris ? rp(Number(baris.harga)) : '—'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -213,8 +264,8 @@ export default function TipeKamarPage() {
       <p className="text-xs text-gray-400 mt-6 inline-flex items-start gap-1.5">
         <InfoCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
         <span>
-          Fasilitas di sini adalah bawaan tipe. Kamar yang sudah diisi fasilitas sendiri tidak
-          ditimpa — hanya kamar yang masih kosong yang mengikuti tipe.
+          Fasilitas adalah bawaan tipe — kamar yang sudah diisi fasilitas sendiri tidak ditimpa.
+          Harga juga milik tipe: semua kamar bertipe sama memakai tarif yang sama.
         </span>
       </p>
 
@@ -269,6 +320,25 @@ export default function TipeKamarPage() {
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
                     Pilih yang berlaku umum untuk tipe ini. Perbedaan antar kamar diatur di kamarnya masing-masing.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="form-label">Harga sewa per tipe</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {PERIODE_SEWA.map((p) => (
+                      <div key={p}>
+                        <label htmlFor={`harga-${p}`} className="text-xs text-gray-500">{LABEL_PERIODE[p]}</label>
+                        <input
+                          id={`harga-${p}`} className="form-input" inputMode="numeric"
+                          value={f.harga[p]} placeholder="kosongkan bila tak disewakan"
+                          onChange={(e) => setHarga(p, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Semua kamar bertipe ini memakai harga di sini. Kosongkan kolom yang tidak disewakan.
                   </p>
                 </div>
 

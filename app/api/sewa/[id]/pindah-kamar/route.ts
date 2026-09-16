@@ -66,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const tujuan = await prisma.kamar.findFirst({
     where: { id: d.kamarTujuanId, propertiId: properti.id },
-    include: { harga: { where: { aktif: true } } },
+    include: { tipe: { include: { harga: { where: { aktif: true } } } } },
   })
   if (!tujuan) return NextResponse.json({ error: 'Kamar tujuan tidak ditemukan' }, { status: 404 })
   if (tujuan.id === sewa.kamar.id) {
@@ -124,8 +124,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       // Kamar tujuan pakai periodeSewa sendiri (bisa beda dari kamar asal),
       // jadi tanggalKeluar dihitung dari harga kamar tujuan.
-      const hargaTujuan = tujuan.harga[0]?.harga ?? sewa.hargaSewa
-      const periode = tujuan.harga[0]?.periodeSewa ?? sewa.periodeSewa
+      const hargaTujuan = Number(tujuan.tipe?.harga[0]?.harga ?? sewa.hargaSewa)
+      const periode = tujuan.tipe?.harga[0]?.periodeSewa ?? sewa.periodeSewa
       const keluarBaru =
         periode === 'HARIAN' ? addDays(pindah, d.durasi)
           : periode === 'MINGGUAN' ? addDays(pindah, d.durasi * 7)
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Deposit pindah apa adanya — tanpa baris Pengeluaran/Pembayaran, karena
       // uangnya tidak berpindah tangan.
       const depositLama = Number(sewa.deposit)
-      const depositDiminta = tujuan.harga[0]?.deposit != null ? Number(tujuan.harga[0].deposit) : depositLama
+      const depositDiminta = tujuan.tipe?.harga[0]?.deposit != null ? Number(tujuan.tipe.harga[0].deposit) : depositLama
       const kurangDeposit = kekuranganDeposit(depositLama, depositDiminta)
 
       const sewaBaru = await tx.sewa.create({

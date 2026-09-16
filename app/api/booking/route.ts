@@ -48,9 +48,10 @@ export async function POST(req: NextRequest) {
   const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
 
+  // Tarif kini milik tipe kamar — ambil lewat relasi, bukan dari kamar langsung.
   const kamar = await prisma.kamar.findFirst({
     where: { id: d.kamarId, propertiId: properti.id },
-    include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } },
+    include: { tipe: { include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } } } },
   })
   if (!kamar) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
   if (kamar.status !== 'TERSEDIA' && kamar.status !== 'DIPESAN') {
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       ? addMonths(masuk, d.durasi)
       : addYears(masuk, d.durasi)
 
-  const harga = kamar.harga[0]?.harga ?? 0
+  const harga = Number(kamar.tipe?.harga[0]?.harga ?? 0)
 
   // Buat / temukan penyewa. Kosong -> null supaya kolom nullable terisi null,
   // bukan string kosong ('' bikin UI tampil blank dan upsert by nik tak akurat).
