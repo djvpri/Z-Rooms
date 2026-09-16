@@ -98,14 +98,15 @@ export default async function KamarPage() {
         }
       })
 
-  // Bentuk data untuk KamarTambahModal mode ubah. Hanya field yang memang bisa
-  // diedit — `status` diatur alur sewa, bukan dari form ini.
+  // Bentuk data untuk KamarTambahModal mode ubah. Fasilitas TIDAK ikut: fasilitas
+  // kamar selalu mengikuti tipe kamarnya, jadi mengirim daftar di sini hanya akan
+  // menampilkan centangan yang berbeda dari yang dilihat di tabel.
+  // `status` juga tidak — diatur alur sewa, bukan form ini.
   const ringkasEdit = (k: KamarBaris) => ({
     id: k.id,
     nomor: k.nomor,
     lantai: k.lantai,
     luas: k.luas,
-    fasilitas: k.fasilitas,
     tipeId: k.tipeId,
   })
 

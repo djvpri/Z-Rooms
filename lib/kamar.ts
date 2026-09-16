@@ -17,7 +17,12 @@ const nomor = z.string().trim().min(1, 'Nomor kamar wajib diisi.')
 // Lantai dasar pun ditulis 1 di properti ini, jadi 0 dan negatif ditolak.
 const lantai = z.number().int().min(1, 'Lantai minimal 1.')
 const luas = z.number().positive('Luas harus lebih dari 0.')
-const fasilitas = z.array(z.string())
+
+// Fasilitas sengaja TIDAK ada di kedua skema. Fasilitas kamar selalu mengikuti
+// tipe kamarnya — tak ada sumber lain. Kalau `fasilitas` dikirim klien, Zod
+// membuangnya seperti field asing lain, jadi kamar tak bisa punya daftar
+// sendiri yang menyimpang dari tipenya. Dulu kamar bisa, dan hasilnya centangan
+// di form berbeda dari yang tampil di tabel.
 
 export const createKamarSchema = z.object({
   nomor,
@@ -26,7 +31,6 @@ export const createKamarSchema = z.object({
   // punya tarif, jadi tak bisa disewakan.
   tipeId: z.string().min(1, 'Tipe kamar wajib dipilih.'),
   luas: luas.optional(),
-  fasilitas: fasilitas.default([]),
 })
 
 // Semua opsional — pemanggil boleh mengirim sebagian saja. `luas: null` berarti
@@ -40,5 +44,4 @@ export const updateKamarSchema = z.object({
   lantai: lantai.optional(),
   tipeId: z.string().min(1, 'Tipe kamar wajib dipilih.').optional(),
   luas: luas.nullable().optional(),
-  fasilitas: fasilitas.optional(),
 })

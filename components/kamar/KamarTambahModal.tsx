@@ -8,7 +8,7 @@
 // — tarif melekat pada tipe (Pengaturan → Tipe kamar).
 //
 // `kamar` diisi = mode ubah (PATCH /api/kamar/[id]), kosong = mode tambah (POST).
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, PlusLg, Check2, InfoCircle, PencilSquare } from 'react-bootstrap-icons'
 
@@ -20,7 +20,6 @@ export type KamarEdit = {
   nomor: string
   lantai: number
   luas: number | null
-  fasilitas: string[]
   tipeId: string
 }
 
@@ -37,28 +36,11 @@ export default function KamarTambahModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sukses, setSukses] = useState('')
-  // Saran dari master properti (Pengaturan → Fasilitas), bukan daftar hardcoded.
-  const [saran, setSaran] = useState<string[]>([])
-
-  useEffect(() => {
-    let batal = false
-    fetch('/api/fasilitas', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => {
-        if (batal) return
-        const aktif = (j?.fasilitas ?? []).filter((x: { aktif: boolean }) => x.aktif)
-        setSaran(aktif.map((x: { nama: string }) => x.nama))
-      })
-      .catch(() => {})
-    return () => { batal = true }
-  }, [])
-
   const kosong = () => ({
     nomor: kamar?.nomor ?? '',
     lantai: kamar?.lantai ?? 1,
     tipeId: kamar?.tipeId ?? daftarTipe[0]?.id ?? '',
     luas: kamar?.luas != null ? String(kamar.luas) : '',
-    fasilitas: kamar?.fasilitas ?? ([] as string[]),
   })
 
   const [f, setF] = useState(kosong)
@@ -67,18 +49,8 @@ export default function KamarTambahModal({
     setF(p => ({ ...p, [k]: v }))
   }
 
-  /** Pilih tipe: fasilitas tipe jadi awalan, tapi tetap bisa dicentang ulang. */
-  function pilihTipe(id: string) {
-    const tipe = daftarTipe.find(t => t.id === id)
-    setF(p => ({ ...p, tipeId: id, fasilitas: tipe ? [...tipe.fasilitas] : p.fasilitas }))
-  }
-
-  function toggleFasilitas(nama: string) {
-    setF(p => ({
-      ...p,
-      fasilitas: p.fasilitas.includes(nama) ? p.fasilitas.filter(x => x !== nama) : [...p.fasilitas, nama],
-    }))
-  }
+  /** Fasilitas kamar selalu mengikuti tipenya — ditampilkan sebagai bacaan saja. */
+  const fasilitasTipe = daftarTipe.find(t => t.id === f.tipeId)?.fasilitas ?? []
 
   function reset() {
     setF(kosong())
@@ -116,7 +88,9 @@ export default function KamarTambahModal({
           // Kosongkan luas = null (bukan dihilangkan), supaya luas lama benar-benar
           // terhapus saat pemilik menghapus isinya.
           luas: f.luas ? Number(f.luas) : null,
-          fasilitas: f.fasilitas,
+          // `fasilitas` sengaja TIDAK dikirim: fasilitas kamar selalu mengikuti
+          // tipe kamarnya. Mengirim daftar dari sini pernah membuat kamar punya
+          // centangan sendiri yang berbeda dari tipenya.
         }),
       })
       const data = await res.json().catch(() => null)
@@ -191,7 +165,7 @@ export default function KamarTambahModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="form-label">Tipe</label>
-                      <select className="form-input" value={f.tipeId} onChange={e => pilihTipe(e.target.value)}>
+                      <select className="form-input" value={f.tipeId} onChange={e => set('tipeId', e.target.value)}>
                         {daftarTipe.length === 0 && <option value="">Belum ada tipe</option>}
                         {daftarTipe.map(t => <option key={t.id} value={t.id}>{t.nama}</option>)}
                       </select>
@@ -215,19 +189,25 @@ export default function KamarTambahModal({
 
                   <div>
                     <label className="form-label">Fasilitas</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[...new Set([...saran, ...f.fasilitas])].map(nama => {
-                        const aktif = f.fasilitas.includes(nama)
-                        return (
-                          <button key={nama} type="button" onClick={() => toggleFasilitas(nama)}
-                            className={`badge border transition-colors ${aktif
-                              ? 'bg-teal-50 text-teal-700 border-teal-100'
-                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-                            {aktif && <Check2 size={10} className="mr-1" aria-hidden="true" />}{nama}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    {fasilitasTipe.length > 0 ? (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {fasilitasTipe.map(nama => (
+                            <span key={nama} className="badge bg-teal-50 text-teal-700 border border-teal-100">
+                              <Check2 size={10} className="mr-1" aria-hidden="true" />{nama}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          Mengikuti tipe kamar. Ubah di Pengaturan → Tipe kamar.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+                        <InfoCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>Tipe ini belum punya fasilitas. Tambahkan di Pengaturan → Tipe kamar.</span>
+                      </p>
+                    )}
                   </div>
 
                   {error && (

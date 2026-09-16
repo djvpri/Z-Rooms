@@ -1,6 +1,6 @@
 // app/api/kamar/[id]/route.ts
 //
-// Ubah data kamar yang sudah ada: nomor, lantai, tipe, luas, fasilitas.
+// Ubah data kamar yang sudah ada: nomor, lantai, tipe, luas.
 //
 // `status` sengaja tidak ada di skemanya — lihat lib/kamar.ts.
 //

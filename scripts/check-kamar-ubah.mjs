@@ -28,10 +28,10 @@ const tolak = (skema, data) => {
 
 console.log('lib/kamar.ts — tambah kamar')
 
-blok('kamar baru cukup nomor + tipe; lantai & fasilitas punya nilai awal', () => {
+blok('kamar baru cukup nomor + tipe; lantai punya nilai awal', () => {
   const d = ok(createKamarSchema, { nomor: 'A-101', tipeId: 't1' })
   assert.equal(d.lantai, 1)
-  assert.deepEqual(d.fasilitas, [])
+  assert.equal(Object.hasOwn(d, 'fasilitas'), false, 'fasilitas bukan urusan form kamar')
 })
 
 blok('nomor dipangkas spasinya', () => {
@@ -96,9 +96,14 @@ blok('tipe kosong ditolak (kalau memang dikirim)', () => {
   tolak(updateKamarSchema, { tipeId: '' })
 })
 
-blok('fasilitas harus daftar teks', () => {
-  assert.deepEqual(ok(updateKamarSchema, { fasilitas: ['AC', 'TV'] }).fasilitas, ['AC', 'TV'])
-  tolak(updateKamarSchema, { fasilitas: 'AC' })
+blok('fasilitas DIABUIKAN — kamar tak boleh punya daftar sendiri', () => {
+  // Fasilitas kamar selalu mengikuti tipe kamarnya. Dulu form mengirim daftar
+  // fasilitas per kamar, dan akibatnya centangan di modal berbeda dari yang
+  // tampil di tabel (kamar mewarisi tipe, tapi form mengirim daftar kosong).
+  const d = ok(updateKamarSchema, { nomor: 'A-104', fasilitas: ['AC'] })
+  assert.equal(Object.hasOwn(d, 'fasilitas'), false, 'fasilitas tidak boleh ikut tersimpan')
+  const c = ok(createKamarSchema, { nomor: 'A-105', tipeId: 't1', fasilitas: ['AC'] })
+  assert.equal(Object.hasOwn(c, 'fasilitas'), false, 'fasilitas tidak boleh ikut tersimpan saat tambah')
 })
 
 blok('badan bukan objek ditolak (bukan meledak 500)', () => {
