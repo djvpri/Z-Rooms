@@ -18,7 +18,8 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { kekuranganDeposit } from '@/lib/deposit'
-import { addDays, addMonths, addYears } from 'date-fns'
+import { addDays } from 'date-fns'
+import { tanggalKeluar } from '@/lib/sewa'
 import { z } from 'zod'
 
 const pindahSchema = z.object({
@@ -126,11 +127,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // jadi tanggalKeluar dihitung dari harga kamar tujuan.
       const hargaTujuan = Number(tujuan.tipe?.harga[0]?.harga ?? sewa.hargaSewa)
       const periode = tujuan.tipe?.harga[0]?.periodeSewa ?? sewa.periodeSewa
-      const keluarBaru =
-        periode === 'HARIAN' ? addDays(pindah, d.durasi)
-          : periode === 'MINGGUAN' ? addDays(pindah, d.durasi * 7)
-            : periode === 'BULANAN' ? addMonths(pindah, d.durasi)
-              : addYears(pindah, d.durasi)
+      const keluarBaru = tanggalKeluar(pindah, periode, d.durasi)
 
       // Deposit pindah apa adanya — tanpa baris Pengeluaran/Pembayaran, karena
       // uangnya tidak berpindah tangan.

@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { tglJamJadiDate } from '@/lib/utils'
 import { z } from 'zod'
-import { addDays, addMonths, addYears } from 'date-fns'
+import { addDays } from 'date-fns'
+import { tanggalKeluar } from '@/lib/sewa'
 
 const bookingSchema = z.object({
   // Penyewa — nama & noHp opsional (penyewa boleh dicatat dulu tanpa data
@@ -71,11 +72,7 @@ export async function POST(req: NextRequest) {
   if (isNaN(masuk.getTime())) {
     return NextResponse.json({ error: 'Tanggal masuk tidak valid' }, { status: 400 })
   }
-  const keluar = d.periodeSewa === 'HARIAN'
-    ? addDays(masuk, d.durasi)
-    : d.periodeSewa === 'BULANAN'
-      ? addMonths(masuk, d.durasi)
-      : addYears(masuk, d.durasi)
+  const keluar = tanggalKeluar(masuk, d.periodeSewa, d.durasi)
 
   const harga = Number(kamar.tipe?.harga[0]?.harga ?? 0)
 
