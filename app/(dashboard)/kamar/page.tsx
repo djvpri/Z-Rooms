@@ -2,8 +2,9 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
-import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa, tglJamSingkat } from '@/lib/utils'
+import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa, tglJamSingkat, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 import { cekLewat, labelLewat, batasCheckout } from '@/lib/checkout'
+import { ringkasBayar } from '@/lib/bayar'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
@@ -28,11 +29,12 @@ export default async function KamarPage() {
         where: { statusSewa: 'AKTIF' },
         include: {
           penyewa: { select: { nama: true, noHp: true } },
-          // Sisa tagihan dipakai modal check-out untuk memperingatkan kasir
-          // sebelum kamar dikosongkan dengan tunggakan masih berjalan.
+          // SEMUA tagihan sewa ini, bukan cuma yang belum bayar: badge "sudah
+          // bayar atau belum" di halaman ini perlu tagihan LUNAS untuk bisa
+          // mengenali kamar yang sudah lunas. `ringkasBayar` (lib/bayar.ts) yang
+          // memisahkan mana yang masih jadi kewajiban.
           tagihan: {
-            where: { status: { in: ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'] } },
-            select: { nominal: true },
+            select: { nominal: true, status: true, jatuhTempo: true },
           },
         },
         take: 1,
@@ -61,17 +63,20 @@ export default async function KamarPage() {
     return s ? cekLewat(s.tanggalKeluar, aturan, sekarang).lewat : false
   }).length
 
-  const ringkasSewa = (k: KamarBaris, s: SewaBaris) => ({
-    id: s.id,
-    kamarNomor: k.nomor,
-    penyewaNama: s.penyewa?.nama ?? null,
-    tanggalKeluar: s.tanggalKeluar.toISOString(),
-    deposit: Number(s.deposit),
-    sisaTagihan: s.tagihan.reduce((a, t) => a + Number(t.nominal), 0),
-    jumlahTagihan: s.tagihan.length,
-    periodeSewa: s.periodeSewa as string,
-    menitLebih: cekLewat(s.tanggalKeluar, aturan, sekarang).menitLebih,
-  })
+  const ringkasSewa = (k: KamarBaris, s: SewaBaris) => {
+    const bayar = ringkasBayar(s.tagihan, sekarang)
+    return {
+      id: s.id,
+      kamarNomor: k.nomor,
+      penyewaNama: s.penyewa?.nama ?? null,
+      tanggalKeluar: s.tanggalKeluar.toISOString(),
+      deposit: Number(s.deposit),
+      sisaTagihan: bayar.sisa,
+      jumlahTagihan: s.tagihan.filter(t => t.status !== 'DIBATALKAN').length,
+      periodeSewa: s.periodeSewa as string,
+      menitLebih: cekLewat(s.tanggalKeluar, aturan, sekarang).menitLebih,
+    }
+  }
   // Kandidat kamar tujuan pindah: kamar TERSEDIA selain kamar asal.
   const kamarTersediaUntuk = (asalId: string) =>
     kamar
@@ -157,6 +162,15 @@ export default async function KamarPage() {
               <p className="text-xs mt-1 opacity-60 truncate">
                 {penyewa ? namaPenyewa(penyewa.nama) : 'Kosong'}
               </p>
+              {/* Sudah bayar atau belum. Aturan di lib/bayar.ts, bukan di sini. */}
+              {sewaAktif && (() => {
+                const bayar = ringkasBayar(sewaAktif.tagihan, sekarang)
+                return (
+                  <p className={`text-[10px] font-semibold mt-1 px-1.5 py-0.5 rounded inline-block ${statusTagihanColor(bayar.status)}`}>
+                    {statusTagihanLabel(bayar.status)}
+                  </p>
+                )
+              })()}
               {/* Kapan kamar ini tersedia lagi. Dihitung dari tanggal keluar +
                   jam check-out properti, bukan jam masuk + 24 jam. */}
               {sewaAktif && (
@@ -199,6 +213,7 @@ export default async function KamarPage() {
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Harga/bln</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Status</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Penyewa</th>
+                <th className="text-left py-2 text-xs font-medium text-gray-400">Bayar</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Kosong</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Fasilitas</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400"></th>
@@ -219,6 +234,16 @@ export default async function KamarPage() {
                       <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
                     </td>
                     <td className="py-2.5 text-gray-600">{penyewa ? namaPenyewa(penyewa.nama) : '-'}</td>
+                    <td className="py-2.5">
+                      {sewaAktif ? (() => {
+                        const bayar = ringkasBayar(sewaAktif.tagihan, sekarang)
+                        return (
+                          <span className={`badge ${statusTagihanColor(bayar.status)}`}>
+                            {statusTagihanLabel(bayar.status)}
+                          </span>
+                        )
+                      })() : '-'}
+                    </td>
                     <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
                       {sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : '-'}
                     </td>
@@ -252,6 +277,14 @@ export default async function KamarPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-800 text-sm">{k.nomor}</span>
                     <span className={`badge text-[10px] ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
+                    {sewaAktif && (() => {
+                      const bayar = ringkasBayar(sewaAktif.tagihan, sekarang)
+                      return (
+                        <span className={`badge text-[10px] ${statusTagihanColor(bayar.status)}`}>
+                          {statusTagihanLabel(bayar.status)}
+                        </span>
+                      )
+                    })()}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {tipeKamarLabel[k.tipe]}{k.luas ? ` · ${k.luas}m²` : ''}
