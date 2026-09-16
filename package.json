@@ -11,7 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "check": "for f in scripts/check-*.mjs; do echo \"── $f\"; tsx \"$f\" || exit 1; done",
+    "check": "node scripts/check-all.mjs",
     "typecheck": "tsc --noEmit",
     "smoke": "bash scripts/smoke-deploy.sh",
     "verify": "npm run typecheck && npm run check && npm run build"
