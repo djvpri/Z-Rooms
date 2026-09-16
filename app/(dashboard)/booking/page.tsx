@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, sekarangWib } from '@/lib/utils'
-import { jamKeluarHariTerakhir } from '@/lib/checkout'
+import { batasCheckout } from '@/lib/checkout'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -43,6 +43,7 @@ type PropertiNota = {
   noHp: string | null
   teksNota: string | null
   jamCheckout: string
+  toleransiCheckout: number
 }
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
@@ -763,13 +764,13 @@ export default function BookingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Keluar</span>
-                  {/* Jam keluar dari setelan jam check-out properti (tab
-                      Pengaturan), BUKAN jam masuk. Sewa harian berakhir jam
-                      check-out di hari terakhir — orang masuk 19:00 tetap
-                      keluar 14:00. Sebelumnya baris ini mencetak jam masuk,
-                      sehingga nota bilang 19.00 sementara layar kamar bilang
-                      "Kosong 14.00" untuk sewa yang sama. */}
-                  <span>{nota.tanggalKeluar ? tglJam(jamKeluarHariTerakhir(new Date(nota.tanggalKeluar), { jamCheckout: propertiNota?.jamCheckout ?? '12:00', toleransiCheckout: 0 }).toISOString()) : '-'}</span>
+                  {/* Jam keluar dari setelan check-out properti (tab Pengaturan),
+                      BUKAN jam masuk. Orang masuk 19:00 tetap keluar 14:00 di
+                      hari terakhir. Termasuk toleransi supaya angkanya PERSIS
+                      sama dengan "Kosong ..." di layar kamar — dulu nota
+                      mencetak jam masuk, jadi satu sewa terbaca berbeda di dua
+                      tempat. */}
+                  <span>{nota.tanggalKeluar ? tglJam(batasCheckout(new Date(nota.tanggalKeluar), { jamCheckout: propertiNota?.jamCheckout ?? '12:00', toleransiCheckout: propertiNota?.toleransiCheckout ?? 0 }).toISOString()) : '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Durasi</span>

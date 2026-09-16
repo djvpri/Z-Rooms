@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict'
 import { tglJam, tglJamSingkat, tglJamJadiDate, sekarangWib } from '../lib/utils.ts'
 import { tanggalKeluar } from '../lib/sewa.ts'
-import { jamKeluarHariTerakhir } from '../lib/checkout.ts'
+import { batasCheckout } from '../lib/checkout.ts'
 
 // Gabungan tanggal + jam sekarang impor dari lib/utils.ts — dulu berkas ini
 // menyalin rumusnya sendiri (`new Date(\`${tgl}T${jam}:00+07:00\`)`), dan
@@ -37,7 +37,7 @@ assert.equal(m1.toISOString(), '2026-09-15T07:30:00.000Z')
 
 // 6. Nota booking: baris "Keluar" = TANGGAL dari tanggalKeluar(), tetapi
 //    JAMNYA dari setelan jam check-out properti (tab Pengaturan) — bukan jam
-//    masuk. Karena itu yang diuji di sini adalah jamKeluarHariTerakhir().
+//    masuk. Karena itu yang diuji di sini adalah batasCheckout().
 //    (Sebelumnya berkas ini menguji "jam keluar = jam masuk", padahal app
 //    mencetak jam check-out. Test-nya membenarkan perilaku yang salah.)
 const ATURAN_14 = { jamCheckout: '14:00', toleransiCheckout: 0 }
@@ -45,20 +45,20 @@ const ATURAN_12 = { jamCheckout: '12:00', toleransiCheckout: 0 }
 
 // Masuk 15 Sep 14:30, harian 1 hari -> hari terakhir 16 Sep, keluar 14:00.
 const hariKeluar = tanggalKeluar(m1, 'HARIAN', 1)
-const jamKeluar = jamKeluarHariTerakhir(hariKeluar, ATURAN_14)
+const jamKeluar = batasCheckout(hariKeluar, ATURAN_14)
 assert.ok(tglJam(jamKeluar.toISOString()).includes('16 September'), 'tanggal keluar +1 hari')
 assert.ok(tglJam(jamKeluar.toISOString()).includes('14.00'), 'jam keluar dari setelan, bukan jam masuk')
 
 // 6b. Penyewa masuk MALAM (19:00) tetap keluar 14:00 hari terakhir — inilah
 //     aturan yang dipegang: orang masuk 15:00 tetap habis 12:00 besok.
 const masukMalam = gabung('2026-09-16', '19:00')
-const keluarMalam = jamKeluarHariTerakhir(tanggalKeluar(masukMalam, 'HARIAN', 1), ATURAN_14)
+const keluarMalam = batasCheckout(tanggalKeluar(masukMalam, 'HARIAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarMalam.toISOString()).includes('17 September'), 'masuk 19:00 -> hari terakhir 17 Sep')
 assert.ok(tglJam(keluarMalam.toISOString()).includes('14.00'), 'jam 14:00, BUKAN 19.00')
 assert.ok(!tglJam(keluarMalam.toISOString()).includes('19.00'), 'jam masuk tak boleh bocor ke baris Keluar')
 
 // 6c. Tengah malam: masuk 00:00, keluar tetap 14:00 hari terakhir.
-const keluarSubuh = jamKeluarHariTerakhir(tanggalKeluar(gabung('2026-09-16', '00:00'), 'HARIAN', 1), ATURAN_14)
+const keluarSubuh = batasCheckout(tanggalKeluar(gabung('2026-09-16', '00:00'), 'HARIAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarSubuh.toISOString()).includes('17 September'))
 assert.ok(tglJam(keluarSubuh.toISOString()).includes('14.00'))
 
@@ -68,7 +68,7 @@ assert.ok(tglJam(tanggalKeluar(m1, 'MINGGUAN', 2).toISOString()).includes('29 Se
 
 // 7. BULANAN: tanggalnya +1 bulan, jamnya TETAP jam check-out — semua periode
 //    seragam, sama seperti layar kamar.
-const keluarBulan = jamKeluarHariTerakhir(tanggalKeluar(m1, 'BULANAN', 1), ATURAN_14)
+const keluarBulan = batasCheckout(tanggalKeluar(m1, 'BULANAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarBulan.toISOString()).includes('15 Oktober'))
 assert.ok(tglJam(keluarBulan.toISOString()).includes('14.00'), 'bulanan juga jam check-out')
 
@@ -76,21 +76,22 @@ assert.ok(tglJam(keluarBulan.toISOString()).includes('14.00'), 'bulanan juga jam
 assert.ok(tglJam(tanggalKeluar(gabung('2026-01-31', '14:00'), 'BULANAN', 1).toISOString()).includes('28 Februari'))
 
 // 7c. TAHUNAN: tanggal +1 tahun, jam check-out.
-const keluarTahun = jamKeluarHariTerakhir(tanggalKeluar(m1, 'TAHUNAN', 1), ATURAN_14)
+const keluarTahun = batasCheckout(tanggalKeluar(m1, 'TAHUNAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarTahun.toISOString()).includes('15 September 2027'))
 assert.ok(tglJam(keluarTahun.toISOString()).includes('14.00'))
 
 // 7d. Jam check-out properti lain dipakai apa adanya: 12:00 -> 12.00.
-assert.ok(tglJam(jamKeluarHariTerakhir(hariKeluar, ATURAN_12).toISOString()).includes('12.00'))
+assert.ok(tglJam(batasCheckout(hariKeluar, ATURAN_12).toISOString()).includes('12.00'))
 
-// 7e. Toleransi TIDAK boleh ikut tercetak: toleransi 120 menit pada setelan
-//     12:00 tetap mencetak 12.00 (batas LEWAT-nya yang jadi 14:00, itu urusan
-//     internal layar kamar, bukan janji ke penyewa).
-const adaToleransi = jamKeluarHariTerakhir(hariKeluar, { jamCheckout: '12:00', toleransiCheckout: 120 })
-assert.ok(tglJam(adaToleransi.toISOString()).includes('12.00'), 'nota tak boleh memasukkan toleransi')
+// 7e. Toleransi IKUT tercetak: nota dan layar kamar harus menyebut angka yang
+//     PERSIS sama untuk sewa yang sama. Dulu nota memakai jamCheckout saja
+//     (12.00) sementara kamar memakai jamCheckout+toleransi (14:00), jadi kasir
+//     melihat dua jam berbeda untuk satu sewa.
+const adaToleransi = batasCheckout(hariKeluar, { jamCheckout: '12:00', toleransiCheckout: 120 })
+assert.ok(tglJam(adaToleransi.toISOString()).includes('14.00'), '12:00 + 120 menit = 14.00, sama dgn layar kamar')
 
 // 7f. Setelan rusak jatuh ke 12:00, bukan menghasilkan jam ngawur.
-assert.ok(tglJam(jamKeluarHariTerakhir(hariKeluar, { jamCheckout: '99:99', toleransiCheckout: 0 }).toISOString()).includes('12.00'))
+assert.ok(tglJam(batasCheckout(hariKeluar, { jamCheckout: '99:99', toleransiCheckout: 0 }).toISOString()).includes('12.00'))
 
 // 8. Format 24 jam, bukan AM/PM — locale id-ID harus menghasilkan "pukul HH.mm".
 //    Regresi nyata: struk pernah memakai locale en lewat input type=time.

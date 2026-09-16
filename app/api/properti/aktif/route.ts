@@ -25,9 +25,11 @@ export async function GET() {
       provinsi: p.provinsi,
       noHp: p.noHp,
       teksNota: p.teksNota,
-      // Jam check-out dipakai nota untuk baris "Keluar" — sewa harian berakhir
-      // pada jam ini di hari terakhir, bukan pada jam masuk.
+      // Jam check-out dipakai nota untuk baris "Keluar" — sewa berakhir pada
+      // jam ini di hari terakhir, bukan pada jam masuk. Toleransi ikut supaya
+      // angkanya sama dengan yang tampil di layar kamar.
       jamCheckout: p.jamCheckout,
+      toleransiCheckout: p.toleransiCheckout,
     },
   })
 }

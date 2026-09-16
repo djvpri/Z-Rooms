@@ -13,8 +13,8 @@
 //     pernah cocok dengan perilaku layar kamar, yang memakai batasCheckout()
 //     untuk semua periode. Yang benar adalah yang ini.)
 //   - Setelah habis masih ada kelonggaran `toleransiCheckout` menit sebelum
-//     ditandai LEWAT. Toleransi urusan internal, TIDAK dicetak di nota —
-//     lihat jamKeluarHariTerakhir().
+//     ditandai LEWAT. Toleransi IKUT dihitung batasCheckout(), jadi nota dan
+//     layar kamar selalu menyebut angka yang persis sama.
 //
 // Ini sengaja murni: tak sentuh DB, tak lihat jam sekarang sendiri. Pemanggil
 // yang menyuntik `sekarang`, jadi bisa diuji tanpa memalsukan waktu.
@@ -39,8 +39,13 @@ export function jamKeMenit(jam: string): number {
 const WIB_MENIT = 7 * 60
 
 /**
- * Batas waktu check-out: kapan sewa ini mulai dianggap lewat.
- * = hari terakhir pada jam jamCheckout + toleransi, waktu WIB.
+ * Kapan sewa berakhir: hari terakhir pada jam `jamCheckout` + toleransi, WIB.
+ *
+ * Ini SATU-SATUNYA angka check-out, dipakai nota booking ("Keluar 17 Sep pukul
+ * 14.00") dan layar kamar ("Kosong 17 Sep, 14:00"). Dulu nota mencetak jam
+ * MASUK, jadi satu sewa terbaca "Keluar 19.00" di nota sementara kamar bilang
+ * "Kosong 14.00". Toleransi ikut dihitung supaya kedua tempat menyebut angka
+ * yang persis sama.
  *
  * Jamnya dipasang lewat UTC, bukan setHours/setMinutes. Container produksi
  * jalan dengan TZ=UTC, jadi setHours memasang jam UTC — "12:00" jadi 12:00 UTC
@@ -51,39 +56,14 @@ export function batasCheckout(
   tanggalKeluar: Date,
   aturan: AturanCheckout,
 ): Date {
-  // Hari terakhir + jam check-out, lalu digeser toleransi. Memakai fungsi yang
-  // sama dengan nota supaya "Kosong 14.00" di kamar dan "Keluar ... pukul
-  // 14.00" di nota selalu berasal dari setelan yang sama; toleransi satu-satunya
-  // pembeda (kamar menampilkan batas LEWAT, nota menampilkan janji ke penyewa).
-  const dasar = jamKeluarHariTerakhir(tanggalKeluar, aturan)
-  return new Date(dasar.getTime() + Math.max(0, aturan.toleransiCheckout) * 60000)
-}
-
-/**
- * Jam check-out pada hari terakhir sewa, TANPA toleransi — waktu yang
- * tercetak di nota booking ("Keluar 17 Sep pukul 14.00").
- *
- * Angka ini berasal dari setelan `Properti.jamCheckout` di tab Pengaturan,
- * bukan dari jam masuk. Orang masuk 19:00 tetap keluar 14:00 di hari terakhir;
- * sewa harian memang begitu di sini (lihat catatan aturan di kepala berkas
- * ini). Sebelumnya nota mencetak jam MASUK sebagai jam keluar, sehingga satu
- * sewa yang sama terbaca "Keluar 19.00" di nota tapi "Kosong 14.00" di layar
- * kamar — dua jawaban berbeda untuk pertanyaan yang sama.
- *
- * Toleransi sengaja TIDAK ikut: toleransi adalah kelonggaran sebelum sewa
- * ditandai LEWAT (urusan internal), bukan waktu yang dijanjikan ke penyewa.
- * Kalau ikut dicetak, nota akan menjanjikan jam yang lebih longgar dari yang
- * sebenarnya berlaku.
- */
-export function jamKeluarHariTerakhir(tanggalKeluar: Date, aturan: AturanCheckout): Date {
-  // Tanggal keluar disimpan apa adanya dari tanggal masuk (jam ikut jam
+  // `tanggalKeluar` disimpan apa adanya dari tanggal masuk (jamnya ikut jam
   // masuk), jadi komponen UTC-nya BUKAN hari yang dimaksud. Masuk 17 Sep
-  // pukul 00:00 WIB tersimpan sebagai "16 Sep 17:00 UTC" — dibaca sebagai
-  // tanggal UTC, hari terakhirnya jadi 16 Sep, sehari terlalu cepat.
-  // Geser ke WIB dulu supaya yang dibaca memang tanggal yang dilihat kasir.
+  // pukul 00:00 WIB tersimpan "16 Sep 17:00 UTC" — dibaca sebagai tanggal UTC,
+  // hari terakhirnya jadi 16 Sep, sehari terlalu cepat. Geser ke WIB dulu.
   const wib = new Date(tanggalKeluar.getTime() + WIB_MENIT * 60000)
   const hari = Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), wib.getUTCDate())
-  return new Date(hari - WIB_MENIT * 60000 + jamKeMenit(aturan.jamCheckout) * 60000)
+  const menit = jamKeMenit(aturan.jamCheckout) + Math.max(0, aturan.toleransiCheckout)
+  return new Date(hari - WIB_MENIT * 60000 + menit * 60000)
 }
 
 export interface StatusLewat {

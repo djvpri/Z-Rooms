@@ -12,7 +12,7 @@
 // `node` polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
 import {
-  jamKeMenit, batasCheckout, cekLewat, labelLewat, jamKeluarHariTerakhir,
+  jamKeMenit, batasCheckout, cekLewat, labelLewat,
 } from '../lib/checkout.ts'
 import { tanggalKeluar } from '../lib/sewa.ts'
 import { tglJamJadiDate } from '../lib/utils.ts'
@@ -84,15 +84,20 @@ const tglWIB = (d) => Number(d.toLocaleString('en-GB', { timeZone: 'Asia/Jakarta
   assert.equal(jamWIB(batasMalam), 14)
 }
 
-// 3c. Nota dan layar kamar harus menyebut JAM yang sama untuk sewa yang sama;
-//     hanya toleransi yang membedakan.
+// 3c. Nota dan layar kamar harus menyebut ANGKA YANG SAMA untuk sewa yang sama.
+//     Keduanya memakai batasCheckout dengan aturan properti yang sama; kalau
+//     salah satu lupa memasukkan toleransi, kasir melihat dua jam berbeda.
 {
   const keluarNyata = tanggalKeluar(tglJamJadiDate('2026-09-15', '19:00'), 'HARIAN', 1)
-  const janji = jamKeluarHariTerakhir(keluarNyata, { jamCheckout: '14:00', toleransiCheckout: 0 })
-  const batas = batasCheckout(keluarNyata, { jamCheckout: '14:00', toleransiCheckout: 120 })
+  const aturanProperti = { jamCheckout: '14:00', toleransiCheckout: 0 }
+  const janji = batasCheckout(keluarNyata, aturanProperti)      // yang dicetak nota
+  const kamar = batasCheckout(keluarNyata, aturanProperti)      // yang dilihat di kamar
   assert.equal(jamWIB(janji), 14, 'nota mencetak jam check-out')
-  assert.equal(jamWIB(batas), 16, 'layar kamar mencetak jam check-out + toleransi')
-  assert.equal(tglWIB(janji), tglWIB(batas), 'tanggalnya sama')
+  assert.equal(janji.getTime(), kamar.getTime(), 'nota & kamar wajib sama persis')
+
+  // Properti dgn toleransi: kedua tempat tetap harus sama (12:00 + 120 = 14:00).
+  const aturanToleran = { jamCheckout: '12:00', toleransiCheckout: 120 }
+  assert.equal(jamWIB(batasCheckout(keluarNyata, aturanToleran)), 14)
 }
 
 // 4. Sebelum batas -> belum lewat, walaupun sudah lewat tanggal kontrak paginya.

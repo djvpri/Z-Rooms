@@ -19,9 +19,9 @@ export type PeriodeDikenal = 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN'
  *
  * Yang dihasilkan hanya TANGGAL yang benar. Jamnya masih menyalin jam masuk,
  * dan itu bukan jam yang berlaku: sewa berakhir pada jam check-out properti
- * (tab Pengaturan) di hari itu — lihat jamKeluarHariTerakhir() di
- * lib/checkout.ts, yang dipakai nota dan layar kamar. Nilai dari fungsi ini
- * disimpan apa adanya ke DB sebagai penanda hari terakhir.
+ * (tab Pengaturan) di hari itu — lihat batasCheckout() di lib/checkout.ts, yang
+ * dipakai nota dan layar kamar. Nilai dari fungsi ini disimpan apa adanya ke DB
+ * sebagai penanda hari terakhir.
  *
  * Tiga tempat butuh tanggal ini (booking baru, pindah kamar), jadi sengaja
  * satu fungsi — dulu rantai addDays/addMonths/addYears ditulis ulang di tiap
