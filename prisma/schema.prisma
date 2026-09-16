@@ -95,6 +95,7 @@ model Properti {
 
   kamar       Kamar[]
   tipeKamar   TipeKamar[]
+  fasilitasMaster Fasilitas[]
 }
 
 enum TipeProperti {
@@ -153,6 +154,32 @@ model TipeKamar {
 
   kamar       Kamar[]
   harga       HargaTipe[]
+
+  @@unique([propertiId, nama])
+  @@index([propertiId])
+}
+
+// Daftar saran fasilitas milik properti (master data). Sebelumnya saran ini
+// hardcoded di lib/tipeKamar.ts (SARAN_FASILITAS), jadi tiap properti terpaksa
+// menawarkan daftar yang sama dan ejaannya gampang berbeda-beda ("WiFi" vs
+// "Wifi"), yang bikin pencarian/filter meleset.
+//
+// `TipeKamar.fasilitas` dan `Kamar.fasilitas` TETAP String[] — master ini cuma
+// memasok pilihan di form. Fasilitas yang sudah menempel di tipe/kamar tidak
+// ikut terhapus kalau barisnya dihapus di sini; UI menandainya "tak ada di
+// daftar" supaya pemilik bisa mengurutkan sendiri.
+model Fasilitas {
+  id          String   @id @default(cuid())
+  nama        String
+  urutan      Int      @default(0)
+  // Nonaktif = tak ditawarkan di form, tapi tetap dipertahankan supaya
+  // tipe/kamar yang sudah memakainya tidak berubah tampilannya.
+  aktif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  propertiId  String
+  properti    Properti @relation(fields: [propertiId], references: [id], onDelete: Cascade)
 
   @@unique([propertiId, nama])
   @@index([propertiId])

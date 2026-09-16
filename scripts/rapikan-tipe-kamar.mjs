@@ -25,6 +25,13 @@ const q = String.fromCharCode(39)
 const TIPE_DEFAULT = 'Standar'
 const TIPE_DEFAULT_FASILITAS = ['AC', 'Kamar Mandi Dalam']
 const BERKAS_TARIF = '_harga-lama.json'
+// Saran bawaan untuk properti lama — kembar dengan SARAN_FASILITAS di
+// lib/tipeKamar.ts, disalin karena skrip ini .mjs (tak bisa impor TS).
+const SARAN_BAWAAN = [
+  'AC', 'Kipas Angin', 'Kamar Mandi Dalam', 'Kamar Mandi Luar',
+  'Kasur Queen', 'Kasur King', 'Kasur Single', 'Lemari', 'Meja',
+  'WiFi', 'TV', 'Kulkas', 'Dapur', 'Balkon', 'Air Panas', 'Sofa',
+]
 
 async function tabelAda(nama) {
   const b = await p.$queryRawUnsafe(
@@ -140,9 +147,50 @@ async function faseSesudah() {
   console.log('FASE_SESUDAH_OK dipindah=' + dipindah + ' total_harga_tipe=' + total[0].n)
 }
 
+/**
+ * Fase fasilitas: isi master `Fasilitas` per properti dari fasilitas yang
+ * SUDAH dipakai tipe/kamar, lalu lengkapi dengan saran bawaan yang belum ada.
+ * Tanpa ini tab Fasilitas kosong di properti lama, padahal fasilitasnya sudah
+ * dipakai di mana-mana.
+ *
+ * Dipanggil SESUDAH db push (tabel Fasilitas baru ada saat itu). Nama yang
+ * sudah dipakai menang atas saran bawaan supaya ejaan asli data tetap utuh.
+ */
+async function faseFasilitas() {
+  if (!(await tabelAda('Fasilitas'))) {
+    console.log('FASE_FASILITAS_SKIP tabel Fasilitas belum ada')
+    return
+  }
+  const properti = await p.$queryRawUnsafe('SELECT id FROM "Properti"')
+  let dibuat = 0
+  for (const prop of properti) {
+    const pakai = await p.$queryRawUnsafe(
+      'SELECT DISTINCT f AS nama FROM (' +
+        'SELECT unnest(fasilitas) AS f FROM "TipeKamar" WHERE "propertiId"=' + q + prop.id + q +
+        ' UNION ALL SELECT unnest(fasilitas) AS f FROM "Kamar" WHERE "propertiId"=' + q + prop.id + q +
+        ') x WHERE f IS NOT NULL AND f <> ' + q + q
+    )
+    const nama = pakai.map(r => r.nama).filter(n => typeof n === 'string' && n.trim())
+    for (const s of SARAN_BAWAAN) {
+      if (!nama.some(n => n.toLowerCase() === s.toLowerCase())) nama.push(s)
+    }
+    if (nama.length === 0) continue
+    const nilai = nama.map((n, i) =>
+      '(' + q + 'fs' + q + ' || replace(gen_random_uuid()::text, ' + q + '-' + q + ', ' + q + q + '), ' +
+        q + n.replaceAll(q, q + q) + q + ', ' + i + ', true, now(), now(), ' + q + prop.id + q + ')'
+    ).join(',')
+    dibuat += await p.$executeRawUnsafe(
+      'INSERT INTO "Fasilitas" (id, nama, urutan, aktif, "createdAt", "updatedAt", "propertiId") ' +
+        'VALUES ' + nilai + ' ON CONFLICT ("propertiId", nama) DO NOTHING'
+    )
+  }
+  console.log('FASE_FASILITAS_OK dibuat=' + dibuat)
+}
+
 async function main() {
   const fase = process.argv[2] ?? 'sebelum'
   if (fase === 'sebelum') await faseSebelum()
+  else if (fase === 'fasilitas') await faseFasilitas()
   else await faseSesudah()
 }
 

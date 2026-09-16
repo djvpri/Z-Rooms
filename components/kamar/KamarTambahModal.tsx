@@ -8,10 +8,9 @@
 // menambah kamar Studio selalu gagal 500.
 //
 // Harga tidak diisi di sini — tarif melekat pada tipe (Pengaturan → Tipe kamar).
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, PlusLg, Check2, InfoCircle } from 'react-bootstrap-icons'
-import { SARAN_FASILITAS } from '@/lib/tipeKamar'
 
 export type TipeRingkas = { id: string; nama: string; fasilitas: string[] }
 
@@ -21,6 +20,21 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sukses, setSukses] = useState('')
+  // Saran dari master properti (Pengaturan → Fasilitas), bukan daftar hardcoded.
+  const [saran, setSaran] = useState<string[]>([])
+
+  useEffect(() => {
+    let batal = false
+    fetch('/api/fasilitas', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (batal) return
+        const aktif = (j?.fasilitas ?? []).filter((x: { aktif: boolean }) => x.aktif)
+        setSaran(aktif.map((x: { nama: string }) => x.nama))
+      })
+      .catch(() => {})
+    return () => { batal = true }
+  }, [])
 
   const [f, setF] = useState({
     nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '',
@@ -162,7 +176,7 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
                   <div>
                     <label className="form-label">Fasilitas</label>
                     <div className="flex flex-wrap gap-1.5">
-                      {SARAN_FASILITAS.map(nama => {
+                      {[...new Set([...saran, ...f.fasilitas])].map(nama => {
                         const aktif = f.fasilitas.includes(nama)
                         return (
                           <button key={nama} type="button" onClick={() => toggleFasilitas(nama)}

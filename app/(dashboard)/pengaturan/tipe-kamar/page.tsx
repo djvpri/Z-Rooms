@@ -16,7 +16,7 @@ import {
   ExclamationTriangleFill, DoorClosed, InfoCircle,
 } from 'react-bootstrap-icons'
 import TabPengaturan from '@/components/pengaturan/TabPengaturan'
-import { SARAN_FASILITAS, PERIODE_SEWA, LABEL_PERIODE, type PeriodeSewa } from '@/lib/tipeKamar'
+import { PERIODE_SEWA, LABEL_PERIODE, type PeriodeSewa } from '@/lib/tipeKamar'
 
 type BarisHarga = { periodeSewa: PeriodeSewa; harga: number | string; deposit: number | string | null; aktif: boolean }
 
@@ -47,6 +47,9 @@ function hargaAwal(t: Tipe | null): Record<PeriodeSewa, string> {
 
 export default function TipeKamarPage() {
   const [daftar, setDaftar] = useState<Tipe[]>([])
+  // Saran fasilitas datang dari master per properti (/api/fasilitas), bukan lagi
+  // daftar hardcoded — pemilik bisa menyesuaikan tanpa mengubah kode.
+  const [saranFasilitas, setSaranFasilitas] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pesan, setPesan] = useState('')
@@ -59,10 +62,15 @@ export default function TipeKamarPage() {
 
   async function muat() {
     try {
-      const res = await fetch('/api/tipe-kamar')
-      const json = await res.json()
-      if (!res.ok) { setError(json?.error?.message ?? json?.error ?? 'Gagal memuat tipe kamar.'); return }
+      const [resTipe, resFas] = await Promise.all([
+        fetch('/api/tipe-kamar'),
+        fetch('/api/fasilitas', { cache: 'no-store' }),
+      ])
+      const json = await resTipe.json()
+      if (!resTipe.ok) { setError(json?.error?.message ?? json?.error ?? 'Gagal memuat tipe kamar.'); return }
       setDaftar(json.tipe ?? [])
+      const jf = await resFas.json().catch(() => null)
+      if (resFas.ok) setSaranFasilitas((jf?.fasilitas ?? []).filter((f: { aktif: boolean }) => f.aktif).map((f: { nama: string }) => f.nama))
     } catch {
       setError('Gagal memuat tipe kamar.')
     } finally {
@@ -304,7 +312,7 @@ export default function TipeKamarPage() {
                 <div>
                   <label className="form-label">Fasilitas bawaan</label>
                   <div className="flex flex-wrap gap-1.5">
-                    {SARAN_FASILITAS.map((nama) => {
+                    {saranFasilitas.map((nama) => {
                       const aktif = f.fasilitas.includes(nama)
                       return (
                         <button
@@ -317,9 +325,24 @@ export default function TipeKamarPage() {
                         </button>
                       )
                     })}
+                    {/* Fasilitas yang sudah menempel di tipe ini tapi tak ada di
+                        daftar master (mis. barisnya sudah dihapus/di-rename) tetap
+                        ditampilkan supaya bisa dilepas, bukan hilang diam-diam. */}
+                    {f.fasilitas.filter((x) => !saranFasilitas.includes(x)).map((nama) => (
+                      <button
+                        key={nama} type="button" onClick={() => toggleFasilitas(nama)}
+                        className="badge border bg-teal-50 text-teal-700 border-teal-100"
+                        title="Tak ada di daftar fasilitas"
+                      >
+                        <Check2 size={10} className="mr-1" aria-hidden="true" />{nama}
+                      </button>
+                    ))}
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
                     Pilih yang berlaku umum untuk tipe ini. Perbedaan antar kamar diatur di kamarnya masing-masing.
+                    {saranFasilitas.length === 0 && (
+                      <> Daftar saran kosong — isi di tab <a href="/pengaturan/fasilitas" className="text-teal-700 underline">Fasilitas</a>.</>
+                    )}
                   </p>
                 </div>
 

@@ -4,6 +4,7 @@ import { PrismaClient, TipeProperti, StatusKamar, PeriodeSewa,
   KategoriBeban, TipeNotifikasi, Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { addDays, subDays, startOfMonth, endOfMonth } from 'date-fns'
+import { SARAN_FASILITAS } from '../lib/tipeKamar'
 
 const prisma = new PrismaClient()
 
@@ -54,6 +55,24 @@ async function main() {
     { nama: 'Suite', hariann: 250000, bulanan: 2500000, tahunan: 25000000, luas: 28,
       fasilitas: ['Kasur', 'Lemari', 'Meja Belajar', 'AC', 'TV', 'Kulkas', 'Kamar Mandi Dalam', 'Sofa'] },
   ]
+
+  // ── Master fasilitas properti (saran yang muncul di form tipe kamar).
+  // Gabungan fasilitas yang dipakai tipe di atas + saran umum, nama kembar
+  // dibuang. Tanpa ini tab Fasilitas kosong dan form tipe tak punya pilihan.
+  const saranFasilitas = [
+    ...new Set([
+      ...tipeKamar.flatMap((t) => t.fasilitas),
+      ...SARAN_FASILITAS,
+    ]),
+  ]
+  for (const [i, nama] of saranFasilitas.entries()) {
+    await prisma.fasilitas.upsert({
+      where: { propertiId_nama: { propertiId: properti.id, nama } },
+      update: {},
+      create: { nama, urutan: i, propertiId: properti.id },
+    })
+  }
+  console.log(`Fasilitas: ${saranFasilitas.length} saran`)
 
   const tipeMap: Record<string, string> = {}
   for (const [i, t] of tipeKamar.entries()) {

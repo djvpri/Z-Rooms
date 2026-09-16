@@ -1,5 +1,6 @@
 import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
+import { SARAN_FASILITAS } from "@/lib/tipeKamar";
 
 interface SeedResult {
   userId: string;
@@ -51,6 +52,16 @@ export async function seedDemoData(ownerId: string): Promise<SeedResult> {
     ].map((t) => prisma.tipeKamar.create({ data: { ...t, propertiId: properti.id } }))
   )
   const tipeId = (nama: string) => tipeDemo.find((t) => t.nama === nama)!.id
+
+  // 2b. Master daftar fasilitas (saran di form tipe). Digabung dari fasilitas
+  //     tipe demo + saran umum properti, nama kembar dibuang.
+  const saranDemo = [
+    ...new Set([...tipeDemo.flatMap((t) => t.fasilitas), ...properti.fasilitas, ...SARAN_FASILITAS]),
+  ]
+  await prisma.fasilitas.createMany({
+    data: saranDemo.map((nama, i) => ({ nama, urutan: i, propertiId: properti.id })),
+    skipDuplicates: true,
+  })
 
   // 3. Create 5 kamars (rooms)
   const kamarData = [
@@ -297,6 +308,9 @@ export async function resetDemoData(propertiId: string): Promise<void> {
   // HargaTipe menunjuk tipe, jadi harus dihapus lebih dulu.
   await prisma.hargaTipe.deleteMany({ where: { tipeKamar: { propertiId } } });
   await prisma.tipeKamar.deleteMany({ where: { propertiId } });
+  // Master fasilitas menunjuk properti dengan onDelete: Cascade, tapi dihapus
+  // eksplisit supaya urutannya jelas dan tak bergantung pada perilaku cascade.
+  await prisma.fasilitas.deleteMany({ where: { propertiId } });
   await prisma.pengeluaran.deleteMany({ where: { propertiId } });
   await prisma.notifikasi.deleteMany({ where: { propertiId } });
   await prisma.properti.delete({ where: { id: propertiId } });
