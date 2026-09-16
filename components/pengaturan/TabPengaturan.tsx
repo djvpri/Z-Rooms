@@ -8,7 +8,6 @@ const TAB = [
   { href: '/pengaturan/properti', label: 'Properti' },
   { href: '/pengaturan/tipe-kamar', label: 'Tipe kamar' },
   { href: '/pengaturan/fasilitas', label: 'Fasilitas' },
-  { href: '/pengaturan/lisensi', label: 'Lisensi' },
 ] as const
 
 export default function TabPengaturan({ aktif }: { aktif: (typeof TAB)[number]['href'] }) {

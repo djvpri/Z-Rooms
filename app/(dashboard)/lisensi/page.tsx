@@ -1,28 +1,26 @@
 // app/(dashboard)/lisensi/page.tsx
 //
-// Lisensi & langganan properti yang sedang dibuka.
+// Lisensi properti — BACA SAJA.
 //
-// Server component: baca langsung dari DB, tanpa fetch ke API sendiri. Halaman
-// ZGym sejenisnya client component karena datanya datang dari token next-auth;
-// di sini datanya di DB dan halamannya tak perlu interaktif, jadi satu
-// perjalanan ke DB lebih ringkas daripada render lalu fetch.
+// Sumber kebenarannya hub ZOne (/manage → Kelola Apps → ZXRoom). Pemilik
+// properti tidak mengubah lisensinya sendiri dari sini; kalau boleh, tanggal
+// berakhir bisa diperpanjang sendiri tanpa sepengetahuan pengelola ekosistem.
 //
-// Kuota sengaja TIDAK ditampilkan. ZGym menampilkan maxMembers/maxInstructors/
-// maxClasses karena ketiganya ditegakkan; ZXRoom tak punya padanannya, dan
-// menampilkan batas yang tak berlaku akan menyesatkan.
+// Karena itu halaman ini sengaja tidak punya form. Yang ditampilkan: plan,
+// masa berlaku, sisa hari, dan ke mana harus menghubungi untuk memperpanjang.
+//
+// Server component: baca DB langsung lewat propertiAktif(), jadi tak ada
+// fetch ke API sendiri.
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ShieldCheck, Calendar3, Clock, ExclamationTriangle, ArrowRepeat, Gear } from 'react-bootstrap-icons'
+import { ShieldCheck, Calendar3, Clock, ExclamationTriangle, InfoCircle } from 'react-bootstrap-icons'
 import { auth } from '@/lib/auth'
 import { propertiAktif } from '@/lib/properti'
-import {
-  labelPlan, statusLisensi, sisaHari, kalimatStatus, hargaPlan,
-} from '@/lib/lisensi'
+import { labelPlan, statusLisensi, sisaHari, kalimatStatus, hargaPlan } from '@/lib/lisensi'
 import { formatRupiah } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-const WARNA_STATUS = {
+const WARNA_TEKS = {
   habis: 'text-red-600 font-medium',
   'segera-habis': 'text-amber-600 font-medium',
   aktif: 'text-green-600 font-medium',
@@ -46,6 +44,7 @@ export default async function LisensiPage() {
 
   const status = statusLisensi(properti.planExpires)
   const sisa = sisaHari(properti.planExpires)
+  const harga = hargaPlan(properti.plan)
 
   return (
     <div className="p-5 max-w-3xl mx-auto">
@@ -54,9 +53,9 @@ export default async function LisensiPage() {
         <h1 className="text-xl font-bold text-gray-900">Lisensi &amp; Langganan</h1>
       </div>
 
-      {/* Identitas properti yang lisensinya ditampilkan. Penting: pemilik bisa
-          punya beberapa properti, dan lisensi melekat pada satu properti —
-          tanpa baris ini user bisa salah kira ini lisensi seluruh akun. */}
+      {/* Pemilik bisa punya lebih dari satu properti secara historis, dan
+          lisensi melekat pada satu properti — tanpa baris ini user bisa salah
+          kira ini lisensi seluruh akun. */}
       <p className="text-sm text-gray-500 mb-4">
         Untuk properti <span className="font-semibold text-gray-700">{properti.nama}</span>
       </p>
@@ -77,9 +76,7 @@ export default async function LisensiPage() {
               {labelPlan(properti.plan)}
             </span>
             <div className="text-xs text-gray-400 mt-1">
-              {hargaPlan(properti.plan) > 0
-                ? `${formatRupiah(hargaPlan(properti.plan))}/bulan`
-                : 'Tanpa biaya'}
+              {harga > 0 ? `${formatRupiah(harga)}/bulan` : 'Tanpa biaya'}
             </div>
           </div>
         </div>
@@ -93,7 +90,7 @@ export default async function LisensiPage() {
                 {properti.planExpires.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
             </div>
-            <div className={`flex items-center gap-2 text-sm ${WARNA_STATUS[status]}`}>
+            <div className={`flex items-center gap-2 text-sm ${WARNA_TEKS[status]}`}>
               <Clock className="h-4 w-4" />
               {kalimatStatus(status, sisa)}
             </div>
@@ -106,24 +103,18 @@ export default async function LisensiPage() {
         )}
       </div>
 
-      {/* Pengelolaan lisensi ada di Pengaturan, bukan di halaman ini: halaman
-          ini untuk MELIHAT status, dan menaruh form ubah di sini membuat
-          pemilik bisa mengubah masa berlakunya sendiri tanpa sadar. */}
+      {/* Asal lisensi dinyatakan terus terang. Tanpa ini, pemilik yang butuh
+          perpanjangan akan mencari tombol ubah di halaman ini dan tak menemukan. */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-gray-800 mb-2">Kelola lisensi</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Plan dan masa berlaku diatur dari halaman Pengaturan &rarr; Lisensi.
+        <h2 className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+          <InfoCircle className="h-4 w-4 text-teal-600" />
+          Cara memperpanjang
+        </h2>
+        <p className="text-sm text-gray-500">
+          Plan dan masa berlaku diatur oleh pengelola ekosistem lewat{' '}
+          <span className="font-medium text-gray-700">Z One &rarr; Kelola Apps &rarr; ZXRoom</span>.
+          Hubungi pengelola untuk memperpanjang atau mengubah plan.
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/pengaturan/lisensi" className="btn btn-primary inline-flex items-center gap-2">
-            <ArrowRepeat className="h-4 w-4" />
-            Perpanjang / ubah plan
-          </Link>
-          <Link href="/pengaturan/properti" className="btn btn-ghost inline-flex items-center gap-2">
-            <Gear className="h-4 w-4" />
-            Data properti
-          </Link>
-        </div>
       </div>
     </div>
   )

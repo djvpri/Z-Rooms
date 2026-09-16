@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { DAFTAR_PLAN, planDikenal } from '@/lib/lisensi'
 import bcrypt from 'bcryptjs'
 
 // Endpoint ini dipanggil Z One (hub ekosistem) lewat /manage, bukan oleh
@@ -22,7 +23,10 @@ export async function GET(req: NextRequest) {
   try {
     const properti = await prisma.properti.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, nama: true, tipe: true, kota: true, aktif: true, createdAt: true },
+      select: {
+        id: true, nama: true, tipe: true, kota: true, aktif: true, createdAt: true,
+        plan: true, planExpires: true,
+      },
     })
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
@@ -35,9 +39,12 @@ export async function GET(req: NextRequest) {
       tenants: properti.map((p: typeof properti[number]) => ({
         id: p.id,
         name: p.nama,
-        plan: 'pro',
+        plan: p.plan,
         active: p.aktif,
-        expires_at: null,
+        // Hub ZOne membaca expires_at / expiresAt / langganan_sampai.
+        // Dikirim dua bentuk supaya tak bergantung pada mana yang dibaca.
+        expires_at: p.planExpires ? p.planExpires.toISOString() : null,
+        expiresAt: p.planExpires ? p.planExpires.toISOString() : null,
       })),
       users: users.map((u: typeof users[number]) => ({
         id: u.id, name: u.name, email: u.email, role: u.role, active: u.isActive,
@@ -80,6 +87,19 @@ export async function POST(req: NextRequest) {
       // Idempotent: jangan bikin properti ganda dgn nama sama untuk owner yang sama
       const existing = await prisma.properti.findFirst({ where: { nama, ownerId: owner.id } })
       if (existing) return NextResponse.json({ success: true, tenant: { id: existing.id, name: existing.nama } })
+      // Satu tenant = satu properti. Owner yang sudah punya properti ditolak —
+      // dulu boleh banyak, dan itu membuat lisensi (yang melekat pada properti)
+      // jadi ambigu: properti mana yang tanggal berakhirnya berlaku?
+      const sudahPunya = await prisma.properti.findFirst({
+        where: { ownerId: owner.id },
+        select: { id: true, nama: true },
+      })
+      if (sudahPunya) {
+        return NextResponse.json({
+          error: `Owner "${owner.email}" sudah memiliki properti "${sudahPunya.nama}". Satu tenant hanya boleh punya satu properti.`
+            + ` Gunakan properti itu, atau pindahkan kepemilikannya dulu (moveTenant).`,
+        }, { status: 409 })
+      }
       const p = await prisma.properti.create({
         data: { nama, tipe: 'KOS', alamat: '-', kota: '-', ownerId: owner.id },
       })
@@ -118,13 +138,76 @@ export async function POST(req: NextRequest) {
       if (!target) {
         return NextResponse.json({ error: `User "${userId || email}" tidak terdaftar di ZXRoom` }, { status: 404 })
       }
+      // Satu tenant = satu properti, jadi pindah hanya boleh kalau tujuan belum
+      // punya properti sama sekali. Tanpa cek ini, "pindah" jadi cara membuat
+      // owner dengan 2 properti — celah dari aturan yang sama.
+      const targetSudahPunya = await prisma.properti.findFirst({
+        where: { ownerId: target.id },
+        select: { nama: true },
+      })
+      if (targetSudahPunya) {
+        return NextResponse.json({
+          error: `User "${target.email}" sudah memiliki properti "${targetSudahPunya.nama}". Satu tenant hanya boleh punya satu properti.`,
+        }, { status: 409 })
+      }
       await prisma.properti.update({ where: { id }, data: { ownerId: target.id } })
       return NextResponse.json({ success: true, moved: true, tenant: { id, name: properti.nama }, owner: target.email })
     }
 
     if (action === 'updatePlan') {
-      // Z-Rooms tidak punya plan tier — abaikan, kembalikan success biar UI tidak error
-      return NextResponse.json({ success: true, note: 'Z-Rooms tidak menggunakan plan tier' })
+      // Lisensi diatur dari hub ZOne (/manage), bukan dari dalam ZXRoom.
+      // ZOne mengirim { tenantId, plan, planExpires } — planExpires sebagai
+      // ISO. Hanya field yang DIKIRIM yang diubah, supaya mengubah plan saja
+      // tak menghapus tanggal berakhirnya.
+      const id = String(data?.tenantId || data?.id || '').trim()
+      if (!id) return NextResponse.json({ error: 'tenantId wajib diisi' }, { status: 400 })
+
+      const ada = await prisma.properti.findUnique({ where: { id }, select: { id: true, nama: true } })
+      if (!ada) return NextResponse.json({ error: `Properti dengan id "${id}" tidak ditemukan` }, { status: 404 })
+
+      const ubah: { plan?: string; planExpires?: Date | null } = {}
+
+      if (data?.plan !== undefined) {
+        const plan = String(data.plan).trim().toLowerCase()
+        if (!planDikenal(plan)) {
+          return NextResponse.json(
+            { error: `plan "${data.plan}" tidak dikenal. Pilihan: ${DAFTAR_PLAN.join(', ')}` },
+            { status: 400 },
+          )
+        }
+        ubah.plan = plan
+      }
+
+      if (data?.planExpires !== undefined) {
+        if (data.planExpires === null || data.planExpires === '') {
+          ubah.planExpires = null
+        } else {
+          const d = new Date(String(data.planExpires))
+          if (isNaN(d.getTime())) {
+            return NextResponse.json({ error: `planExpires "${data.planExpires}" bukan tanggal valid` }, { status: 400 })
+          }
+          // Disimpan sebagai tengah malam UTC: planExpires adalah TANGGAL
+          // kalender. Kalau jamnya ikut, "berlaku hingga 16 Okt" bisa tampil
+          // 16 Okt 12:00 WIB dan sisa harinya bergeser tergantung jam dibuka.
+          ubah.planExpires = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+        }
+      }
+
+      if (Object.keys(ubah).length === 0) {
+        return NextResponse.json({ error: 'Tidak ada yang diubah (plan atau planExpires)' }, { status: 400 })
+      }
+
+      const hasil = await prisma.properti.update({ where: { id }, data: ubah })
+      return NextResponse.json({
+        success: true,
+        tenant: {
+          id: hasil.id,
+          name: hasil.nama,
+          plan: hasil.plan,
+          expires_at: hasil.planExpires ? hasil.planExpires.toISOString() : null,
+          expiresAt: hasil.planExpires ? hasil.planExpires.toISOString() : null,
+        },
+      })
     }
 
     // ── User ─────────────────────────────────────────────────────────────
