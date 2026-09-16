@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 // Urutan kolom bawaan tabel kamar (desktop). Dipakai sebagai urutan awal dan
 // urutan saat kolom dihidupkan lagi lewat panel pemilih kolom.
 const KOLOM_BAWAAN = [
-  'nomor', 'tipe', 'luas', 'harga', 'status',
+  'nomor', 'tipe', 'luas', 'hargaHarian', 'harga', 'status',
   'penyewa', 'bayar', 'mulai', 'selesai', 'fasilitas',
 ]
 
@@ -244,6 +244,7 @@ export default async function KamarPage() {
             kunciAwal={KOLOM_BAWAAN}
             baris={kamar.map(k => {
               const hargaBulanan = hargaEfektif(k, 'BULANAN')
+              const hargaHarian = hargaEfektif(k, 'HARIAN')
               const sewaAktif = k.sewa[0]
               const penyewa = sewaAktif?.penyewa
               const fasilitas = fasilitasEfektif(k)
@@ -273,6 +274,8 @@ export default async function KamarPage() {
                     sel: <span className="text-gray-600">{namaTipe(k.tipe)}</span> },
                   { kunci: 'luas', judul: 'Luas', nilai: k.luas ?? null,
                     sel: <span className="text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</span> },
+                  { kunci: 'hargaHarian', judul: 'Harga/hari', nilai: hargaHarian || null,
+                    sel: <span className="text-gray-700">{hargaHarian > 0 ? formatRupiah(hargaHarian) : '-'}</span> },
                   { kunci: 'harga', judul: 'Harga/bln', nilai: hargaBulanan || null,
                     sel: <span className="text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</span> },
                   { kunci: 'status', judul: 'Status', nilai: statusKamarLabel(k.status),

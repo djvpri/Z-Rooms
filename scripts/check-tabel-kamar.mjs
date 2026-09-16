@@ -34,7 +34,7 @@ const urutkan = (baris, kunci, naik) => {
   })
 }
 
-const KOLOM = ['nomor', 'tipe', 'luas', 'harga', 'status', 'penyewa', 'bayar', 'mulai', 'selesai', 'fasilitas']
+const KOLOM = ['nomor', 'tipe', 'luas', 'hargaHarian', 'harga', 'status', 'penyewa', 'bayar', 'mulai', 'selesai', 'fasilitas']
 
 const baris = [
   { id: 'a', kolom: [{ kunci: 'nomor', nilai: 'A 101' }, { kunci: 'luas', nilai: 18 }, { kunci: 'harga', nilai: 1500000 }, { kunci: 'penyewa', nilai: 'Andi' }, { kunci: 'selesai', nilai: '1 Okt, 14:00' }] },
@@ -45,7 +45,8 @@ const baris = [
 const nomorUrut = (arr) => arr.map(x => x.id).join(',')
 
 // 1. Bawaan: semua kolom tampil, urut sesuai KOLOM.
-assert.deepEqual(KOLOM.length, 10, 'sepuluh kolom terdaftar')
+assert.deepEqual(KOLOM.length, 11, 'sebelas kolom terdaftar')
+assert.ok(KOLOM.includes('hargaHarian'), 'kolom tarif harian ada')
 
 // 2. Sembunyikan lalu hidupkan lagi -> kolom kembali pada URUTAN BAWAAN,
 //    bukan menempel di ujung kanan. Ini yang membuat pemilih kolom bisa
@@ -53,7 +54,7 @@ assert.deepEqual(KOLOM.length, 10, 'sepuluh kolom terdaftar')
 {
   const setelahSembunyi = toggleKolom(KOLOM, KOLOM, 'luas')
   assert.ok(!setelahSembunyi.includes('luas'), 'luas tersembunyi')
-  assert.equal(setelahSembunyi.length, 9, 'tinggal sembilan kolom')
+  assert.equal(setelahSembunyi.length, 10, 'tinggal sepuluh kolom')
 
   const setelahHidup = toggleKolom(KOLOM, setelahSembunyi, 'luas')
   assert.deepEqual(setelahHidup, KOLOM, 'kembali ke urutan bawaan, luas di posisi ketiga')
@@ -101,4 +102,4 @@ assert.equal(nomorUrut(urutkan(baris, null, true)), 'a,b,c', 'tanpa sort tak men
   assert.ok(src.includes('kunciAwal.filter(x => t.includes(x) || x === kunci)'), 'urutan hidupkan kembali masih sama')
 }
 
-console.log('OK — check-tabel-kamar: 12 blok assertion lulus')
+console.log('OK — check-tabel-kamar: 13 blok assertion lulus')
