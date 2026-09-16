@@ -87,6 +87,15 @@ model Properti {
   teksNota    String?
   isDemo      Boolean       @default(false)
   demoExpiresAt DateTime?
+
+  // Lisensi/langganan properti ini. Pola sama dengan Tenant.plan di ZGym:
+  // plan = free/basic/pro/business, planExpires = tanggal berakhir (null =
+  // belum diatur). TIDAK ada kolom kuota — ZXRoom tak punya padanan
+  // maxMembers/maxInstructors/maxClasses, dan kuota yang tak ditegakkan cuma
+  // jadi hiasan yang menyesatkan.
+  plan        String        @default("free")
+  planExpires DateTime?
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

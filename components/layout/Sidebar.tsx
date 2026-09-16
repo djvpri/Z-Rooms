@@ -6,7 +6,7 @@ import { cn, inisial } from '@/lib/utils'
 import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
-  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear, ShieldCheck,
 } from 'react-bootstrap-icons'
 import type { ComponentType } from 'react'
 
@@ -17,6 +17,7 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   { href: '/booking',      label: 'Booking Baru',Icon: CalendarPlus },
   { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
   { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
+  { href: '/lisensi',      label: 'Lisensi',     Icon: ShieldCheck },
   // Kelola properti ada di dalam sini sebagai tab, bukan menu terpisah —
   // satu pintu masuk, dan `/pengaturan/properti` tetap menyalakan menu ini
   // lewat path.startsWith.

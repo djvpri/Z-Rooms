@@ -77,12 +77,15 @@ minta /keuangan            '307,302'  'terproteksi -> redirect login'
 minta /notifikasi          '307,302'  'terproteksi -> redirect login'
 minta /pengaturan          '307,302'  'terproteksi -> redirect login'
 minta /pengaturan/properti '307,302'  'terproteksi -> redirect login'
+minta /pengaturan/lisensi  '307,302'  'terproteksi -> redirect login'
+minta /lisensi             '307,302'  'terproteksi -> redirect login'
 
 # ── API: tanpa sesi SEMUA jalur dilindungi middleware dulu -> 307 ke /login.
 #    Jadi 307 di sini memang benar. Route API membalas 401/404/405 hanya kalau
 #    dipanggil DENGAN sesi — itu uji lapis integrasi, bukan smoke. ─────────
 minta /api/properti        '307'      'middleware lindungi sebelum route'
 minta /api/properti/aktif  '307'      'route identitas properti (dipakai nota)'
+minta /api/lisensi         '307'      'route ubah lisensi (PATCH, hanya ADMIN)'
 minta /api/kamar           '307'      'middleware lindungi sebelum route'
 minta /api/booking         '307'      'middleware lindungi sebelum route'
 minta /api/keuangan        '307'      'middleware lindungi sebelum route'
