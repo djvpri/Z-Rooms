@@ -44,6 +44,25 @@ minta() {
 echo "Smoke: $BASE"
 echo
 
+# Tunggu container benar-benar melayani sebelum menilai. Pasca-deploy ada jeda
+# di mana /api/health sudah balas (proses hidup) tapi routing Next belum siap —
+# smoke yang langsung jalan melaporkan GAGAL palsu untuk sebagian route, dan
+# itu sudah kejadian. Tunggu sampai /login stabil 200 dua kali berturut-turut.
+siap=0
+for i in $(seq 1 30); do
+  kode=$(curl -sS -o .smoke-siap.$$ -w '%{http_code}' --max-time 10 "$BASE/login" 2>/dev/null) || kode="000"
+  if [ "$kode" = "200" ]; then
+    kode2=$(curl -sS -o .smoke-siap.$$ -w '%{http_code}' --max-time 10 "$BASE/login" 2>/dev/null) || kode2="000"
+    [ "$kode2" = "200" ] && { siap=1; break; }
+  fi
+  sleep 3
+done
+rm -f .smoke-siap.$$
+if [ "$siap" -ne 1 ]; then
+  echo "GAGAL — $BASE/login tidak siap setelah 90 detik (kode terakhir: $kode)"
+  exit 1
+fi
+
 # ── Halaman publik ───────────────────────────────────────────────────────
 minta /login               '200'      'halaman login harus render'
 
