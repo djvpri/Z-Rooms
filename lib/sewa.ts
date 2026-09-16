@@ -17,9 +17,15 @@ export type PeriodeDikenal = 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN'
 /**
  * Tanggal keluar dari tanggal masuk + durasi, mengikuti periode.
  *
- * Jamnya SELALU ikut jam masuk — penyewa masuk 19:00, keluar 19:00 di hari
- * terakhir. Jam 12:00 sengaja tidak dipakai: itu hanya acuan batas check-out
- * di layar kamar, bukan waktu yang tercetak di nota.
+ * Yang dihasilkan hanya TANGGAL yang benar. Jamnya masih menyalin jam masuk,
+ * dan itu bukan jam yang berlaku: sewa berakhir pada jam check-out properti
+ * (tab Pengaturan) di hari itu — lihat jamKeluarHariTerakhir() di
+ * lib/checkout.ts, yang dipakai nota dan layar kamar. Nilai dari fungsi ini
+ * disimpan apa adanya ke DB sebagai penanda hari terakhir.
+ *
+ * Tiga tempat butuh tanggal ini (booking baru, pindah kamar), jadi sengaja
+ * satu fungsi — dulu rantai addDays/addMonths/addYears ditulis ulang di tiap
+ * tempat, dan perbedaannya tak akan ketahuan.
  */
 export function tanggalKeluar(masuk: Date, periode: PeriodeSewa | PeriodeDikenal, durasi: number): Date {
   switch (periode) {

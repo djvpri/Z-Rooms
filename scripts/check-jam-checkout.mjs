@@ -12,8 +12,10 @@
 // `node` polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
 import {
-  jamKeMenit, batasCheckout, cekLewat, labelLewat,
+  jamKeMenit, batasCheckout, cekLewat, labelLewat, jamKeluarHariTerakhir,
 } from '../lib/checkout.ts'
+import { tanggalKeluar } from '../lib/sewa.ts'
+import { tglJamJadiDate } from '../lib/utils.ts'
 
 const ATURAN = { jamCheckout: '12:00', toleransiCheckout: 120 }   // 12:00 + 2 jam
 
@@ -55,6 +57,42 @@ const tglWIB = (d) => Number(d.toLocaleString('en-GB', { timeZone: 'Asia/Jakarta
   // Jam masuk tidak berpengaruh sama sekali.
   const batasMasukPagi = batasCheckout(keluar, ATURAN)
   assert.equal(batasMasukPagi.getTime(), batas.getTime(), 'jam masuk tak boleh menggeser batas')
+}
+
+// 3b. Batas harus benar saat tanggal keluar berisi JAM, bukan tengah malam UTC.
+//     Ini bentuk nyata dari DB: tanggalKeluar() menyalin jam masuk, jadi masuk
+//     17 Sep pukul 00:00 WIB tersimpan "16 Sep 17:00 UTC". Dibaca apa adanya
+//     sebagai tanggal UTC, hari terakhirnya jadi 16 Sep — batas check-out
+//     sehari terlalu cepat. Test lama tak menangkapnya karena selalu menyuntik
+//     tengah malam UTC.
+{
+  // Masuk 15 Sep 15:00 -> hari terakhir 16 Sep, dengan jam ikut (15:00 WIB).
+  const keluarNyata = tanggalKeluar(tglJamJadiDate('2026-09-15', '15:00'), 'HARIAN', 1)
+  const batas = batasCheckout(keluarNyata, ATURAN)
+  assert.equal(tglWIB(batas), 16, 'jam masuk sore tak boleh menggeser tanggal batas')
+  assert.equal(jamWIB(batas), 14, 'batas tetap jam acuan + toleransi')
+
+  // Dini hari: masuk 15 Sep 00:00 -> hari terakhir TETAP 16 Sep (bukan 15).
+  const keluarSubuh = tanggalKeluar(tglJamJadiDate('2026-09-15', '00:00'), 'HARIAN', 1)
+  const batasSubuh = batasCheckout(keluarSubuh, ATURAN)
+  assert.equal(tglWIB(batasSubuh), 16, 'masuk 00:00 -> batas 16 Sep, bukan 15 Sep')
+
+  // Hampir tengah malam: masuk 23:00, hari terakhir tetap 16 Sep.
+  const keluarMalam = tanggalKeluar(tglJamJadiDate('2026-09-15', '23:00'), 'HARIAN', 1)
+  const batasMalam = batasCheckout(keluarMalam, ATURAN)
+  assert.equal(tglWIB(batasMalam), 16, 'masuk 23:00 -> batas 16 Sep')
+  assert.equal(jamWIB(batasMalam), 14)
+}
+
+// 3c. Nota dan layar kamar harus menyebut JAM yang sama untuk sewa yang sama;
+//     hanya toleransi yang membedakan.
+{
+  const keluarNyata = tanggalKeluar(tglJamJadiDate('2026-09-15', '19:00'), 'HARIAN', 1)
+  const janji = jamKeluarHariTerakhir(keluarNyata, { jamCheckout: '14:00', toleransiCheckout: 0 })
+  const batas = batasCheckout(keluarNyata, { jamCheckout: '14:00', toleransiCheckout: 120 })
+  assert.equal(jamWIB(janji), 14, 'nota mencetak jam check-out')
+  assert.equal(jamWIB(batas), 16, 'layar kamar mencetak jam check-out + toleransi')
+  assert.equal(tglWIB(janji), tglWIB(batas), 'tanggalnya sama')
 }
 
 // 4. Sebelum batas -> belum lewat, walaupun sudah lewat tanggal kontrak paginya.

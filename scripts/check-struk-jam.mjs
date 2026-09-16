@@ -11,6 +11,7 @@
 import assert from 'node:assert/strict'
 import { tglJam, tglJamSingkat, tglJamJadiDate, sekarangWib } from '../lib/utils.ts'
 import { tanggalKeluar } from '../lib/sewa.ts'
+import { jamKeluarHariTerakhir } from '../lib/checkout.ts'
 
 // Gabungan tanggal + jam sekarang impor dari lib/utils.ts — dulu berkas ini
 // menyalin rumusnya sendiri (`new Date(\`${tgl}T${jam}:00+07:00\`)`), dan
@@ -34,44 +35,62 @@ assert.ok(tglJam(gabung('2026-09-15', '23:59').toISOString()).includes('15 Septe
 // 5. Offset tersimpan benar: 14:30 WIB = 07:30 UTC.
 assert.equal(m1.toISOString(), '2026-09-15T07:30:00.000Z')
 
-// 6. Tanggal keluar HARIAN +1 hari, jam ikut jam masuk (bukan jam 12:00 —
-//    jam 12:00 hanya acuan batas check-out, bukan waktu di struk).
-//    Diuji lewat tanggalKeluar() dari lib/sewa.ts — fungsi yang BENAR-BENAR
-//    dipakai app/api/booking. Sebelumnya berkas ini menyalin rumusnya
-//    (`setUTCDate`), jadi rusaknya kode produksi tak terdeteksi.
-const keluar = tanggalKeluar(m1, 'HARIAN', 1)
-assert.ok(tglJam(keluar.toISOString()).includes('16 September'), 'keluar +1 hari')
-assert.ok(tglJam(keluar.toISOString()).includes('14.30'), 'jam keluar = jam masuk')
+// 6. Nota booking: baris "Keluar" = TANGGAL dari tanggalKeluar(), tetapi
+//    JAMNYA dari setelan jam check-out properti (tab Pengaturan) — bukan jam
+//    masuk. Karena itu yang diuji di sini adalah jamKeluarHariTerakhir().
+//    (Sebelumnya berkas ini menguji "jam keluar = jam masuk", padahal app
+//    mencetak jam check-out. Test-nya membenarkan perilaku yang salah.)
+const ATURAN_14 = { jamCheckout: '14:00', toleransiCheckout: 0 }
+const ATURAN_12 = { jamCheckout: '12:00', toleransiCheckout: 0 }
 
-// 6b. Kasus paling rawan: masuk 23:00, +1 hari. Jamnya harus tetap 23:00 pada
-//     tanggal berikutnya — bukan bergeser jadi 00:00 hari yang sama.
-const malam = gabung('2026-09-16', '23:00')
-const keluarMalam = tanggalKeluar(malam, 'HARIAN', 1)
-assert.ok(tglJam(keluarMalam.toISOString()).includes('17 September'), 'masuk 23:00 -> keluar 17 Sep')
-assert.ok(tglJam(keluarMalam.toISOString()).includes('23.00'), 'jam 23:00 dipertahankan')
+// Masuk 15 Sep 14:30, harian 1 hari -> hari terakhir 16 Sep, keluar 14:00.
+const hariKeluar = tanggalKeluar(m1, 'HARIAN', 1)
+const jamKeluar = jamKeluarHariTerakhir(hariKeluar, ATURAN_14)
+assert.ok(tglJam(jamKeluar.toISOString()).includes('16 September'), 'tanggal keluar +1 hari')
+assert.ok(tglJam(jamKeluar.toISOString()).includes('14.00'), 'jam keluar dari setelan, bukan jam masuk')
 
-// 6c. Tengah malam: masuk 00:00, +1 hari -> 00:00 hari berikutnya.
-const subuh = gabung('2026-09-16', '00:00')
-const keluarSubuh = tanggalKeluar(subuh, 'HARIAN', 1)
+// 6b. Penyewa masuk MALAM (19:00) tetap keluar 14:00 hari terakhir — inilah
+//     aturan yang dipegang: orang masuk 15:00 tetap habis 12:00 besok.
+const masukMalam = gabung('2026-09-16', '19:00')
+const keluarMalam = jamKeluarHariTerakhir(tanggalKeluar(masukMalam, 'HARIAN', 1), ATURAN_14)
+assert.ok(tglJam(keluarMalam.toISOString()).includes('17 September'), 'masuk 19:00 -> hari terakhir 17 Sep')
+assert.ok(tglJam(keluarMalam.toISOString()).includes('14.00'), 'jam 14:00, BUKAN 19.00')
+assert.ok(!tglJam(keluarMalam.toISOString()).includes('19.00'), 'jam masuk tak boleh bocor ke baris Keluar')
+
+// 6c. Tengah malam: masuk 00:00, keluar tetap 14:00 hari terakhir.
+const keluarSubuh = jamKeluarHariTerakhir(tanggalKeluar(gabung('2026-09-16', '00:00'), 'HARIAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarSubuh.toISOString()).includes('17 September'))
-assert.ok(tglJam(keluarSubuh.toISOString()).includes('00.00'))
+assert.ok(tglJam(keluarSubuh.toISOString()).includes('14.00'))
 
-// 6d. Durasi >1 hari dihitung dari tanggal masuk, bukan ditambah satu-satu.
+// 6d. Tanggalnya tetap dihitung dari tanggal masuk, bukan ditambah satu-satu.
 assert.ok(tglJam(tanggalKeluar(m1, 'HARIAN', 3).toISOString()).includes('18 September'))
 assert.ok(tglJam(tanggalKeluar(m1, 'MINGGUAN', 2).toISOString()).includes('29 September'))
 
-// 7. BULANAN +1 bulan mempertahankan jam.
-const keluarBulan = tanggalKeluar(m1, 'BULANAN', 1)
+// 7. BULANAN: tanggalnya +1 bulan, jamnya TETAP jam check-out — semua periode
+//    seragam, sama seperti layar kamar.
+const keluarBulan = jamKeluarHariTerakhir(tanggalKeluar(m1, 'BULANAN', 1), ATURAN_14)
 assert.ok(tglJam(keluarBulan.toISOString()).includes('15 Oktober'))
-assert.ok(tglJam(keluarBulan.toISOString()).includes('14.30'))
+assert.ok(tglJam(keluarBulan.toISOString()).includes('14.00'), 'bulanan juga jam check-out')
 
 // 7b. 31 Januari + 1 bulan dijepit ke akhir Februari, tak meluber ke Maret.
-//     date-fns sudah benar di sini; yang diuji adalah kita memang memakainya.
 assert.ok(tglJam(tanggalKeluar(gabung('2026-01-31', '14:00'), 'BULANAN', 1).toISOString()).includes('28 Februari'))
 
-// 7c. TAHUNAN mempertahankan jam & tanggal.
-assert.ok(tglJam(tanggalKeluar(m1, 'TAHUNAN', 1).toISOString()).includes('15 September 2027'))
-assert.ok(tglJam(tanggalKeluar(m1, 'TAHUNAN', 1).toISOString()).includes('14.30'))
+// 7c. TAHUNAN: tanggal +1 tahun, jam check-out.
+const keluarTahun = jamKeluarHariTerakhir(tanggalKeluar(m1, 'TAHUNAN', 1), ATURAN_14)
+assert.ok(tglJam(keluarTahun.toISOString()).includes('15 September 2027'))
+assert.ok(tglJam(keluarTahun.toISOString()).includes('14.00'))
+
+// 7d. Jam check-out properti lain dipakai apa adanya: 12:00 -> 12.00.
+assert.ok(tglJam(jamKeluarHariTerakhir(hariKeluar, ATURAN_12).toISOString()).includes('12.00'))
+
+// 7e. Toleransi TIDAK boleh ikut tercetak: toleransi 120 menit pada setelan
+//     12:00 tetap mencetak 12.00 (batas LEWAT-nya yang jadi 14:00, itu urusan
+//     internal layar kamar, bukan janji ke penyewa).
+const adaToleransi = jamKeluarHariTerakhir(hariKeluar, { jamCheckout: '12:00', toleransiCheckout: 120 })
+assert.ok(tglJam(adaToleransi.toISOString()).includes('12.00'), 'nota tak boleh memasukkan toleransi')
+
+// 7f. Setelan rusak jatuh ke 12:00, bukan menghasilkan jam ngawur.
+assert.ok(tglJam(jamKeluarHariTerakhir(hariKeluar, { jamCheckout: '99:99', toleransiCheckout: 0 }).toISOString()).includes('12.00'))
 
 // 8. Format 24 jam, bukan AM/PM — locale id-ID harus menghasilkan "pukul HH.mm".
 //    Regresi nyata: struk pernah memakai locale en lewat input type=time.

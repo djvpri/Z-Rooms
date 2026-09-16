@@ -3,13 +3,18 @@
 // Satu-satunya sumber kebenaran untuk "sewa ini sudah lewat durasi?".
 //
 // Aturan (diputuskan user):
-//   - Sewa HARIAN habis jam `Properti.jamCheckout` pada hari terakhir, BUKAN
-//     jam masuk + 24 jam. Orang masuk jam 15:00 tetap habis jam 12:00 besok.
+//   - Sewa habis jam `Properti.jamCheckout` pada hari terakhir, BUKAN jam
+//     masuk + 24 jam. Orang masuk jam 15:00 tetap habis jam 12:00 besok.
 //     Dipilih supaya checkout serempak dan kasir bisa keliling sekali.
-//   - Periode lain (MINGGUAN/BULANAN/TAHUNAN) habis di tanggal `tanggalKeluar`
-//     pada jam yang sama, agar tak ada sewa yang "habis jam 23:59".
+//   - BERLAKU UNTUK SEMUA PERIODE, bukan cuma HARIAN: BULANAN/TAHUNAN juga
+//     habis pada jam check-out di tanggal terakhirnya. Nota booking mencetak
+//     jam yang sama, jadi satu sewa tak pernah terbaca berbeda di dua tempat.
+//     (Catatan lama di sini bilang periode lain memakai jam masuk — itu tak
+//     pernah cocok dengan perilaku layar kamar, yang memakai batasCheckout()
+//     untuk semua periode. Yang benar adalah yang ini.)
 //   - Setelah habis masih ada kelonggaran `toleransiCheckout` menit sebelum
-//     ditandai LEWAT. Jam check-out sungguhan dihitung dari jam ini.
+//     ditandai LEWAT. Toleransi urusan internal, TIDAK dicetak di nota —
+//     lihat jamKeluarHariTerakhir().
 //
 // Ini sengaja murni: tak sentuh DB, tak lihat jam sekarang sendiri. Pemanggil
 // yang menyuntik `sekarang`, jadi bisa diuji tanpa memalsukan waktu.
@@ -46,17 +51,39 @@ export function batasCheckout(
   tanggalKeluar: Date,
   aturan: AturanCheckout,
 ): Date {
-  // Tanggal keluar disimpan sebagai tengah malam UTC; ambil komponen Y/M/D-nya
-  // apa adanya supaya tanggal tak bergeser saat dikonversi ke WIB.
-  const hari = new Date(Date.UTC(
-    tanggalKeluar.getUTCFullYear(),
-    tanggalKeluar.getUTCMonth(),
-    tanggalKeluar.getUTCDate(),
-  ))
-  const menit = jamKeMenit(aturan.jamCheckout) + Math.max(0, aturan.toleransiCheckout)
-  // Waktu WIB = UTC + 7 jam, jadi batas dalam UTC = tengah malam hari itu
-  // dikurangi offset, lalu ditambah menit batas.
-  return new Date(hari.getTime() - WIB_MENIT * 60000 + menit * 60000)
+  // Hari terakhir + jam check-out, lalu digeser toleransi. Memakai fungsi yang
+  // sama dengan nota supaya "Kosong 14.00" di kamar dan "Keluar ... pukul
+  // 14.00" di nota selalu berasal dari setelan yang sama; toleransi satu-satunya
+  // pembeda (kamar menampilkan batas LEWAT, nota menampilkan janji ke penyewa).
+  const dasar = jamKeluarHariTerakhir(tanggalKeluar, aturan)
+  return new Date(dasar.getTime() + Math.max(0, aturan.toleransiCheckout) * 60000)
+}
+
+/**
+ * Jam check-out pada hari terakhir sewa, TANPA toleransi — waktu yang
+ * tercetak di nota booking ("Keluar 17 Sep pukul 14.00").
+ *
+ * Angka ini berasal dari setelan `Properti.jamCheckout` di tab Pengaturan,
+ * bukan dari jam masuk. Orang masuk 19:00 tetap keluar 14:00 di hari terakhir;
+ * sewa harian memang begitu di sini (lihat catatan aturan di kepala berkas
+ * ini). Sebelumnya nota mencetak jam MASUK sebagai jam keluar, sehingga satu
+ * sewa yang sama terbaca "Keluar 19.00" di nota tapi "Kosong 14.00" di layar
+ * kamar — dua jawaban berbeda untuk pertanyaan yang sama.
+ *
+ * Toleransi sengaja TIDAK ikut: toleransi adalah kelonggaran sebelum sewa
+ * ditandai LEWAT (urusan internal), bukan waktu yang dijanjikan ke penyewa.
+ * Kalau ikut dicetak, nota akan menjanjikan jam yang lebih longgar dari yang
+ * sebenarnya berlaku.
+ */
+export function jamKeluarHariTerakhir(tanggalKeluar: Date, aturan: AturanCheckout): Date {
+  // Tanggal keluar disimpan apa adanya dari tanggal masuk (jam ikut jam
+  // masuk), jadi komponen UTC-nya BUKAN hari yang dimaksud. Masuk 17 Sep
+  // pukul 00:00 WIB tersimpan sebagai "16 Sep 17:00 UTC" — dibaca sebagai
+  // tanggal UTC, hari terakhirnya jadi 16 Sep, sehari terlalu cepat.
+  // Geser ke WIB dulu supaya yang dibaca memang tanggal yang dilihat kasir.
+  const wib = new Date(tanggalKeluar.getTime() + WIB_MENIT * 60000)
+  const hari = Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), wib.getUTCDate())
+  return new Date(hari - WIB_MENIT * 60000 + jamKeMenit(aturan.jamCheckout) * 60000)
 }
 
 export interface StatusLewat {
