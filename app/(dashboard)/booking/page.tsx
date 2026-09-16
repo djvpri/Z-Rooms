@@ -2,8 +2,8 @@
 // app/(dashboard)/booking/page.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate } from '@/lib/utils'
+import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
+import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, sekarangWib } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -583,7 +583,21 @@ export default function BookingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Tanggal masuk *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="form-label mb-0">Tanggal masuk *</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = sekarangWib()
+                    setForm(f => ({ ...f, tanggalMasuk: s.tanggal, jamMasuk: s.jam }))
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 transition-colors hover:border-teal-400 hover:bg-teal-100"
+                  title="Isi tanggal & jam dengan waktu sekarang (dibulatkan ke jam terdekat)"
+                >
+                  <Clock className="h-3 w-3" />
+                  Sekarang
+                </button>
+              </div>
               <input type="date" className="form-input" value={form.tanggalMasuk} onChange={e => set('tanggalMasuk', e.target.value)} required />
             </div>
             <div>

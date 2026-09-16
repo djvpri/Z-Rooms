@@ -58,6 +58,47 @@ export function tglJamJadiDate(tanggal: string, jam?: string | null): Date {
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hh - 7, mm))
 }
 
+// Bagian tanggal & jam sebuah waktu, menurut zona WIB. hourCycle 'h23' dipakai
+// supaya tengah malam jadi "00", bukan "24" yang keluar dari hour12:false di
+// sebagian mesin.
+function bagianWib(d: Date) {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  }).formatToParts(d)
+  const g = (t: string) => p.find(x => x.type === t)?.value ?? ''
+  return {
+    tanggal: `${g('year')}-${g('month')}-${g('day')}`,
+    jam: `${g('hour')}:00`,
+    menitTotal: Number(g('hour')) * 60 + Number(g('minute')),
+  }
+}
+
+// "Sekarang" untuk isian cepat tanggal + jam masuk: dibulatkan ke jam TERDEKAT
+// menurut WIB, karena dropdown jam hanya menyediakan kelipatan jam. 14:37 ->
+// 15:00, dan 14:29 -> 14:00.
+//
+// Perlu dibulatkan, bukan dipotong: 14:37 yang jadi 14:00 mencatat sewa mulai
+// 37 menit sebelum kasir menekan tombol. Ke atas paling banyak 29 menit, dan
+// tanggalnya ikut maju sendiri kalau 23:40 -> 00:00 besok.
+//
+// Dihitung dari `now` lewat formatToParts, BUKAN dari getHours(): jam dinding
+// mesin kasir bisa beda zona, dan angka yang dihasilkan harus tetap WIB.
+//
+// `menitTotal` sengaja TIDAK ikut dikembalikan — itu urusan dalam fungsi, dan
+// pemanggil hanya perlu dua nilai yang langsung dipasang ke form.
+export function sekarangWib(now: Date = new Date()): { tanggal: string; jam: string } {
+  const { tanggal, menitTotal } = bagianWib(now)
+  const jamTerdekat = Math.round(menitTotal / 60) * 60
+  // Lewat tengah malam: dasar jam 00:00 WIB + menit, lalu diformat ulang WIB
+  // supaya tanggalnya ikut berpindah. new Date(…, hh + 24) akan menggeser hari
+  // di zona mesin, bukan di WIB.
+  const hasil = new Date(tglJamJadiDate(tanggal, '00:00').getTime() + jamTerdekat * 60000)
+  const akhir = bagianWib(hasil)
+  return { tanggal: akhir.tanggal, jam: akhir.jam }
+}
+
 // "16 Sep 12:00" — kapan sebuah kamar akan tersedia lagi. Dipakai tab Kamar
 // supaya kasir tahu kapan bisa menerima penyewa berikutnya. Zona eksplisit
 // seperti tglJam: server jalan di UTC, tanpa ini jamnya bergeser 7 jam.

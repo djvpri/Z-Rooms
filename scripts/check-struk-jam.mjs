@@ -9,7 +9,7 @@
 // tsx yang mengimpor .ts: jalankan `npm run check` (pakai tsx), BUKAN `node`
 // polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
-import { tglJam, tglJamSingkat, tglJamJadiDate } from '../lib/utils.ts'
+import { tglJam, tglJamSingkat, tglJamJadiDate, sekarangWib } from '../lib/utils.ts'
 
 // Gabungan tanggal + jam sekarang impor dari lib/utils.ts — dulu berkas ini
 // menyalin rumusnya sendiri (`new Date(\`${tgl}T${jam}:00+07:00\`)`), dan
@@ -108,4 +108,41 @@ assert.ok(tglJam(gabung('2026-09-15', '09:05').toISOString()).includes('09.05'),
   assert.ok(tglJam(gabung('2026-09-16', '20:00').toISOString()).includes('20.00'))
 }
 
-console.log('OK — check-struk-jam: 22 blok assertion lulus')
+// 11. sekarangWib: isian cepat lewat tombol "Sekarang". Waktu di-hardcode, jadi
+//     hasilnya sama kapan pun dijalankan; jam dinding mesin tak boleh berpengaruh.
+{
+  const wib = (iso) => sekarangWib(new Date(iso))
+
+  // Dibulatkan ke jam TERDEKAT, karena dropdown hanya punya kelipatan jam.
+  assert.deepEqual(wib('2026-09-16T07:37:00Z'), { tanggal: '2026-09-16', jam: '15:00' })  // 14:37 WIB
+  assert.deepEqual(wib('2026-09-16T07:29:00Z'), { tanggal: '2026-09-16', jam: '14:00' })  // 14:29 WIB
+  // Tepat setengah jam membulatkan ke atas (Math.round).
+  assert.deepEqual(wib('2026-09-16T07:30:00Z'), { tanggal: '2026-09-16', jam: '15:00' })  // 14:30 WIB
+
+  // Lewat tengah malam: pembulatan ke atas harus MENGGESER TANGGALNYA juga.
+  // Ini kasus yang paling mudah salah — 23:40 WIB bukan 24:00 di hari yang
+  // sama, tapi 00:00 besoknya.
+  assert.deepEqual(wib('2026-09-16T16:40:00Z'), { tanggal: '2026-09-17', jam: '00:00' })  // 23:40 WIB
+  assert.deepEqual(wib('2026-09-15T16:35:00Z'), { tanggal: '2026-09-16', jam: '00:00' })  // 23:35 WIB
+
+  // Belum lewat: tetap hari yang sama.
+  assert.deepEqual(wib('2026-09-16T16:29:00Z'), { tanggal: '2026-09-16', jam: '23:00' })  // 23:29 WIB
+  // Dini hari WIB (masih tanggal UTC sebelumnya) tetap tanggal lokal yang benar.
+  assert.deepEqual(wib('2026-09-15T17:05:00Z'), { tanggal: '2026-09-16', jam: '00:00' })  // 00:05 WIB
+
+  // Tengah malam harus "00:00", bukan "24:00" — sebagian mesin mengeluarkan 24
+  // kalau hourCycle tak dipatok ke h23.
+  assert.equal(wib('2026-09-15T17:20:00Z').jam, '00:00')  // 00:20 WIB
+
+  // Jamnya selalu kelipatan jam yang ADA di dropdown JAM_MASUK halaman Booking,
+  // jadi tombol tak bisa menghasilkan nilai yang tak bisa dipilih kasir.
+  const pilihan = new Set(Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`))
+  for (const iso of ['2026-09-16T07:37:00Z', '2026-09-16T16:40:00Z', '2026-09-15T17:59:00Z', '2026-09-16T07:30:00Z']) {
+    assert.ok(pilihan.has(wib(iso).jam), `${wib(iso).jam} harus ada di dropdown`)
+  }
+
+  // Tanggalnya harus bentuk yang diterima <input type="date">.
+  assert.match(wib('2026-09-16T07:37:00Z').tanggal, /^\d{4}-\d{2}-\d{2}$/)
+}
+
+console.log('OK — check-struk-jam: 23 blok assertion lulus')
