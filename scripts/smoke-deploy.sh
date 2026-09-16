@@ -54,6 +54,7 @@ minta /pengaturan/properti '307,302'  'terproteksi -> redirect login'
 #    Jadi 307 di sini memang benar. Route API membalas 401/404/405 hanya kalau
 #    dipanggil DENGAN sesi — itu uji lapis integrasi, bukan smoke. ─────────
 minta /api/properti        '307'      'middleware lindungi sebelum route'
+minta /api/properti/aktif  '307'      'route identitas properti (dipakai nota)'
 minta /api/kamar           '307'      'middleware lindungi sebelum route'
 minta /api/booking         '307'      'middleware lindungi sebelum route'
 minta /api/keuangan        '307'      'middleware lindungi sebelum route'
