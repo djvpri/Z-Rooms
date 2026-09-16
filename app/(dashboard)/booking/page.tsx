@@ -817,10 +817,7 @@ export default function BookingPage() {
               <div className="text-center text-xs text-gray-500 whitespace-pre-line">
                 {propertiNota?.teksNota
                   ? propertiNota.teksNota
-                  : <>
-                      <p>Selamat bergabung di properti kami!</p>
-                      <p>Simpan nota ini sebagai bukti booking.</p>
-                    </>}
+                  : <p>Powered by ZXRoom</p>}
               </div>
             </div>
 

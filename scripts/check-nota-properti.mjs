@@ -29,7 +29,9 @@ const barisKontak = (properti) => {
 }
 
 const BAWAAN_TAGIHAN = ['Terima kasih atas kepercayaan Anda.', 'Simpan nota ini sebagai bukti pembayaran.']
-const BAWAAN_BOOKING = ['Selamat bergabung di properti kami!', 'Simpan nota ini sebagai bukti booking.']
+// Kaki nota booking tak lagi memakai kalimat sambutan; sekarang satu baris
+// "Powered by ZXRoom" (diganti atas permintaan user).
+const BAWAAN_BOOKING = ['Powered by ZXRoom']
 
 const PRODUKSI = {
   nama: 'PENGINAPAN KD',
