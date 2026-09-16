@@ -70,7 +70,7 @@ export default async function LisensiPage() {
           <div className="flex-1">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
               properti.plan === 'free' ? 'bg-gray-100 text-gray-700'
-              : properti.plan === 'business' ? 'bg-amber-100 text-amber-700'
+              : properti.plan === 'enterprise' ? 'bg-amber-100 text-amber-700'
               : 'bg-teal-100 text-teal-700'
             }`}>
               {labelPlan(properti.plan)}

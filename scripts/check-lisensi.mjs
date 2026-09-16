@@ -21,8 +21,8 @@ const SEKARANG = new Date('2026-09-16T05:00:00Z')  // 12:00 WIB
 // ── Plan dikenal
 blok('plan dikenal dikenali', () => {
   assert.ok(planDikenal('free'))
-  assert.ok(planDikenal('business'))
-  assert.ok(!planDikenal('enterprise'))
+  assert.ok(planDikenal('enterprise'))
+  assert.ok(!planDikenal('business'), 'business BUKAN plan — hub kirim enterprise')
   assert.ok(!planDikenal(''))
   assert.ok(!planDikenal(null))
   assert.ok(!planDikenal(undefined))
@@ -34,7 +34,7 @@ blok('plan dikenal dikenali', () => {
 blok('label plan: dikenal -> label, tak dikenal -> Free', () => {
   assert.equal(labelPlan('free'), 'Free')
   assert.equal(labelPlan('pro'), 'Pro')
-  assert.equal(labelPlan('business'), 'Business')
+  assert.equal(labelPlan('enterprise'), 'Enterprise')
   assert.equal(labelPlan(null), 'Free')
   assert.equal(labelPlan('sampah'), 'Free')
 })
@@ -42,13 +42,13 @@ blok('label plan: dikenal -> label, tak dikenal -> Free', () => {
 blok('harga plan: tak dikenal -> 0', () => {
   assert.equal(hargaPlan('free'), 0)
   assert.equal(hargaPlan('basic'), 100000)
-  assert.equal(hargaPlan('business'), 1000000)
+  assert.equal(hargaPlan('enterprise'), 1000000)
   assert.equal(hargaPlan('sampah'), 0)
   assert.equal(hargaPlan(null), 0)
 })
 
 blok('DAFTAR_PLAN & PLANS sinkron', () => {
-  assert.deepEqual(DAFTAR_PLAN, ['free', 'basic', 'pro', 'business'])
+  assert.deepEqual(DAFTAR_PLAN, ['free', 'basic', 'pro', 'enterprise'])
   for (const p of DAFTAR_PLAN) assert.ok(PLANS[p], `${p} harus ada di PLANS`)
 })
 

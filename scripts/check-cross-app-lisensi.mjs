@@ -15,14 +15,14 @@ let n = 0
 const blok = (nama, fn) => { fn(); n++; console.log(`  ok ${n}. ${nama}`) }
 
 // ── Plan yang diterima dari hub
-blok('plan dari hub divalidasi: hanya free/basic/pro/business', () => {
+blok('plan dari hub divalidasi: hanya free/basic/pro/enterprise', () => {
   // Nilai ini persis yang dikirim ZOne lewat /manage → Kelola Apps → ZXRoom.
-  for (const p of ['free', 'basic', 'pro', 'business']) {
+  for (const p of ['free', 'basic', 'pro', 'enterprise']) {
     assert.ok(planDikenal(p), `${p} harus diterima`)
   }
-  // 'enterprise' ada di ZGym tapi TIDAK di ZXRoom — hub memakai daftar plan
-  // yang sama untuk semua app, jadi harus ditolak, bukan diam-diam diterima.
-  assert.ok(!planDikenal('enterprise'))
+  // 'enterprise' ada di ZGym DAN di tombol hub ZOne — ZXRoom wajib menerimanya,
+  // kalau tidak klik Enterprise di hub selalu ditolak dan lisensi tak tersimpan.
+  assert.ok(planDikenal('enterprise'), 'enterprise wajib diterima')
   assert.ok(!planDikenal('PRO'), 'huruf besar bukan nama plan kanonik')
 })
 
@@ -35,15 +35,23 @@ blok('plan di-lowercase sebelum divalidasi (hub bisa kirim "Pro")', () => {
 })
 
 blok('DAFTAR_PLAN dipakai untuk pesan error', () => {
-  assert.equal(DAFTAR_PLAN.join(', '), 'free, basic, pro, business')
+  assert.equal(DAFTAR_PLAN.join(', '), 'free, basic, pro, enterprise')
 })
 
-// ── Plan ZXRoom berbeda dari ZGym
-blok('ZXRoom TIDAK memakai "enterprise" (beda dari ZGym)', () => {
-  // Kalau ini gagal, ada yang menyalin daftar plan ZGym ke ZXRoom — dan
-  // lisensi ZXRoom akan menampilkan plan yang tak punya harga.
-  assert.ok(!DAFTAR_PLAN.includes('enterprise'))
-  assert.deepEqual([...DAFTAR_PLAN], ['free', 'basic', 'pro', 'business'])
+// ── Plan ZXRoom selaras dengan hub ZOne
+blok('daftar plan SAMA dengan tombol hub ZOne', () => {
+  // ZOne ManageContent.tsx: PLANS = ['free','basic','pro','enterprise'].
+  // Daftar ini yang menentukan tombol apa yang bisa diklik pengelola, jadi
+  // ZXRoom harus menerima tepat himpunan yang sama.
+  const PLANS_DI_HUB = ['free', 'basic', 'pro', 'enterprise']
+  assert.deepEqual([...DAFTAR_PLAN], PLANS_DI_HUB)
+  for (const p of PLANS_DI_HUB) {
+    assert.ok(planDikenal(p), `${p} ada di hub, harus diterima ZXRoom`)
+  }
+  // Kebalikannya juga: plan yang tak ada tombolnya di hub tak perlu diterima.
+  for (const p of DAFTAR_PLAN) {
+    assert.ok(PLANS_DI_HUB.includes(p), `${p} tak punya tombol di hub`)
+  }
 })
 
 // ── Tanggal berakhir dari hub

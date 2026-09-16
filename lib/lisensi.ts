@@ -15,7 +15,11 @@ export const PLANS = {
   free:     { label: 'Free',     harga: 0 },
   basic:    { label: 'Basic',    harga: 100000 },
   pro:      { label: 'Pro',      harga: 500000 },
-  business: { label: 'Business', harga: 1000000 },
+  // Nama plan SENGAJA sama dengan ZGym dan tombol di hub ZOne
+  // (ManageContent.tsx: PLANS = ['free','basic','pro','enterprise']).
+  // Dari sana tak ada tombol "business" — kalau di sini tetap "business",
+  // klik Enterprise di hub akan ditolak 409 dan lisensi tak pernah tersimpan.
+  enterprise: { label: 'Enterprise', harga: 1000000 },
 } as const
 
 export type NamaPlan = keyof typeof PLANS
