@@ -9,9 +9,17 @@ import { namaTipe, fasilitasEfektif, hargaEfektif, depositEfektif } from '@/lib/
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
+import TabelKamar from '@/components/kamar/TabelKamar'
 import { DoorClosedFill } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
+
+// Urutan kolom bawaan tabel kamar (desktop). Dipakai sebagai urutan awal dan
+// urutan saat kolom dihidupkan lagi lewat panel pemilih kolom.
+const KOLOM_BAWAAN = [
+  'nomor', 'tipe', 'luas', 'harga', 'status',
+  'penyewa', 'bayar', 'mulai', 'selesai', 'fasilitas',
+]
 
 export default async function KamarPage() {
   const session = await auth()
@@ -228,79 +236,68 @@ export default async function KamarPage() {
       <div className="card">
         <h2 className="text-sm font-medium text-gray-700 mb-3">Detail kamar</h2>
 
-        {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Nomor</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Tipe</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Luas</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Harga/bln</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Status</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Penyewa</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Bayar</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Mulai</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Selesai</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Fasilitas</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {kamar.map(k => {
-                const hargaBulanan = hargaEfektif(k, 'BULANAN')
-                const sewaAktif = k.sewa[0]
-                const penyewa = sewaAktif?.penyewa
-                return (
-                  <tr key={k.id} className="border-b border-gray-50 hover:bg-gray-50">
-                    <td className="py-2.5 font-medium text-gray-800">{k.nomor}</td>
-                    <td className="py-2.5 text-gray-600">{namaTipe(k.tipe)}</td>
-                    <td className="py-2.5 text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</td>
-                    <td className="py-2.5 text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</td>
-                    <td className="py-2.5">
-                      <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
-                    </td>
-                    <td className="py-2.5 text-gray-600">{penyewa ? namaPenyewa(penyewa.nama) : '-'}</td>
-                    <td className="py-2.5">
-                      {sewaAktif ? (() => {
-                        const bayar = ringkasBayar(sewaAktif.tagihan, sekarang)
-                        return (
-                          <span className={`badge ${statusTagihanColor(bayar.status)}`}>
-                            {statusTagihanLabel(bayar.status)}
-                          </span>
-                        )
-                      })() : '-'}
-                    </td>
-                    {/* Mulai = tanggal & jam masuk yang dicatat kasir;
-                        Selesai = batas check-out (hari terakhir + jam
-                        check-out properti + toleransi). Kolom "Kosong" dulu
-                        hanya menampilkan sisi selesai, sehingga kasir tak bisa
-                        melihat sewa ini berjalan sejak kapan. */}
-                    <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                      {sewaAktif ? tglJamSingkat(sewaAktif.tanggalMasuk) : '-'}
-                    </td>
-                    <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
-                      {sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : '-'}
-                    </td>
-                    <td className="py-2.5 text-gray-400 text-xs">{(() => { const f = fasilitasEfektif(k); return f.slice(0, 3).join(', ') + (f.length > 3 ? '…' : '') })()}</td>
-                    <td className="py-2.5 w-px">
-                      <div className="flex items-center gap-1">
-                        <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
-                        {sewaAktif && (
-                          <div className="w-28">
-                            <CheckoutModal
-                              sewa={ringkasSewa(k, sewaAktif)}
-                              kamarTersedia={kamarTersediaUntuk(k.id)}
-                            />
-                          </div>
-                        )}
+        {/* Desktop table. Kolom bisa dipilih & diurutkan — lihat TabelKamar.
+            Nilai tiap sel dihitung di sini (server) karena aturan harga, status
+            bayar, dan batas check-out tinggal di lib, bukan di komponen. */}
+        <div className="hidden md:block">
+          <TabelKamar
+            kunciAwal={KOLOM_BAWAAN}
+            baris={kamar.map(k => {
+              const hargaBulanan = hargaEfektif(k, 'BULANAN')
+              const sewaAktif = k.sewa[0]
+              const penyewa = sewaAktif?.penyewa
+              const fasilitas = fasilitasEfektif(k)
+              const namaPenyewaAktif = penyewa ? namaPenyewa(penyewa.nama) : null
+              const statusBayar = sewaAktif ? ringkasBayar(sewaAktif.tagihan, sekarang) : null
+              const masuk = sewaAktif ? tglJamSingkat(sewaAktif.tanggalMasuk) : null
+              const selesai = sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : null
+              return {
+                id: k.id,
+                aksi: (
+                  <div className="flex items-center gap-1">
+                    <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                    {sewaAktif && (
+                      <div className="w-28">
+                        <CheckoutModal
+                          sewa={ringkasSewa(k, sewaAktif)}
+                          kamarTersedia={kamarTersediaUntuk(k.id)}
+                        />
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                ),
+                kolom: [
+                  { kunci: 'nomor', judul: 'Nomor', nilai: k.nomor,
+                    sel: <span className="font-medium text-gray-800">{k.nomor}</span> },
+                  { kunci: 'tipe', judul: 'Tipe', nilai: namaTipe(k.tipe),
+                    sel: <span className="text-gray-600">{namaTipe(k.tipe)}</span> },
+                  { kunci: 'luas', judul: 'Luas', nilai: k.luas ?? null,
+                    sel: <span className="text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</span> },
+                  { kunci: 'harga', judul: 'Harga/bln', nilai: hargaBulanan || null,
+                    sel: <span className="text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</span> },
+                  { kunci: 'status', judul: 'Status', nilai: statusKamarLabel(k.status),
+                    sel: <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span> },
+                  { kunci: 'penyewa', judul: 'Penyewa', nilai: namaPenyewaAktif,
+                    sel: <span className="text-gray-600">{namaPenyewaAktif ?? '-'}</span> },
+                  { kunci: 'bayar', judul: 'Bayar', nilai: statusBayar ? statusTagihanLabel(statusBayar.status) : null,
+                    sel: statusBayar
+                      ? <span className={`badge ${statusTagihanColor(statusBayar.status)}`}>{statusTagihanLabel(statusBayar.status)}</span>
+                      : '-' },
+                  // Mulai = tanggal & jam masuk yang dicatat kasir; Selesai =
+                  // batas check-out (tanggal keluar + jam check-out properti +
+                  // toleransi). Keduanya teks WIB 24 jam.
+                  { kunci: 'mulai', judul: 'Mulai', nilai: masuk,
+                    sel: <span className="text-gray-500 text-xs whitespace-nowrap">{masuk ?? '-'}</span> },
+                  { kunci: 'selesai', judul: 'Selesai', nilai: selesai,
+                    sel: <span className="text-gray-500 text-xs whitespace-nowrap">{selesai ?? '-'}</span> },
+                  { kunci: 'fasilitas', judul: 'Fasilitas', nilai: fasilitas.join(', ') || null,
+                    sel: <span className="text-gray-400 text-xs">
+                      {fasilitas.slice(0, 3).join(', ') + (fasilitas.length > 3 ? '…' : '')}
+                    </span> },
+                ],
+              }
+            })}
+          />
         </div>
 
         {/* Mobile cards */}
