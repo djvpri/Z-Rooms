@@ -21,8 +21,17 @@ LEWAT=0
 
 minta() {
   local jalur="$1" harap="$2" nama="$3"
-  local kode
-  kode=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$BASE$jalur" 2>/dev/null) || kode="000"
+  local kode bodi
+  # -o ke berkas sementara RELATIF, bukan /dev/null dan bukan hasil mktemp:
+  # curl bawaan MSYS (git-bash) menolak menulis ke jalur yang dikenali shell
+  # tapi bukan jalur Windows yang sah — /dev/null dan /tmp/tmp.XXXX sama-sama
+  # keluar dengan status 23 ("client returned ERROR on write"), sehingga tiap
+  # route dilaporkan "000 tak terhubung" padahal produksi sehat: smoke selalu
+  # 18/18 GAGAL di Windows. Nama relatif di direktori kerja bekerja di
+  # Windows maupun Linux.
+  bodi=".smoke-bodi.$$"
+  kode=$(curl -sS -o "$bodi" -w '%{http_code}' --max-time 20 "$BASE$jalur" 2>/dev/null) || kode="000"
+  rm -f "$bodi"
   if [[ ",$harap," == *",$kode,"* ]]; then
     printf 'OK    %-28s %s\n' "$jalur" "$kode"
   else
