@@ -70,6 +70,13 @@ export default function BookingPage() {
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
   })
 
+  // Pembacaan KTP. Hanya berarti di mode penyewa baru.
+  const [bacaKtpLoading, setBacaKtpLoading] = useState(false)
+  const [pesanKtp, setPesanKtp] = useState('')
+  // Penyewa lama yang NIK-nya sama dengan hasil bacaan. Kasir yang memutuskan
+  // mau memakai data lama atau tetap membuat yang baru.
+  const [ktpDuplikat, setKtpDuplikat] = useState<{ id: string; nama: string | null; noHp: string | null; alamatAsal: string | null } | null>(null)
+
   useEffect(() => {
     fetch('/api/properti/aktif')
       .then(r => r.json())
@@ -116,6 +123,67 @@ export default function BookingPage() {
       ...f, nama: '', nik: '', noHp: '', alamatAsal: '',
       namaPerusahaan: '', npwp: '',
     }))
+    setPesanKtp(''); setKtpDuplikat(null)
+  }
+
+  // Baca KTP dari foto. Field yang terbaca MENIMPA isian yang ada — kasir
+  // menekan tombol ini justru karena isian itu belum benar. Yang tidak terbaca
+  // dibiarkan apa adanya supaya ketikan manual tidak hilang.
+  async function bacaKtpDariFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const berkas = e.target.files?.[0]
+    // Reset input supaya memilih foto yang sama dua kali tetap memicu onChange
+    // (mis. foto pertama buram, kasir mengulang dengan berkas yang sama).
+    e.target.value = ''
+    if (!berkas) return
+
+    setBacaKtpLoading(true); setPesanKtp(''); setKtpDuplikat(null)
+    try {
+      const fd = new FormData()
+      fd.append('foto', berkas)
+      const res = await fetch('/api/ktp/baca', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Gagal membaca KTP.')
+
+      const h = data.hasil as { nama: string; nik: string; alamat: string; jenisKelamin: string }
+      setForm(f => ({
+        ...f,
+        nama: h.nama || f.nama,
+        nik: h.nik || f.nik,
+        alamatAsal: h.alamat || f.alamatAsal,
+      }))
+
+      const bagian = [
+        h.nama && 'nama',
+        h.nik && 'NIK',
+        h.alamat && 'alamat',
+        h.jenisKelamin && `jenis kelamin (${h.jenisKelamin})`,
+      ].filter(Boolean) as string[]
+      setPesanKtp(`Terbaca: ${bagian.join(', ')}. Periksa lagi sebelum disimpan.`)
+
+      if (data.terdaftar) setKtpDuplikat(data.terdaftar)
+    } catch (err: any) {
+      setPesanKtp(err.message)
+    } finally {
+      setBacaKtpLoading(false)
+    }
+  }
+
+  // Pakai data penyewa lama yang NIK-nya cocok. Ini yang mencegah orang yang
+  // sama tercatat dua kali — tanpa ini, NIK yang baru terbaca akurat justru
+  // berujung galat 409 di /api/booking.
+  function pakaiDataLama() {
+    const p = ktpDuplikat
+    if (!p) return
+    setPenyewaId(p.id)
+    setPenyewaNama(p.nama ?? '')
+    setForm(f => ({
+      ...f,
+      nama: p.nama ?? f.nama,
+      noHp: p.noHp || f.noHp,
+      alamatAsal: p.alamatAsal || f.alamatAsal,
+    }))
+    setKtpDuplikat(null)
+    setPesanKtp(`Memakai data penyewa lama: ${p.nama ?? 'tanpa nama'}.`)
   }
 
   const kamarDipilih = kamarList.find(k => k.id === form.kamarId)
@@ -302,6 +370,52 @@ export default function BookingPage() {
         {/* Data penyewa */}
         <div className="card space-y-3">
           <h2 className="text-sm font-medium text-gray-700">Data penyewa</h2>
+
+          {/* Isi otomatis dari foto KTP. Hanya di mode penyewa baru: kalau
+              kasir sudah memilih penyewa lama, datanya memang sudah ada. */}
+          {!penyewaId && (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-gray-700">Isi otomatis dari foto KTP</div>
+                  <div className="text-xs text-gray-500">Foto KTP, lalu periksa hasilnya sebelum disimpan.</div>
+                </div>
+                <label className={`btn-ghost shrink-0 cursor-pointer ${bacaKtpLoading ? 'opacity-60 pointer-events-none' : ''}`}>
+                  {bacaKtpLoading ? 'Membaca...' : 'Foto KTP'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    className="hidden"
+                    disabled={bacaKtpLoading}
+                    onChange={bacaKtpDariFoto}
+                  />
+                </label>
+              </div>
+
+              {pesanKtp && (
+                <div className="text-xs text-gray-600">{pesanKtp}</div>
+              )}
+
+              {/* NIK hasil bacaan sudah terdaftar. Kasir memutuskan: pakai data
+                  lama, atau anggap orang berbeda dan lanjut membuat baru. */}
+              {ktpDuplikat && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-2">
+                  <div className="text-xs text-amber-900">
+                    NIK ini sudah terdaftar atas nama <span className="font-medium">{ktpDuplikat.nama ?? 'tanpa nama'}</span>.
+                    Pakai data lama supaya tidak tercatat dua kali.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={pakaiDataLama} className="btn-ghost text-xs">Pakai data lama</button>
+                    <button type="button" onClick={() => setKtpDuplikat(null)} className="text-xs text-gray-500 hover:text-gray-700">
+                      Abaikan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="form-label">Nama lengkap</label>
