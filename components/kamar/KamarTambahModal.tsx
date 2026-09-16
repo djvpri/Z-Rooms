@@ -2,18 +2,19 @@
 // components/kamar/KamarTambahModal.tsx
 // Form tambah kamar. Endpoint POST /api/kamar sudah ada sejak lama tapi belum
 // punya UI — komponen inilah pemanggilnya.
+//
+// Tipe kamar kini master data dari /pengaturan/tipe-kamar, bukan daftar lokal.
+// Daftar lokal dulu memuat 'STUDIO' yang tak ada di enum Prisma, sehingga
+// menambah kamar Studio selalu gagal 500.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, PlusLg, Check2 } from 'react-bootstrap-icons'
+import { X, PlusLg, Check2, InfoCircle } from 'react-bootstrap-icons'
 import { formatRupiah } from '@/lib/utils'
+import { SARAN_FASILITAS } from '@/lib/tipeKamar'
 
-const TIPE = ['STANDAR', 'DELUXE', 'VIP', 'SUITE', 'STUDIO'] as const
-const TIPE_LABEL: Record<string, string> = {
-  STANDAR: 'Standar', DELUXE: 'Deluxe', VIP: 'VIP', SUITE: 'Suite', STUDIO: 'Studio',
-}
-const FASILITAS_UMUM = ['AC', 'Kamar Mandi Dalam', 'Kasur Queen', 'Kasur King', 'Lemari', 'Meja', 'WiFi', 'TV', 'Dapur', 'Balkon']
+export type TipeRingkas = { id: string; nama: string; fasilitas: string[] }
 
-export default function KamarTambahModal() {
+export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: TipeRingkas[] }) {
   const router = useRouter()
   const [buka, setBuka] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -21,13 +22,19 @@ export default function KamarTambahModal() {
   const [sukses, setSukses] = useState('')
 
   const [f, setF] = useState({
-    nomor: '', lantai: 1, tipe: 'STANDAR', luas: '',
+    nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '',
     fasilitas: [] as string[], hargaBulanan: '', depositBulanan: '',
     hargaHarian: '', hargaTahunan: '',
   })
 
   function set<K extends keyof typeof f>(k: K, v: (typeof f)[K]) {
     setF(p => ({ ...p, [k]: v }))
+  }
+
+  /** Pilih tipe: fasilitas tipe jadi awalan, tapi tetap bisa dicentang ulang. */
+  function pilihTipe(id: string) {
+    const tipe = daftarTipe.find(t => t.id === id)
+    setF(p => ({ ...p, tipeId: id, fasilitas: tipe ? [...tipe.fasilitas] : p.fasilitas }))
   }
 
   function toggleFasilitas(nama: string) {
@@ -38,7 +45,7 @@ export default function KamarTambahModal() {
   }
 
   function reset() {
-    setF({ nomor: '', lantai: 1, tipe: 'STANDAR', luas: '', fasilitas: [], hargaBulanan: '', depositBulanan: '', hargaHarian: '', hargaTahunan: '' })
+    setF({ nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '', fasilitas: [], hargaBulanan: '', depositBulanan: '', hargaHarian: '', hargaTahunan: '' })
     setError('')
   }
 
@@ -66,7 +73,7 @@ export default function KamarTambahModal() {
         body: JSON.stringify({
           nomor: f.nomor.trim(),
           lantai: Number(f.lantai) || 1,
-          tipe: f.tipe,
+          ...(f.tipeId ? { tipeId: f.tipeId } : {}),
           ...(f.luas ? { luas: Number(f.luas) } : {}),
           fasilitas: f.fasilitas,
           // Tiap harga hanya dikirim kalau terisi; server menolak 0/negatif.
@@ -142,9 +149,10 @@ export default function KamarTambahModal() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="form-label">Tipe *</label>
-                      <select className="form-input" value={f.tipe} onChange={e => set('tipe', e.target.value)}>
-                        {TIPE.map(t => <option key={t} value={t}>{TIPE_LABEL[t]}</option>)}
+                      <label className="form-label">Tipe</label>
+                      <select className="form-input" value={f.tipeId} onChange={e => pilihTipe(e.target.value)}>
+                        {daftarTipe.length === 0 && <option value="">Belum ada tipe</option>}
+                        {daftarTipe.map(t => <option key={t.id} value={t.id}>{t.nama}</option>)}
                       </select>
                     </div>
                     <div>
@@ -153,6 +161,16 @@ export default function KamarTambahModal() {
                         onChange={e => set('luas', e.target.value)} placeholder="12.5" />
                     </div>
                   </div>
+
+                  {daftarTipe.length === 0 && (
+                    <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 inline-flex items-start gap-1.5">
+                      <InfoCircle size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        Belum ada tipe kamar. Tambahkan dulu di Pengaturan → Tipe kamar;
+                        kamar tetap bisa disimpan tanpa tipe.
+                      </span>
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -184,7 +202,7 @@ export default function KamarTambahModal() {
                   <div>
                     <label className="form-label">Fasilitas</label>
                     <div className="flex flex-wrap gap-1.5">
-                      {FASILITAS_UMUM.map(nama => {
+                      {SARAN_FASILITAS.map(nama => {
                         const aktif = f.fasilitas.includes(nama)
                         return (
                           <button key={nama} type="button" onClick={() => toggleFasilitas(nama)}

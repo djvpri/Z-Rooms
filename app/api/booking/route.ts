@@ -202,7 +202,7 @@ export async function GET(req: NextRequest) {
       ...(status ? { statusSewa: status as any } : {}),
     },
     include: {
-      kamar: { select: { nomor: true, tipe: true } },
+      kamar: { select: { nomor: true, tipe: { select: { nama: true } } } },
       penyewa: { select: { nama: true, noHp: true, tipeEntitas: true } },
       tagihan: { orderBy: { createdAt: 'desc' }, take: 1 },
     },

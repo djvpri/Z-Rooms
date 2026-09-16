@@ -8,7 +8,11 @@ import { z } from 'zod'
 const createKamarSchema = z.object({
   nomor: z.string().min(1),
   lantai: z.number().default(1),
-  tipe: z.enum(['STANDAR', 'DELUXE', 'VIP', 'SUITE', 'STUDIO']),
+  // Tipe kini master data (model TipeKamar), bukan enum — pemilik bisa
+  // menambah tipe sendiri. Opsional: kamar boleh didaftarkan sebelum tipenya
+  // diatur. Dulu di sini ada enum dengan 'STUDIO' yang tak dikenal Prisma,
+  // sehingga menambah kamar Studio selalu gagal 500.
+  tipeId: z.string().min(1).optional(),
   luas: z.number().optional(),
   fasilitas: z.array(z.string()).default([]),
   // Ketiga harga opsional — kamar boleh didaftarkan dulu tanpa harga
@@ -61,7 +65,22 @@ export async function POST(req: NextRequest) {
   const properti = await propertiAktif(userId)
   if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
 
-  const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, ...kamarData } = parsed.data
+  const { hargaBulanan, hargaHarian, hargaTahunan, depositBulanan, tipeId, ...kamarData } = parsed.data
+
+  // TipeId milik properti aktif, bukan properti lain — id karangan atau tipe
+  // properti lain ditolak, bukan diam-diam tersimpan.
+  if (tipeId) {
+    const tipe = await prisma.tipeKamar.findFirst({
+      where: { id: tipeId, propertiId: properti.id },
+      select: { id: true },
+    })
+    if (!tipe) {
+      return NextResponse.json(
+        { error: { message: 'Tipe kamar tidak ditemukan di properti ini.' } },
+        { status: 400 },
+      )
+    }
+  }
 
   // Nomor kamar unik per properti (@@unique([propertiId, nomor])). Cek dulu supaya
   // klien dapat pesan 409 yang terbaca, bukan 500 mentah dari Prisma.
@@ -92,8 +111,10 @@ export async function POST(req: NextRequest) {
     data: {
       ...kamarData,
       propertiId: properti.id,
+      ...(tipeId ? { tipeId } : {}),
       ...(hargaRows.length ? { harga: { create: hargaRows } } : {}),
     },
+    include: { tipe: { select: { id: true, nama: true } } },
   })
 
   return NextResponse.json(kamar, { status: 201 })

@@ -94,6 +94,7 @@ model Properti {
   owner       User          @relation(fields: [ownerId], references: [id])
 
   kamar       Kamar[]
+  tipeKamar   TipeKamar[]
 }
 
 enum TipeProperti {
@@ -110,13 +111,18 @@ model Kamar {
   id          String       @id @default(cuid())
   nomor       String
   lantai      Int          @default(1)
-  tipe        TipeKamar
   luas        Float?       // m²
   fasilitas   String[]     @default([])
   foto        String[]     @default([])
   status      StatusKamar  @default(TERSEDIA)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  // Tipe kamar kini master data (model TipeKamar), bukan enum — pemilik bisa
+  // menambah tipe sendiri (Studio, Family, ...). Nullable karena baris lama
+  // bisa punya tipe yang sudah dihapus; UI memperlakukannya sebagai "tanpa tipe".
+  tipeId      String?
+  tipe        TipeKamar?   @relation(fields: [tipeId], references: [id], onDelete: SetNull)
 
   propertiId  String
   properti    Properti     @relation(fields: [propertiId], references: [id])
@@ -125,14 +131,28 @@ model Kamar {
   sewa        Sewa[]
 
   @@unique([propertiId, nomor])
+  @@index([tipeId])
 }
 
-enum TipeKamar {
-  STANDAR
-  DELUXE
-  VIP
-  SUITE
-  STUDIO
+// Tipe kamar per properti. Fasilitas di sini adalah BAWAAN tipe — kamar yang
+// belum diisi fasilitas sendiri mewarisinya. Kamar yang sudah punya fasilitas
+// sendiri TIDAK ditimpa, supaya kamar yang berbeda dari tipe-nya tetap aman.
+model TipeKamar {
+  id          String    @id @default(cuid())
+  nama        String
+  keterangan  String?
+  fasilitas   String[]  @default([])
+  urutan      Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  propertiId  String
+  properti    Properti  @relation(fields: [propertiId], references: [id])
+
+  kamar       Kamar[]
+
+  @@unique([propertiId, nama])
+  @@index([propertiId])
 }
 
 enum StatusKamar {

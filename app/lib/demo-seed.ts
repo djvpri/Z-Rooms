@@ -41,50 +41,36 @@ export async function seedDemoData(ownerId: string): Promise<SeedResult> {
     },
   });
 
+  // 2. Tipe kamar master data. Dibuat lebih dulu karena kamar menunjuk ke sini
+  //    (Kamar.tipeId NOT NULL saat diisi; di sini semua kamar demo bertipe).
+  const tipeDemo = await Promise.all(
+    [
+      { nama: "Standar", urutan: 0, fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur Queen"] },
+      { nama: "Deluxe", urutan: 1, fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur King", "Kursi"] },
+      { nama: "VIP", urutan: 2, fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur King", "Sofa", "Mini Bar"] },
+    ].map((t) => prisma.tipeKamar.create({ data: { ...t, propertiId: properti.id } }))
+  )
+  const tipeId = (nama: string) => tipeDemo.find((t) => t.nama === nama)!.id
+
   // 3. Create 5 kamars (rooms)
   const kamarData = [
-    {
-      nomor: "A-101",
-      lantai: 1,
-      tipe: "STANDAR" as const,
-      luas: 12.5,
-      fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur Queen"],
-    },
-    {
-      nomor: "A-102",
-      lantai: 1,
-      tipe: "STANDAR" as const,
-      luas: 12.5,
-      fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur Queen"],
-    },
-    {
-      nomor: "B-201",
-      lantai: 2,
-      tipe: "DELUXE" as const,
-      luas: 16.0,
-      fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur King", "Kursi"],
-    },
-    {
-      nomor: "B-202",
-      lantai: 2,
-      tipe: "DELUXE" as const,
-      luas: 16.0,
-      fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur King", "Kursi"],
-    },
-    {
-      nomor: "C-301",
-      lantai: 3,
-      tipe: "VIP" as const,
-      luas: 20.0,
-      fasilitas: ["AC", "Kamar Mandi Dalam", "Kasur King", "Sofa", "Mini Bar"],
-    },
+    { nomor: "A-101", lantai: 1, tipe: "Standar", luas: 12.5 },
+    { nomor: "A-102", lantai: 1, tipe: "Standar", luas: 12.5 },
+    { nomor: "B-201", lantai: 2, tipe: "Deluxe", luas: 16.0 },
+    { nomor: "B-202", lantai: 2, tipe: "Deluxe", luas: 16.0 },
+    { nomor: "C-301", lantai: 3, tipe: "VIP", luas: 20.0 },
   ];
 
   const kamars = await Promise.all(
     kamarData.map((data) =>
       prisma.kamar.create({
         data: {
-          ...data,
+          // Fasilitas kamar sengaja dikosongkan di demo: yang berlaku adalah
+          // fasilitas tipe (warisan), supaya perilaku itu ikut terlihat.
+          nomor: data.nomor,
+          lantai: data.lantai,
+          luas: data.luas,
+          tipeId: tipeId(data.tipe),
           propertiId: properti.id,
           status: "TERSEDIA",
         },
@@ -93,14 +79,15 @@ export async function seedDemoData(ownerId: string): Promise<SeedResult> {
   );
 
   // 4. Create pricing for each kamar
+  const hargaPerTipe: Record<string, number> = { Standar: 1000000, Deluxe: 1200000, VIP: 1500000 }
   await Promise.all(
-    kamars.map((kamar) =>
+    kamars.map((kamar, i) =>
       prisma.hargaKamar.create({
         data: {
           kamarId: kamar.id,
           periodeSewa: "BULANAN",
-          harga: kamar.tipe === "VIP" ? 1500000 : kamar.tipe === "DELUXE" ? 1200000 : 1000000,
-          deposit: kamar.tipe === "VIP" ? 1500000 : kamar.tipe === "DELUXE" ? 1200000 : 1000000,
+          harga: hargaPerTipe[kamarData[i].tipe],
+          deposit: hargaPerTipe[kamarData[i].tipe],
           aktif: true,
         },
       })
@@ -307,6 +294,8 @@ export async function resetDemoData(propertiId: string): Promise<void> {
     await prisma.kamar.deleteMany({ where: { propertiId } });
   }
 
+  // Tipe kamar menunjuk properti; kamar sudah dihapus di atas, jadi FK aman.
+  await prisma.tipeKamar.deleteMany({ where: { propertiId } });
   await prisma.pengeluaran.deleteMany({ where: { propertiId } });
   await prisma.notifikasi.deleteMany({ where: { propertiId } });
   await prisma.properti.delete({ where: { id: propertiId } });

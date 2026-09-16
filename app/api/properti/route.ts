@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { TIPE_BAWAAN } from '@/lib/tipeKamar'
 
 const TIPE = ['KOS', 'KONTRAKAN', 'HOTEL', 'APARTEMEN'] as const
 
@@ -66,6 +67,9 @@ export async function POST(req: NextRequest) {
   }
 
   const d = parsed.data
+  // Properti baru diberi tipe kamar bawaan sekaligus — kalau tidak, pemilik
+  // baru membuka Pengaturan → Tipe kamar dan menemukan halaman kosong tanpa
+  // gambaran tipe apa yang wajar. Ia tetap bebas mengubah/menghapusnya.
   const properti = await prisma.properti.create({
     data: {
       nama: d.nama,
@@ -78,7 +82,9 @@ export async function POST(req: NextRequest) {
       noHp: kosongJadiNull(d.noHp),
       teksNota: kosongJadiNull(d.teksNota),
       ownerId: userId,
+      tipeKamar: { create: TIPE_BAWAAN.map(t => ({ ...t, fasilitas: [...t.fasilitas] })) },
     },
+    include: { tipeKamar: { select: { id: true, nama: true } } },
   })
 
   return NextResponse.json({ properti }, { status: 201 })

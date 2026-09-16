@@ -5,16 +5,13 @@ import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, statusKamarColor, statusKamarLabel, namaPenyewa, tglJamSingkat, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 import { cekLewat, labelLewat, batasCheckout } from '@/lib/checkout'
 import { ringkasBayar } from '@/lib/bayar'
+import { namaTipe, fasilitasEfektif } from '@/lib/tipeKamar'
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
 import { DoorClosedFill } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
-
-const tipeKamarLabel: Record<string, string> = {
-  STANDAR: 'Standar', DELUXE: 'Deluxe', VIP: 'VIP', SUITE: 'Suite', STUDIO: 'Studio',
-}
 
 export default async function KamarPage() {
   const session = await auth()
@@ -24,6 +21,9 @@ export default async function KamarPage() {
   const kamar = await prisma.kamar.findMany({
     where: { propertiId: properti.id },
     include: {
+      // Tipe master data: kamar menunjuk ke sini, dan fasilitas tipe dipakai
+      // sebagai bawaan untuk kamar yang belum diisi fasilitas sendiri.
+      tipe: { select: { id: true, nama: true, fasilitas: true } },
       harga: { where: { aktif: true } },
       sewa: {
         where: { statusSewa: 'AKTIF' },
@@ -41,6 +41,12 @@ export default async function KamarPage() {
       },
     },
     orderBy: { nomor: 'asc' },
+  })
+
+  const daftarTipe = await prisma.tipeKamar.findMany({
+    where: { propertiId: properti.id },
+    select: { id: true, nama: true, fasilitas: true },
+    orderBy: [{ urutan: 'asc' }, { nama: 'asc' }],
   })
 
   const statusGroups = {
@@ -86,7 +92,7 @@ export default async function KamarPage() {
         return {
           id: x.id,
           nomor: x.nomor,
-          tipe: tipeKamarLabel[x.tipe],
+          tipe: namaTipe(x.tipe),
           hargaBulanan: hb ? Number(hb.harga) : null,
           deposit: hb?.deposit != null ? Number(hb.deposit) : null,
         }
@@ -100,7 +106,7 @@ export default async function KamarPage() {
           <p className="text-sm text-gray-400">{kamar.length} kamar terdaftar</p>
         </div>
         <div className="flex items-center gap-2">
-          <KamarTambahModal />
+          <KamarTambahModal daftarTipe={daftarTipe} />
           <Link href="/booking" className="btn btn-ghost">Booking baru</Link>
         </div>
       </div>
@@ -153,7 +159,7 @@ export default async function KamarPage() {
               className={`rounded-xl border p-3 text-center ${statusKamarColor(k.status)}`}
             >
               <p className="font-semibold text-sm">{k.nomor}</p>
-              <p className="text-xs mt-0.5 opacity-75">{tipeKamarLabel[k.tipe]}</p>
+              <p className="text-xs mt-0.5 opacity-75">{namaTipe(k.tipe)}</p>
               {hargaBulanan && (
                 <p className="text-xs mt-1 font-medium">
                   {formatRupiah(hargaBulanan.harga)}<span className="opacity-60">/bln</span>
@@ -227,7 +233,7 @@ export default async function KamarPage() {
                 return (
                   <tr key={k.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="py-2.5 font-medium text-gray-800">{k.nomor}</td>
-                    <td className="py-2.5 text-gray-600">{tipeKamarLabel[k.tipe]}</td>
+                    <td className="py-2.5 text-gray-600">{namaTipe(k.tipe)}</td>
                     <td className="py-2.5 text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</td>
                     <td className="py-2.5 text-gray-700">{hargaBulanan ? formatRupiah(hargaBulanan.harga) : '-'}</td>
                     <td className="py-2.5">
@@ -247,7 +253,7 @@ export default async function KamarPage() {
                     <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
                       {sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : '-'}
                     </td>
-                    <td className="py-2.5 text-gray-400 text-xs">{k.fasilitas.slice(0, 3).join(', ')}{k.fasilitas.length > 3 ? '…' : ''}</td>
+                    <td className="py-2.5 text-gray-400 text-xs">{(() => { const f = fasilitasEfektif(k); return f.slice(0, 3).join(', ') + (f.length > 3 ? '…' : '') })()}</td>
                     <td className="py-2.5 w-px">
                       {sewaAktif && (
                         <div className="w-28">
@@ -287,11 +293,11 @@ export default async function KamarPage() {
                     })()}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {tipeKamarLabel[k.tipe]}{k.luas ? ` · ${k.luas}m²` : ''}
+                    {namaTipe(k.tipe)}{k.luas ? ` · ${k.luas}m²` : ''}
                     {hargaBulanan ? ` · ${formatRupiah(hargaBulanan.harga)}/bln` : ''}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
-                    {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {k.fasilitas.slice(0, 2).join(', ')}{k.fasilitas.length > 2 ? '…' : ''}
+                    {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {(() => { const f = fasilitasEfektif(k); return f.slice(0, 2).join(', ') + (f.length > 2 ? '…' : '') })()}
                   </div>
                   {sewaAktif && (
                     <div className="text-xs text-gray-500 mt-0.5">

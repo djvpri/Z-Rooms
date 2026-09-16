@@ -1,8 +1,8 @@
 // app/(dashboard)/pengaturan/page.tsx
-import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { propertiAktif } from '@/lib/properti'
 import { jamKeMenit } from '@/lib/checkout'
+import TabPengaturan from '@/components/pengaturan/TabPengaturan'
 import FormPengaturan from './FormPengaturan'
 
 export const dynamic = 'force-dynamic'
@@ -24,20 +24,7 @@ export default async function PengaturanPage() {
         <p className="text-sm text-gray-400">{properti.nama}</p>
       </div>
 
-      <div className="flex gap-1 mb-4 border-b border-gray-100">
-        <Link
-          href="/pengaturan"
-          className="px-3 py-2 text-sm font-medium text-teal-700 border-b-2 border-teal-600 -mb-px"
-        >
-          Umum
-        </Link>
-        <Link
-          href="/pengaturan/properti"
-          className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border-b-2 border-transparent -mb-px"
-        >
-          Properti
-        </Link>
-      </div>
+      <TabPengaturan aktif="/pengaturan" />
 
       <FormPengaturan jam={`${jj}:${mm}`} toleransi={aturan.toleransiCheckout} />
     </div>

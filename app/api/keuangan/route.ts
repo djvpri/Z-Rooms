@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       include: {
         sewa: {
           include: {
-            kamar: { select: { nomor: true, tipe: true } },
+            kamar: { select: { nomor: true, tipe: { select: { nama: true } } } },
             penyewa: { select: { nama: true } },
           },
         },

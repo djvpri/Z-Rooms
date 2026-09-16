@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, TipeProperti, TipeKamar, StatusKamar, PeriodeSewa,
+import { PrismaClient, TipeProperti, StatusKamar, PeriodeSewa,
   TipeEntitas, StatusSewa, StatusTagihan, MetodeBayar,
   KategoriBeban, TipeNotifikasi, Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
@@ -43,53 +43,65 @@ async function main() {
   })
   console.log('Properti:', properti.nama)
 
-  // ── 20 Kamar
-  const tipeKamar: { tipe: TipeKamar; hariann: number; bulanan: number; tahunan: number }[] = [
-    { tipe: TipeKamar.STANDAR,  hariann: 80000,   bulanan: 800000,   tahunan: 8500000 },
-    { tipe: TipeKamar.DELUXE,   hariann: 120000,  bulanan: 1200000,  tahunan: 12000000 },
-    { tipe: TipeKamar.VIP,      hariann: 180000,  bulanan: 1800000,  tahunan: 18000000 },
-    { tipe: TipeKamar.SUITE,    hariann: 250000,  bulanan: 2500000,  tahunan: 25000000 },
+  // ── Tipe kamar (master data, dibuat sebelum kamar)
+  const tipeKamar: { nama: string; hariann: number; bulanan: number; tahunan: number; luas: number; fasilitas: string[] }[] = [
+    { nama: 'Standar', hariann: 80000, bulanan: 800000, tahunan: 8500000, luas: 12,
+      fasilitas: ['Kasur', 'Lemari', 'Meja Belajar', 'Kipas Angin'] },
+    { nama: 'Deluxe', hariann: 120000, bulanan: 1200000, tahunan: 12000000, luas: 16,
+      fasilitas: ['Kasur', 'Lemari', 'Meja Belajar', 'AC'] },
+    { nama: 'VIP', hariann: 180000, bulanan: 1800000, tahunan: 18000000, luas: 20,
+      fasilitas: ['Kasur', 'Lemari', 'Meja Belajar', 'AC', 'TV', 'Kulkas'] },
+    { nama: 'Suite', hariann: 250000, bulanan: 2500000, tahunan: 25000000, luas: 28,
+      fasilitas: ['Kasur', 'Lemari', 'Meja Belajar', 'AC', 'TV', 'Kulkas', 'Kamar Mandi Dalam', 'Sofa'] },
   ]
 
+  const tipeMap: Record<string, string> = {}
+  for (const [i, t] of tipeKamar.entries()) {
+    const baris = await prisma.tipeKamar.upsert({
+      where: { propertiId_nama: { propertiId: properti.id, nama: t.nama } },
+      update: {},
+      create: { nama: t.nama, urutan: i, fasilitas: t.fasilitas, propertiId: properti.id },
+    })
+    tipeMap[t.nama] = baris.id
+  }
+
   const kamarData = [
-    { nomor: 'K.01', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERISI },
-    { nomor: 'K.02', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERSEDIA },
-    { nomor: 'K.03', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERISI },
-    { nomor: 'K.04', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERSEDIA },
-    { nomor: 'K.05', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERISI },
-    { nomor: 'K.06', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERISI },
-    { nomor: 'K.07', tipe: TipeKamar.VIP,      status: StatusKamar.TERISI },
-    { nomor: 'K.08', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERISI },
-    { nomor: 'K.09', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERSEDIA },
-    { nomor: 'K.10', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERISI },
-    { nomor: 'K.11', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERSEDIA },
-    { nomor: 'K.12', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERISI },
-    { nomor: 'K.13', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERSEDIA },
-    { nomor: 'K.14', tipe: TipeKamar.SUITE,    status: StatusKamar.DIPESAN },
-    { nomor: 'K.15', tipe: TipeKamar.DELUXE,   status: StatusKamar.TERISI },
-    { nomor: 'K.16', tipe: TipeKamar.VIP,      status: StatusKamar.TERSEDIA },
-    { nomor: 'K.17', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERISI },
-    { nomor: 'K.18', tipe: TipeKamar.SUITE,    status: StatusKamar.TERISI },
-    { nomor: 'K.19', tipe: TipeKamar.STANDAR,  status: StatusKamar.TERISI },
-    { nomor: 'K.20', tipe: TipeKamar.VIP,      status: StatusKamar.TERISI },
+    { nomor: 'K.01', tipe: 'Standar', status: StatusKamar.TERISI },
+    { nomor: 'K.02', tipe: 'Standar', status: StatusKamar.TERSEDIA },
+    { nomor: 'K.03', tipe: 'Deluxe',   status: StatusKamar.TERISI },
+    { nomor: 'K.04', tipe: 'Standar', status: StatusKamar.TERSEDIA },
+    { nomor: 'K.05', tipe: 'Deluxe',   status: StatusKamar.TERISI },
+    { nomor: 'K.06', tipe: 'Standar', status: StatusKamar.TERISI },
+    { nomor: 'K.07', tipe: 'VIP',      status: StatusKamar.TERISI },
+    { nomor: 'K.08', tipe: 'Standar', status: StatusKamar.TERISI },
+    { nomor: 'K.09', tipe: 'Standar', status: StatusKamar.TERSEDIA },
+    { nomor: 'K.10', tipe: 'Deluxe',   status: StatusKamar.TERISI },
+    { nomor: 'K.11', tipe: 'Standar', status: StatusKamar.TERSEDIA },
+    { nomor: 'K.12', tipe: 'Deluxe',   status: StatusKamar.TERISI },
+    { nomor: 'K.13', tipe: 'Deluxe',   status: StatusKamar.TERSEDIA },
+    { nomor: 'K.14', tipe: 'Suite',    status: StatusKamar.DIPESAN },
+    { nomor: 'K.15', tipe: 'Deluxe',   status: StatusKamar.TERISI },
+    { nomor: 'K.16', tipe: 'VIP',      status: StatusKamar.TERSEDIA },
+    { nomor: 'K.17', tipe: 'Standar', status: StatusKamar.TERISI },
+    { nomor: 'K.18', tipe: 'Suite',    status: StatusKamar.TERISI },
+    { nomor: 'K.19', tipe: 'Standar', status: StatusKamar.TERISI },
+    { nomor: 'K.20', tipe: 'VIP',      status: StatusKamar.TERISI },
   ]
 
   const kamarMap: Record<string, string> = {}
   for (const k of kamarData) {
-    const info = tipeKamar.find(t => t.tipe === k.tipe)!
+    const info = tipeKamar.find(t => t.nama === k.tipe)!
     const kamar = await prisma.kamar.upsert({
       where: { propertiId_nomor: { propertiId: properti.id, nomor: k.nomor } },
       update: { status: k.status },
       create: {
         nomor: k.nomor,
         lantai: parseInt(k.nomor.replace('K.', '')) <= 10 ? 1 : 2,
-        tipe: k.tipe,
-        luas: k.tipe === TipeKamar.STANDAR ? 12 : k.tipe === TipeKamar.DELUXE ? 16 : k.tipe === TipeKamar.VIP ? 20 : 28,
-        fasilitas: ['Kasur', 'Lemari', 'Meja Belajar',
-          ...(k.tipe !== TipeKamar.STANDAR ? ['AC'] : ['Kipas Angin']),
-          ...(k.tipe === TipeKamar.VIP || k.tipe === TipeKamar.SUITE ? ['TV', 'Kulkas'] : []),
-          ...(k.tipe === TipeKamar.SUITE ? ['Kamar Mandi Dalam', 'Sofa'] : []),
-        ],
+        tipeId: tipeMap[k.tipe],
+        luas: info.luas,
+        // Fasilitas kamar dikosongkan: yang berlaku adalah fasilitas tipe
+        // (warisan), supaya satu sumber saja untuk properti seed ini.
+        fasilitas: [],
         status: k.status,
         propertiId: properti.id,
         harga: {
