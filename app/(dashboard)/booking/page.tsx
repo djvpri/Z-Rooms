@@ -1,6 +1,6 @@
 'use client'
 // app/(dashboard)/booking/page.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam } from '@/lib/utils'
@@ -78,6 +78,19 @@ export default function BookingPage() {
   // Penyewa lama yang NIK-nya sama dengan hasil bacaan. Kasir yang memutuskan
   // mau memakai data lama atau tetap membuat yang baru.
   const [ktpDuplikat, setKtpDuplikat] = useState<{ id: string; nama: string | null; noHp: string | null; alamatAsal: string | null } | null>(null)
+  // Satu input file dipakai kamera dan pemilih berkas. `capture` harus
+  // dipasang/dilepas tepat sebelum klik: kalau selalu terpasang, tombol
+  // "Pilih File" pun memaksa kamera di HP.
+  const inputKtp = useRef<HTMLInputElement>(null)
+
+  const ambilDari = (sumber: 'kamera' | 'berkas') => {
+    const el = inputKtp.current
+    if (!el) return
+    if (sumber === 'kamera') el.setAttribute('capture', 'environment')
+    else el.removeAttribute('capture')
+    el.click()
+  }
+
 
   useEffect(() => {
     fetch('/api/properti/aktif')
@@ -375,30 +388,15 @@ export default function BookingPage() {
 
           {/* Isi otomatis dari foto KTP. Hanya di mode penyewa baru: kalau
               kasir sudah memilih penyewa lama, datanya memang sudah ada.
-              Seluruh baris ini adalah <label> untuk input file di dalamnya,
-              jadi menekan area mana pun membuka kamera/galeri — bukan cuma
-              teks kecil di kanan. */}
+              Dua tombol, bukan satu: `capture` memaksa kamera dan tanpa itu
+              user dapat pemilih berkas. Satu input saja tak bisa dua-duanya —
+              `capture` berlaku per-input, bukan per-pilihan.
+              Panel status dan duplikat sengaja di LUAR tombol, supaya kliknya
+              tak ikut membuka kamera/pemilih berkas. */}
           {!penyewaId && (
-            <label
-              className={`block rounded-xl border px-3 py-3 transition-colors ${
-                bacaKtpLoading
-                  ? 'border-teal-200 bg-teal-50 cursor-progress'
-                  : 'border-dashed border-gray-300 bg-gray-50 hover:border-teal-400 hover:bg-teal-50 cursor-pointer'
-              }`}
-            >
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                className="sr-only"
-                disabled={bacaKtpLoading}
-                onChange={bacaKtpDariFoto}
-              />
-
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 py-3">
               <div className="flex items-center gap-3">
-                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${
-                  bacaKtpLoading ? 'bg-teal-100 text-teal-600' : 'bg-white text-teal-600 shadow-sm ring-1 ring-gray-200'
-                }`}>
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-teal-600 shadow-sm ring-1 ring-gray-200">
                   {bacaKtpLoading ? (
                     <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
@@ -420,14 +418,52 @@ export default function BookingPage() {
                   <div className="truncate text-xs text-gray-500">
                     {bacaKtpLoading
                       ? 'Tunggu sebentar, jangan tutup halaman ini.'
-                      : 'Ketuk untuk foto KTP, lalu periksa hasilnya sebelum disimpan.'}
+                      : 'Foto KTP-nya, lalu periksa hasilnya sebelum disimpan.'}
                   </div>
                 </div>
-
-                <svg className={`h-4 w-4 shrink-0 text-gray-400 ${bacaKtpLoading ? 'hidden' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
               </div>
+
+              {/* Dua sumber. Ikon kamera dan ikon berkas, bukan tombol teks
+                  kecil: ini aksi utama blok, dan di HP harus enak diketuk. */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => ambilDari('kamera')}
+                  disabled={bacaKtpLoading}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-700 disabled:opacity-60"
+                >
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1-2h5l1 2h2A1.5 1.5 0 0 1 17 8.5" />
+                    <path d="M3.5 8.5h16A1.5 1.5 0 0 1 21 10v7.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V10a1.5 1.5 0 0 1 .5-1.5Z" />
+                    <circle cx="12" cy="13.5" r="3.2" />
+                  </svg>
+                  Kamera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => ambilDari('berkas')}
+                  disabled={bacaKtpLoading}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-teal-400 hover:text-teal-700 disabled:opacity-60"
+                >
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l1.8 2H19.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5Z" />
+                  </svg>
+                  Pilih File
+                </button>
+              </div>
+
+              {/* Satu input dipakai dua-duanya; `capture` dipasang dan dilepas
+                  tepat sebelum klik. HEIC ikut di `accept` karena server
+                  menerimanya (lib/ktp.ts MIME_DIIZINKAN) dan foto iPhone
+                  berformat itu — tanpa ini berkasnya tampak abu di iOS. */}
+              <input
+                ref={inputKtp}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+                className="sr-only"
+                disabled={bacaKtpLoading}
+                onChange={bacaKtpDariFoto}
+              />
 
               {/* Hasil bacaan. Warna panel mengikuti `gagal`, supaya pesan
                   galat tak tampil senada pesan sukses. */}
@@ -453,13 +489,10 @@ export default function BookingPage() {
 
               {/* NIK hasil bacaan sudah terdaftar. Kasir memutuskan: pakai data
                   lama, atau anggap orang berbeda dan lanjut membuat baru.
-                  Tombol di dalam <label> menelan klik-nya — klik di sini
-                  tidak boleh ikut membuka pemilih berkas. */}
+                  Dulu blok ini ada di dalam <label>, jadi klik tombolnya ikut
+                  membuka pemilih berkas — sekarang tak lagi perlu ditahan. */}
               {ktpDuplikat && (
-                <div
-                  className="mt-2.5 space-y-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2"
-                  onClick={e => { e.preventDefault(); e.stopPropagation() }}
-                >
+                <div className="mt-2.5 space-y-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2">
                   <div className="text-xs text-amber-900">
                     NIK ini sudah terdaftar atas nama <span className="font-medium">{ktpDuplikat.nama ?? 'tanpa nama'}</span>.
                     Pakai data lama supaya tidak tercatat dua kali.
@@ -472,7 +505,7 @@ export default function BookingPage() {
                   </div>
                 </div>
               )}
-            </label>
+            </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
