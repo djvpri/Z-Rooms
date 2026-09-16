@@ -154,6 +154,16 @@ export default async function KeuanganPage() {
       {/* Tabel tagihan bulan ini */}
       <TagihanTable
         bulanLabel={now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+        // Identitas properti untuk kepala & kaki nota cetak. Dikirim dari sini
+        // karena halaman ini server component yang sudah memegang `properti`.
+        properti={{
+          nama: properti.nama,
+          alamat: properti.alamat,
+          kota: properti.kota,
+          provinsi: properti.provinsi,
+          noHp: properti.noHp,
+          teksNota: properti.teksNota,
+        }}
         tagihan={tagihan.map(t => ({
           id: t.id,
           nominal: Number(t.nominal),

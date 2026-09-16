@@ -80,6 +80,11 @@ model Properti {
   // ToleransiCheckout = menit kelonggaran sebelum ditandai lewat (120 = 2 jam).
   jamCheckout         String  @default("12:00")
   toleransiCheckout   Int     @default(120)
+  // Kontak & catatan pemilik properti. Keduanya muncul di nota cetak:
+  // noHp di baris kontak, teksNota menggantikan kalimat penutup bawaan.
+  // Opsional — properti tanpa isinya tetap memakai teks bawaan.
+  noHp        String?
+  teksNota    String?
   isDemo      Boolean       @default(false)
   demoExpiresAt DateTime?
   createdAt   DateTime      @default(now())

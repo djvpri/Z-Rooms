@@ -16,7 +16,22 @@ export type TagihanRow = {
   pembayaran: { metodeBayar: string | null }[]
 }
 
-export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: TagihanRow[]; bulanLabel: string }) {
+// Identitas properti untuk kepala & kaki nota cetak. Opsional supaya komponen
+// ini tetap bisa dipakai tanpa konteks properti (mis. di halaman lain nanti).
+export type PropertiNota = {
+  nama: string
+  alamat: string
+  kota: string
+  provinsi: string
+  noHp: string | null
+  teksNota: string | null
+}
+
+export default function TagihanTable({ tagihan, bulanLabel, properti }: {
+  tagihan: TagihanRow[]
+  bulanLabel: string
+  properti?: PropertiNota
+}) {
   const [printTagihan, setPrintTagihan] = useState<TagihanRow | null>(null)
 
   return (
@@ -109,9 +124,16 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
             <div id="nota-tagihan" className="p-6 font-mono text-sm">
               <div className="text-center mb-4">
                 <div className="text-lg font-bold flex items-center justify-center gap-2">
-                  <i className="bi bi-house-door-fill text-teal-600" /> ZXRoom
+                  <i className="bi bi-house-door-fill text-teal-600" /> {properti?.nama ?? 'ZXRoom'}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Sistem Manajemen Kos & Apartemen</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {properti
+                    ? `${properti.alamat}, ${properti.kota}, ${properti.provinsi}`
+                    : 'Sistem Manajemen Kos & Apartemen'}
+                </div>
+                {properti?.noHp && (
+                  <div className="text-xs text-gray-500 mt-0.5">HP {properti.noHp}</div>
+                )}
                 <div className="border-t border-dashed border-gray-300 my-3" />
               </div>
 
@@ -156,9 +178,13 @@ export default function TagihanTable({ tagihan, bulanLabel }: { tagihan: Tagihan
               )}
 
               <div className="border-t border-dashed border-gray-300 my-3" />
-              <div className="text-center text-xs text-gray-500">
-                <p>Terima kasih atas kepercayaan Anda.</p>
-                <p>Simpan nota ini sebagai bukti pembayaran.</p>
+              <div className="text-center text-xs text-gray-500 whitespace-pre-line">
+                {properti?.teksNota
+                  ? properti.teksNota
+                  : <>
+                      <p>Terima kasih atas kepercayaan Anda.</p>
+                      <p>Simpan nota ini sebagai bukti pembayaran.</p>
+                    </>}
               </div>
             </div>
 

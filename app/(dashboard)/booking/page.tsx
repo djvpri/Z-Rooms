@@ -33,6 +33,15 @@ type PenyewaHasil = {
   jumlahSewa: number
 }
 
+type PropertiNota = {
+  nama: string
+  alamat: string
+  kota: string
+  provinsi: string
+  noHp: string | null
+  teksNota: string | null
+}
+
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
@@ -43,6 +52,9 @@ export default function BookingPage() {
   const [nota, setNota] = useState<NotaBooking | null>(null)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'INDIVIDU' | 'PERUSAHAAN'>('INDIVIDU')
+  // Identitas properti untuk kepala & kaki nota. Diambil sekali; kalau gagal,
+  // nota tetap tercetak dengan teks bawaan (bukan blank).
+  const [propertiNota, setPropertiNota] = useState<PropertiNota | null>(null)
 
   // Pencarian penyewa lama. `penyewaId` kosong = penyewa baru.
   const [cari, setCari] = useState('')
@@ -56,6 +68,13 @@ export default function BookingPage() {
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', jamMasuk: '', durasi: 1,
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
   })
+
+  useEffect(() => {
+    fetch('/api/properti/aktif')
+      .then(r => r.json())
+      .then(j => setPropertiNota(j?.properti ?? null))
+      .catch(() => setPropertiNota(null))
+  }, [])
 
   useEffect(() => {
     fetch('/api/kamar?status=TERSEDIA')
@@ -467,9 +486,16 @@ export default function BookingPage() {
             <div id="nota-booking" className="p-6 font-mono text-sm">
               <div className="text-center mb-4">
                 <div className="text-lg font-bold flex items-center justify-center gap-2">
-                  <i className="bi bi-house-door-fill text-teal-600" /> ZXRoom
+                  <i className="bi bi-house-door-fill text-teal-600" /> {propertiNota?.nama ?? 'ZXRoom'}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Sistem Manajemen Kos & Apartemen</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {propertiNota
+                    ? `${propertiNota.alamat}, ${propertiNota.kota}, ${propertiNota.provinsi}`
+                    : 'Sistem Manajemen Kos & Apartemen'}
+                </div>
+                {propertiNota?.noHp && (
+                  <div className="text-xs text-gray-500 mt-0.5">HP {propertiNota.noHp}</div>
+                )}
                 <div className="border-t border-dashed border-gray-300 my-3" />
               </div>
 
@@ -551,9 +577,13 @@ export default function BookingPage() {
               </div>
 
               <div className="border-t border-dashed border-gray-300 my-3" />
-              <div className="text-center text-xs text-gray-500">
-                <p>Selamat bergabung di properti kami!</p>
-                <p>Simpan nota ini sebagai bukti booking.</p>
+              <div className="text-center text-xs text-gray-500 whitespace-pre-line">
+                {propertiNota?.teksNota
+                  ? propertiNota.teksNota
+                  : <>
+                      <p>Selamat bergabung di properti kami!</p>
+                      <p>Simpan nota ini sebagai bukti booking.</p>
+                    </>}
               </div>
             </div>
 

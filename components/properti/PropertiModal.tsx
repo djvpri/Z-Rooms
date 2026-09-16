@@ -15,6 +15,9 @@ export type PropertiData = {
   provinsi: string
   deskripsi: string | null
   fasilitas: string[]
+  // Muncul di nota cetak. Opsional: kosong -> nota pakai teks bawaan.
+  noHp: string | null
+  teksNota: string | null
 }
 
 const TIPE = [
@@ -31,7 +34,7 @@ const FASILITAS_UMUM = [
 
 const KOSONG = {
   nama: '', tipe: 'KOS', alamat: '', kota: '', provinsi: 'Kalimantan Barat',
-  deskripsi: '', fasilitas: [] as string[],
+  deskripsi: '', fasilitas: [] as string[], noHp: '', teksNota: '',
 }
 
 export default function PropertiModal({
@@ -51,6 +54,7 @@ export default function PropertiModal({
       setF({
         nama: data.nama, tipe: data.tipe, alamat: data.alamat, kota: data.kota,
         provinsi: data.provinsi, deskripsi: data.deskripsi ?? '', fasilitas: data.fasilitas,
+        noHp: data.noHp ?? '', teksNota: data.teksNota ?? '',
       })
     } else {
       setF(KOSONG)
@@ -157,6 +161,32 @@ export default function PropertiModal({
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nomor HP <span className="text-gray-400 font-normal">(opsional)</span>
+            </label>
+            <input
+              value={f.noHp} onChange={e => set('noHp', e.target.value)}
+              inputMode="tel" placeholder="0812-3456-7890"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Muncul di nota cetak sebagai kontak yang bisa dihubungi.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Teks nota bagian bawah <span className="text-gray-400 font-normal">(opsional)</span>
+            </label>
+            <textarea
+              value={f.teksNota} onChange={e => set('teksNota', e.target.value)}
+              rows={3} placeholder="Mis. Barang berharga harap dibawa pulang. Terima kasih."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Tampil di bagian bawah nota tagihan & nota booking. Kosongkan untuk memakai teks bawaan.
+            </p>
           </div>
 
           <div>

@@ -22,6 +22,10 @@ const propertiSchema = z.object({
   provinsi: z.string().trim().min(1).default('Kalimantan Barat'),
   deskripsi: z.string().trim().optional(),
   fasilitas: z.array(z.string()).default([]),
+  // Kontak & catatan nota. Batas panjang dijaga supaya nota cetak tak meluber
+  // keluar kertas; nomor HP bukan email jadi tak divalidasi format ketat.
+  noHp: z.string().trim().max(30, 'Nomor HP maksimal 30 karakter').optional(),
+  teksNota: z.string().trim().max(500, 'Teks nota maksimal 500 karakter').optional(),
 })
 
 // Zod `.optional()` lolos string kosong — normalkan supaya tak tersimpan ""
@@ -38,7 +42,8 @@ export async function GET() {
     orderBy: { createdAt: 'asc' },
     select: {
       id: true, nama: true, tipe: true, alamat: true, kota: true, provinsi: true,
-      deskripsi: true, fasilitas: true, aktif: true, isDemo: true, createdAt: true,
+      deskripsi: true, fasilitas: true, noHp: true, teksNota: true,
+      aktif: true, isDemo: true, createdAt: true,
       _count: { select: { kamar: true } },
     },
   })
@@ -70,6 +75,8 @@ export async function POST(req: NextRequest) {
       provinsi: d.provinsi,
       deskripsi: kosongJadiNull(d.deskripsi),
       fasilitas: d.fasilitas,
+      noHp: kosongJadiNull(d.noHp),
+      teksNota: kosongJadiNull(d.teksNota),
       ownerId: userId,
     },
   })
@@ -117,6 +124,10 @@ export async function PATCH(req: NextRequest) {
       ...(d.provinsi !== undefined && { provinsi: d.provinsi }),
       ...(d.deskripsi !== undefined && { deskripsi: kosongJadiNull(d.deskripsi) }),
       ...(d.fasilitas !== undefined && { fasilitas: d.fasilitas }),
+      // Kosong -> NULL, bukan "", supaya nota kembali ke teks bawaan tanpa
+      // harus menebak apakah "" berarti "sengaja dikosongkan".
+      ...(d.noHp !== undefined && { noHp: kosongJadiNull(d.noHp) }),
+      ...(d.teksNota !== undefined && { teksNota: kosongJadiNull(d.teksNota) }),
     },
   })
 
