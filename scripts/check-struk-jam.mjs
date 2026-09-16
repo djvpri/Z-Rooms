@@ -99,9 +99,10 @@ assert.ok(!/am|pm/i.test(tglJam(m1.toISOString())), 'struk tak boleh memakai AM/
 assert.ok(tglJam(gabung('2026-09-15', '15:30').toISOString()).includes('15.30'), 'sore harus 15.30, bukan 03.30')
 assert.ok(tglJam(gabung('2026-09-15', '09:05').toISOString()).includes('09.05'), 'pagi harus 09.05')
 
-// 9. tglJamSingkat dipakai tab Kamar untuk "Kosong 16 Sep, 12:00". Formatnya
-//    HARUS 24 jam dan ber-WIB, sama seperti tglJam — kalau tidak, kasir melihat
-//    jam tersedia yang beda dari jam di struk untuk kamar yang sama.
+// 9. tglJamSingkat dipakai tab Kamar untuk kolom "Selesai 16 Sep, 14:00" (dan
+//    "Mulai ...") di samping "Kosong 16 Sep, 12:00" yang lama. Formatnya HARUS
+//    24 jam dan ber-WIB, sama seperti tglJam — kalau tidak, kasir melihat jam
+//    yang beda dari jam di struk untuk kamar yang sama.
 {
   const b = new Date('2026-09-16T05:00:00Z')   // 12:00 WIB
   const s = tglJamSingkat(b)

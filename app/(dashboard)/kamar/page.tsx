@@ -189,11 +189,14 @@ export default async function KamarPage() {
                   </p>
                 )
               })()}
-              {/* Kapan kamar ini tersedia lagi. Dihitung dari tanggal keluar +
-                  jam check-out properti, bukan jam masuk + 24 jam. */}
+              {/* Mulai & selesai sewa. Selesai = batas check-out (tanggal
+                  keluar + jam check-out properti + toleransi), bukan jam
+                  masuk + 24 jam. Dulu hanya sisi selesai yang tampil. */}
               {sewaAktif && (
                 <p className="text-[10px] mt-0.5 opacity-75">
-                  Kosong {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
+                  Mulai {tglJamSingkat(sewaAktif.tanggalMasuk)}
+                  <span className="mx-1 opacity-60">·</span>
+                  Selesai {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
                 </p>
               )}
               {(() => {
@@ -237,7 +240,8 @@ export default async function KamarPage() {
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Status</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Penyewa</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Bayar</th>
-                <th className="text-left py-2 text-xs font-medium text-gray-400">Kosong</th>
+                <th className="text-left py-2 text-xs font-medium text-gray-400">Mulai</th>
+                <th className="text-left py-2 text-xs font-medium text-gray-400">Selesai</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400">Fasilitas</th>
                 <th className="text-left py-2 text-xs font-medium text-gray-400"></th>
               </tr>
@@ -266,6 +270,14 @@ export default async function KamarPage() {
                           </span>
                         )
                       })() : '-'}
+                    </td>
+                    {/* Mulai = tanggal & jam masuk yang dicatat kasir;
+                        Selesai = batas check-out (hari terakhir + jam
+                        check-out properti + toleransi). Kolom "Kosong" dulu
+                        hanya menampilkan sisi selesai, sehingga kasir tak bisa
+                        melihat sewa ini berjalan sejak kapan. */}
+                    <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                      {sewaAktif ? tglJamSingkat(sewaAktif.tanggalMasuk) : '-'}
                     </td>
                     <td className="py-2.5 text-gray-500 text-xs whitespace-nowrap">
                       {sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : '-'}
@@ -321,7 +333,9 @@ export default async function KamarPage() {
                   </div>
                   {sewaAktif && (
                     <div className="text-xs text-gray-500 mt-0.5">
-                      Kosong {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
+                      Mulai {tglJamSingkat(sewaAktif.tanggalMasuk)}
+                      <span className="mx-1 opacity-60">·</span>
+                      Selesai {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
                     </div>
                   )}
                 </div>
