@@ -111,8 +111,6 @@ export default async function LisensiPage() {
           Cara memperpanjang
         </h2>
         <p className="text-sm text-gray-500">
-          Plan dan masa berlaku diatur oleh pengelola ekosistem lewat{' '}
-          <span className="font-medium text-gray-700">Z One &rarr; Kelola Apps &rarr; ZXRoom</span>.
           Hubungi pengelola untuk memperpanjang atau mengubah plan.
         </p>
       </div>
