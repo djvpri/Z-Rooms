@@ -98,6 +98,17 @@ export default async function KamarPage() {
         }
       })
 
+  // Bentuk data untuk KamarTambahModal mode ubah. Hanya field yang memang bisa
+  // diedit — `status` diatur alur sewa, bukan dari form ini.
+  const ringkasEdit = (k: KamarBaris) => ({
+    id: k.id,
+    nomor: k.nomor,
+    lantai: k.lantai,
+    luas: k.luas,
+    fasilitas: k.fasilitas,
+    tipeId: k.tipeId,
+  })
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-4 md:mb-6">
@@ -192,6 +203,11 @@ export default async function KamarPage() {
                   </p>
                 ) : null
               })()}
+              {/* Ubah data kamar. Selalu tersedia — nomor, tipe, luas, fasilitas
+                  boleh dikoreksi kapan saja; yang tak boleh cuma `status`. */}
+              <div className="mt-2">
+                <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+              </div>
               {sewaAktif && (
                 <CheckoutModal
                   sewa={ringkasSewa(k, sewaAktif)}
@@ -255,14 +271,17 @@ export default async function KamarPage() {
                     </td>
                     <td className="py-2.5 text-gray-400 text-xs">{(() => { const f = fasilitasEfektif(k); return f.slice(0, 3).join(', ') + (f.length > 3 ? '…' : '') })()}</td>
                     <td className="py-2.5 w-px">
-                      {sewaAktif && (
-                        <div className="w-28">
-                          <CheckoutModal
-                            sewa={ringkasSewa(k, sewaAktif)}
-                            kamarTersedia={kamarTersediaUntuk(k.id)}
-                          />
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                        {sewaAktif && (
+                          <div className="w-28">
+                            <CheckoutModal
+                              sewa={ringkasSewa(k, sewaAktif)}
+                              kamarTersedia={kamarTersediaUntuk(k.id)}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -305,14 +324,17 @@ export default async function KamarPage() {
                     </div>
                   )}
                 </div>
-                {sewaAktif && (
-                  <div className="w-24 shrink-0 ml-2">
-                    <CheckoutModal
-                      sewa={ringkasSewa(k, sewaAktif)}
-                      kamarTersedia={kamarTersediaUntuk(k.id)}
-                    />
-                  </div>
-                )}
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                  {sewaAktif && (
+                    <div className="w-24">
+                      <CheckoutModal
+                        sewa={ringkasSewa(k, sewaAktif)}
+                        kamarTersedia={kamarTersediaUntuk(k.id)}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )
           })}

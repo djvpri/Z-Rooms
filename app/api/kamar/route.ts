@@ -9,18 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
-import { z } from 'zod'
-
-const createKamarSchema = z.object({
-  nomor: z.string().min(1),
-  lantai: z.number().default(1),
-  // Tipe kini master data (model TipeKamar) dan WAJIB. Dulu di sini ada enum
-  // dengan 'STUDIO' yang tak dikenal Prisma, sehingga menambah kamar Studio
-  // selalu gagal 500.
-  tipeId: z.string().min(1, 'Tipe kamar wajib dipilih.'),
-  luas: z.number().optional(),
-  fasilitas: z.array(z.string()).default([]),
-})
+import { createKamarSchema } from '@/lib/kamar'
 
 export async function GET(req: NextRequest) {
   const session = await auth()

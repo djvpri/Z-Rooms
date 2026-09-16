@@ -1,21 +1,38 @@
 'use client'
 // components/kamar/KamarTambahModal.tsx
-// Form tambah kamar. Endpoint POST /api/kamar sudah ada sejak lama tapi belum
-// punya UI — komponen inilah pemanggilnya.
+// Form kamar — dipakai untuk TAMBAH dan UBAH. Satu komponen dua mode: isian,
+// validasi, dan daftar fasilitasnya identik, jadi memisahkannya jadi dua berkas
+// hanya akan membuat keduanya pelan-pelan berbeda.
 //
-// Tipe kamar kini master data dari /pengaturan/tipe-kamar, bukan daftar lokal.
-// Daftar lokal dulu memuat 'STUDIO' yang tak ada di enum Prisma, sehingga
-// menambah kamar Studio selalu gagal 500.
+// Tipe kamar master data dari /pengaturan/tipe-kamar. Harga tidak diisi di sini
+// — tarif melekat pada tipe (Pengaturan → Tipe kamar).
 //
-// Harga tidak diisi di sini — tarif melekat pada tipe (Pengaturan → Tipe kamar).
+// `kamar` diisi = mode ubah (PATCH /api/kamar/[id]), kosong = mode tambah (POST).
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, PlusLg, Check2, InfoCircle } from 'react-bootstrap-icons'
+import { X, PlusLg, Check2, InfoCircle, PencilSquare } from 'react-bootstrap-icons'
 
 export type TipeRingkas = { id: string; nama: string; fasilitas: string[] }
 
-export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: TipeRingkas[] }) {
+/** Bentuk kamar yang bisa diubah — hanya field yang memang bisa diedit. */
+export type KamarEdit = {
+  id: string
+  nomor: string
+  lantai: number
+  luas: number | null
+  fasilitas: string[]
+  tipeId: string
+}
+
+export default function KamarTambahModal({
+  daftarTipe = [],
+  kamar,
+}: {
+  daftarTipe?: TipeRingkas[]
+  kamar?: KamarEdit
+}) {
   const router = useRouter()
+  const ubah = !!kamar
   const [buka, setBuka] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,10 +53,15 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
     return () => { batal = true }
   }, [])
 
-  const [f, setF] = useState({
-    nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '',
-    fasilitas: [] as string[],
+  const kosong = () => ({
+    nomor: kamar?.nomor ?? '',
+    lantai: kamar?.lantai ?? 1,
+    tipeId: kamar?.tipeId ?? daftarTipe[0]?.id ?? '',
+    luas: kamar?.luas != null ? String(kamar.luas) : '',
+    fasilitas: kamar?.fasilitas ?? ([] as string[]),
   })
+
+  const [f, setF] = useState(kosong)
 
   function set<K extends keyof typeof f>(k: K, v: (typeof f)[K]) {
     setF(p => ({ ...p, [k]: v }))
@@ -59,7 +81,7 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
   }
 
   function reset() {
-    setF({ nomor: '', lantai: 1, tipeId: daftarTipe[0]?.id ?? '', luas: '', fasilitas: [] })
+    setF(kosong())
     setError('')
   }
 
@@ -67,24 +89,33 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
     setBuka(false); setError(''); setSukses(''); reset()
   }
 
+  /** Buka modal selalu dari data terkini — bukan sisa editan yang lalu dibatalkan. */
+  function bukaModal() {
+    reset()
+    setSukses('')
+    setBuka(true)
+  }
+
   async function simpan(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!f.nomor.trim()) { setError('Nomor kamar wajib diisi.'); return }
-    // Tipe wajib kini: harga sewa melekat pada tipe, jadi kamar tanpa tipe tak
-    // bisa dihargai. Server juga menolaknya — cek di sini supaya pesannya jelas.
+    // Tipe wajib: harga sewa melekat pada tipe, jadi kamar tanpa tipe tak bisa
+    // dihargai. Server juga menolaknya — cek di sini supaya pesannya jelas.
     if (!f.tipeId) { setError('Tipe kamar wajib dipilih. Tambahkan tipe dulu di Pengaturan → Tipe kamar.'); return }
 
     setLoading(true)
     try {
-      const res = await fetch('/api/kamar', {
-        method: 'POST',
+      const res = await fetch(ubah ? `/api/kamar/${kamar!.id}` : '/api/kamar', {
+        method: ubah ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nomor: f.nomor.trim(),
           lantai: Number(f.lantai) || 1,
           tipeId: f.tipeId,
-          ...(f.luas ? { luas: Number(f.luas) } : {}),
+          // Kosongkan luas = null (bukan dihilangkan), supaya luas lama benar-benar
+          // terhapus saat pemilik menghapus isinya.
+          luas: f.luas ? Number(f.luas) : null,
           fasilitas: f.fasilitas,
         }),
       })
@@ -95,10 +126,10 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
         const fe = data?.error?.fieldErrors
         const pesan = fe ? Object.entries(fe).map(([k, v]: any) => `${k}: ${v.join(', ')}`).join(' · ')
           : data?.error?.message || data?.error?.formErrors?.join(', ')
-        setError(pesan || 'Gagal menyimpan kamar.')
+        setError(pesan || (ubah ? 'Gagal menyimpan perubahan.' : 'Gagal menyimpan kamar.'))
         return
       }
-      setSukses(`Kamar ${data?.nomor ?? f.nomor} ditambahkan.`)
+      setSukses(ubah ? `Kamar ${data?.nomor ?? f.nomor} diperbarui.` : `Kamar ${data?.nomor ?? f.nomor} ditambahkan.`)
       reset()
       router.refresh()
       // biar kasir sempat lihat konfirmasi lalu modal menutup sendiri
@@ -112,16 +143,25 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
 
   return (
     <>
-      <button type="button" onClick={() => setBuka(true)} className="btn btn-primary">
-        <PlusLg aria-hidden="true" /> Tambah kamar
-      </button>
+      {ubah ? (
+        <button type="button" onClick={bukaModal} className="btn btn-ghost px-2 py-1 text-xs"
+          aria-label={`Ubah kamar ${kamar!.nomor}`} title="Ubah kamar">
+          <PencilSquare size={13} aria-hidden="true" />
+        </button>
+      ) : (
+        <button type="button" onClick={bukaModal} className="btn btn-primary">
+          <PlusLg aria-hidden="true" /> Tambah kamar
+        </button>
+      )}
 
       {buka && (
         <div className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-900">Tambah kamar</h2>
+              <h2 className="text-sm font-semibold text-gray-900">
+                {ubah ? `Ubah kamar ${kamar!.nomor}` : 'Tambah kamar'}
+              </h2>
               <button type="button" onClick={tutup} aria-label="Tutup" className="text-gray-400 hover:text-gray-700 p-1">
                 <X size={18} aria-hidden="true" />
               </button>
@@ -200,7 +240,7 @@ export default function KamarTambahModal({ daftarTipe = [] }: { daftarTipe?: Tip
                 <div className="flex gap-3 justify-end px-5 py-4 border-t border-gray-100">
                   <button type="button" onClick={tutup} className="btn btn-ghost">Batal</button>
                   <button type="submit" disabled={loading} className="btn btn-primary">
-                    {loading ? 'Menyimpan...' : (<><Check2 aria-hidden="true" /> Simpan kamar</>)}
+                    {loading ? 'Menyimpan...' : (<><Check2 aria-hidden="true" /> {ubah ? 'Simpan perubahan' : 'Simpan kamar'}</>)}
                   </button>
                 </div>
               </form>
