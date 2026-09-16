@@ -72,7 +72,9 @@ export default function BookingPage() {
 
   // Pembacaan KTP. Hanya berarti di mode penyewa baru.
   const [bacaKtpLoading, setBacaKtpLoading] = useState(false)
-  const [pesanKtp, setPesanKtp] = useState('')
+  // `gagal` dibedakan dari pesan biasa supaya panelnya berubah warna — pesan
+  // galat yang terlihat sama dengan pesan sukses bikin kasir mengira berhasil.
+  const [pesanKtp, setPesanKtp] = useState<{ teks: string; gagal?: boolean } | null>(null)
   // Penyewa lama yang NIK-nya sama dengan hasil bacaan. Kasir yang memutuskan
   // mau memakai data lama atau tetap membuat yang baru.
   const [ktpDuplikat, setKtpDuplikat] = useState<{ id: string; nama: string | null; noHp: string | null; alamatAsal: string | null } | null>(null)
@@ -123,7 +125,7 @@ export default function BookingPage() {
       ...f, nama: '', nik: '', noHp: '', alamatAsal: '',
       namaPerusahaan: '', npwp: '',
     }))
-    setPesanKtp(''); setKtpDuplikat(null)
+    setPesanKtp(null); setKtpDuplikat(null)
   }
 
   // Baca KTP dari foto. Field yang terbaca MENIMPA isian yang ada — kasir
@@ -136,7 +138,7 @@ export default function BookingPage() {
     e.target.value = ''
     if (!berkas) return
 
-    setBacaKtpLoading(true); setPesanKtp(''); setKtpDuplikat(null)
+    setBacaKtpLoading(true); setPesanKtp(null); setKtpDuplikat(null)
     try {
       const fd = new FormData()
       fd.append('foto', berkas)
@@ -158,11 +160,11 @@ export default function BookingPage() {
         h.alamat && 'alamat',
         h.jenisKelamin && `jenis kelamin (${h.jenisKelamin})`,
       ].filter(Boolean) as string[]
-      setPesanKtp(`Terbaca: ${bagian.join(', ')}. Periksa lagi sebelum disimpan.`)
+      setPesanKtp({ teks: `Terbaca: ${bagian.join(', ')}. Periksa lagi sebelum disimpan.` })
 
       if (data.terdaftar) setKtpDuplikat(data.terdaftar)
     } catch (err: any) {
-      setPesanKtp(err.message)
+      setPesanKtp({ teks: err.message, gagal: true })
     } finally {
       setBacaKtpLoading(false)
     }
@@ -183,7 +185,7 @@ export default function BookingPage() {
       alamatAsal: p.alamatAsal || f.alamatAsal,
     }))
     setKtpDuplikat(null)
-    setPesanKtp(`Memakai data penyewa lama: ${p.nama ?? 'tanpa nama'}.`)
+    setPesanKtp({ teks: `Memakai data penyewa lama: ${p.nama ?? 'tanpa nama'}.` })
   }
 
   const kamarDipilih = kamarList.find(k => k.id === form.kamarId)
@@ -372,35 +374,92 @@ export default function BookingPage() {
           <h2 className="text-sm font-medium text-gray-700">Data penyewa</h2>
 
           {/* Isi otomatis dari foto KTP. Hanya di mode penyewa baru: kalau
-              kasir sudah memilih penyewa lama, datanya memang sudah ada. */}
+              kasir sudah memilih penyewa lama, datanya memang sudah ada.
+              Seluruh baris ini adalah <label> untuk input file di dalamnya,
+              jadi menekan area mana pun membuka kamera/galeri — bukan cuma
+              teks kecil di kanan. */}
           {!penyewaId && (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2.5 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-medium text-gray-700">Isi otomatis dari foto KTP</div>
-                  <div className="text-xs text-gray-500">Foto KTP, lalu periksa hasilnya sebelum disimpan.</div>
+            <label
+              className={`block rounded-xl border px-3 py-3 transition-colors ${
+                bacaKtpLoading
+                  ? 'border-teal-200 bg-teal-50 cursor-progress'
+                  : 'border-dashed border-gray-300 bg-gray-50 hover:border-teal-400 hover:bg-teal-50 cursor-pointer'
+              }`}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                className="sr-only"
+                disabled={bacaKtpLoading}
+                onChange={bacaKtpDariFoto}
+              />
+
+              <div className="flex items-center gap-3">
+                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${
+                  bacaKtpLoading ? 'bg-teal-100 text-teal-600' : 'bg-white text-teal-600 shadow-sm ring-1 ring-gray-200'
+                }`}>
+                  {bacaKtpLoading ? (
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2l1-2h5l1 2h2A1.5 1.5 0 0 1 17 8.5" />
+                      <path d="M3.5 8.5h16A1.5 1.5 0 0 1 21 10v7.5A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5V10a1.5 1.5 0 0 1 .5-1.5Z" />
+                      <circle cx="12" cy="13.5" r="3.2" />
+                    </svg>
+                  )}
                 </div>
-                <label className={`btn-ghost shrink-0 cursor-pointer ${bacaKtpLoading ? 'opacity-60 pointer-events-none' : ''}`}>
-                  {bacaKtpLoading ? 'Membaca...' : 'Foto KTP'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    capture="environment"
-                    className="hidden"
-                    disabled={bacaKtpLoading}
-                    onChange={bacaKtpDariFoto}
-                  />
-                </label>
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-gray-800">
+                    {bacaKtpLoading ? 'Membaca foto KTP…' : 'Isi otomatis dari foto KTP'}
+                  </div>
+                  <div className="truncate text-xs text-gray-500">
+                    {bacaKtpLoading
+                      ? 'Tunggu sebentar, jangan tutup halaman ini.'
+                      : 'Ketuk untuk foto KTP, lalu periksa hasilnya sebelum disimpan.'}
+                  </div>
+                </div>
+
+                <svg className={`h-4 w-4 shrink-0 text-gray-400 ${bacaKtpLoading ? 'hidden' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
               </div>
 
+              {/* Hasil bacaan. Warna panel mengikuti `gagal`, supaya pesan
+                  galat tak tampil senada pesan sukses. */}
               {pesanKtp && (
-                <div className="text-xs text-gray-600">{pesanKtp}</div>
+                <div
+                  role="status"
+                  className={`mt-2.5 flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs ${
+                    pesanKtp.gagal
+                      ? 'bg-coral-50 text-coral-600'
+                      : 'bg-white text-gray-600 ring-1 ring-gray-100'
+                  }`}
+                >
+                  <svg className="mt-[1px] h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    {pesanKtp.gagal ? (
+                      <><circle cx="12" cy="12" r="9" /><path d="M12 8v4.5M12 16h.01" /></>
+                    ) : (
+                      <><circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" /></>
+                    )}
+                  </svg>
+                  <span className="leading-relaxed">{pesanKtp.teks}</span>
+                </div>
               )}
 
               {/* NIK hasil bacaan sudah terdaftar. Kasir memutuskan: pakai data
-                  lama, atau anggap orang berbeda dan lanjut membuat baru. */}
+                  lama, atau anggap orang berbeda dan lanjut membuat baru.
+                  Tombol di dalam <label> menelan klik-nya — klik di sini
+                  tidak boleh ikut membuka pemilih berkas. */}
               {ktpDuplikat && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-2">
+                <div
+                  className="mt-2.5 space-y-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2"
+                  onClick={e => { e.preventDefault(); e.stopPropagation() }}
+                >
                   <div className="text-xs text-amber-900">
                     NIK ini sudah terdaftar atas nama <span className="font-medium">{ktpDuplikat.nama ?? 'tanpa nama'}</span>.
                     Pakai data lama supaya tidak tercatat dua kali.
@@ -413,7 +472,7 @@ export default function BookingPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </label>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
