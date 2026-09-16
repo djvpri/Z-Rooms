@@ -69,19 +69,34 @@ type KamarFasilitas = { fasilitas?: string[] | null; tipe?: TipeFasilitas }
 type TipeFasilitas = { fasilitas?: string[] | null } | null | undefined
 
 /**
- * Fasilitas yang benar-benar berlaku untuk sebuah kamar.
+ * Fasilitas yang benar-benar berlaku untuk sebuah kamar: SELALU milik tipenya.
  *
- * Kamar yang sudah diisi fasilitas sendiri dipakai apa adanya. Kamar yang
- * kosong mewarisi fasilitas tipe-nya. Kamar tanpa tipe dan tanpa fasilitas
- * menghasilkan daftar kosong — ditampilkan sebagai '-' oleh pemanggil.
+ * Dulu kamar yang punya daftar sendiri dipakai apa adanya, sehingga 15 dari 15
+ * kamar produksi menampilkan sisa data pra-migrasi dan tak satu pun mengikuti
+ * fasilitas tipenya — fitur "fasilitas per tipe" praktis tak berpengaruh. Kasir
+ * melihat kamar 001/002 tanpa "Kasur King" walau tipenya punya.
+ *
+ * Kolom `Kamar.fasilitas` kini tak dibaca; `lib/kamar.ts` juga sudah menolak
+ * kiriman `fasilitas` dari klien. Dibiarkan ada di skema supaya tak perlu
+ * migrasi kolom, dan `fasilitasSendiri` disediakan kalau suatu saat perlu
+ * menampilkan sisa data lama.
  *
  * Menerima objek kamar hasil `include: { tipe: ... }` langsung, supaya
  * pemanggil tak perlu merobek relasinya dulu.
  */
 export function fasilitasEfektif(kamar: KamarFasilitas): string[] {
-  const sendiri = rapikanFasilitas(kamar?.fasilitas)
-  if (sendiri.length > 0) return sendiri
   return rapikanFasilitas(kamar?.tipe?.fasilitas)
+}
+
+/**
+ * Fasilitas yang tertulis di kamar itu sendiri — bukan yang berlaku.
+ *
+ * Tak dipakai UI. Ada supaya sisa data pra-migrasi masih bisa diperiksa
+ * sebelum dikosongkan, dan supaya tak ada yang memanggil `kamar.fasilitas`
+ * langsung dengan mengira itu fasilitas yang tampil.
+ */
+export function fasilitasSendiri(kamar: KamarFasilitas): string[] {
+  return rapikanFasilitas(kamar?.fasilitas)
 }
 
 /** Nama tipe untuk ditampilkan; kamar tanpa tipe jadi 'Tanpa tipe'. */

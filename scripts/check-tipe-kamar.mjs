@@ -6,7 +6,7 @@
 // Jalankan: node scripts/check-tipe-kamar.mjs
 import assert from 'node:assert/strict'
 import {
-  fasilitasEfektif, namaTipe, rapikanFasilitas, kunciNama, TIPE_BAWAAN,
+  fasilitasEfektif, fasilitasSendiri, namaTipe, rapikanFasilitas, kunciNama, TIPE_BAWAAN,
   hargaEfektif, depositEfektif, periodeTersedia, hargaRingkas,
 } from '../lib/tipeKamar.ts'
 
@@ -18,16 +18,24 @@ const blok = (nama, fn) => {
 
 console.log('lib/tipeKamar.ts')
 
-// ── Warisan fasilitas: kamar kosong memakai fasilitas tipe
+// ── Fasilitas: SELALU dari tipe, bukan dari kamar
 blok('kamar tanpa fasilitas mewarisi fasilitas tipe', () => {
   const k = { fasilitas: [], tipe: { fasilitas: ['AC', 'TV'] } }
   assert.deepEqual(fasilitasEfektif(k), ['AC', 'TV'])
 })
 
-blok('kamar dengan fasilitas sendiri tidak ditimpa tipe', () => {
-  // Kasus nyata prod: A 101 dan A 102 sama-sama STANDAR tapi isinya beda.
+blok('fasilitas kamar DIIABAIKAN — tipe menang', () => {
+  // Regresi yang dijaga: dulu kamar yang punya daftar sendiri menang, dan
+  // akibatnya 15 dari 15 kamar prod tak mengikuti fasilitas tipenya. Kamar 001
+  // tampil tanpa "Kasur King" walau tipe Standarnya punya.
   const k = { fasilitas: ['Dapur'], tipe: { fasilitas: ['AC', 'TV'] } }
-  assert.deepEqual(fasilitasEfektif(k), ['Dapur'])
+  assert.deepEqual(fasilitasEfektif(k), ['AC', 'TV'])
+})
+
+blok('fasilitasSendiri tetap membaca kolom kamar (untuk periksa sisa data)', () => {
+  const k = { fasilitas: ['Dapur'], tipe: { fasilitas: ['AC', 'TV'] } }
+  assert.deepEqual(fasilitasSendiri(k), ['Dapur'])
+  assert.deepEqual(fasilitasSendiri({ fasilitas: null }), [])
 })
 
 blok('kamar tanpa tipe dan tanpa fasilitas -> daftar kosong', () => {
@@ -42,6 +50,12 @@ blok('fasilitas null/undefined diperlakukan sebagai kosong', () => {
 
 blok('fasilitas tipe null tidak meledak', () => {
   assert.deepEqual(fasilitasEfektif({ fasilitas: [], tipe: { fasilitas: null } }), [])
+})
+
+blok('kamar bersisa data lama TIDAK menyembunyikan fasilitas tipe', () => {
+  // Bentuk nyata baris prod pra-migrasi: kamar 001, tipe Standar.
+  const kamar001 = { fasilitas: ['AC', 'Kamar Mandi Dalam'], tipe: { fasilitas: ['AC', 'Kamar Mandi Dalam', 'Kasur King'] } }
+  assert.deepEqual(fasilitasEfektif(kamar001), ['AC', 'Kamar Mandi Dalam', 'Kasur King'])
 })
 
 // ── Nama tipe
