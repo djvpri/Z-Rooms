@@ -15,7 +15,7 @@
 // npx di Windows adalah shim .cmd, dan lewat spawnSync tanpa shell ia balik
 // dengan status bukan-nol walau perintahnya sukses — tiap check dilaporkan
 // GAGAL padahal lulus (dibuktikan: npx -> status 1, cli.mjs -> status 0).
-import { readdirSync, existsSync } from 'node:fs'
+import { readdirSync, existsSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -39,9 +39,23 @@ if (berkas.length === 0) {
   process.exit(1)
 }
 
+// Sebagian check menyentuh Postgres sungguhan (menulis lalu membersihkan data
+// uji) dan mengimpor PrismaClient — tanpa DATABASE_URL, Prisma melempar
+// "Environment variable not found" dan seluruh `npm run check` jadi merah
+// padahal kodenya benar. Bedakan lewat isi berkas, bukan daftar nama: daftar
+// nama akan basi begitu ada check baru yang butuh DB.
+const bacaBerkas = (f) => readFileSync(join(scriptsDir, f), 'utf8')
+const butuhDb = (f) => /@prisma\/client|new PrismaClient/.test(bacaBerkas(f))
+
+const punyaDb = Boolean(process.env.DATABASE_URL)
 const gagal = []
+const dilewati = []
 
 for (const f of berkas) {
+  if (butuhDb(f) && !punyaDb) {
+    dilewati.push(f)
+    continue
+  }
   const r = spawnSync(process.execPath, [tsxCli, join(scriptsDir, f)], {
     stdio: 'inherit',
     cwd: akarRepo,
@@ -49,8 +63,16 @@ for (const f of berkas) {
   if (r.status !== 0) gagal.push(f)
 }
 
+// Dilewati BUKAN lulus. Dicetak besar supaya tak ada yang mengira seluruh
+// pemeriksaan hijau padahal jalur DB belum diuji sama sekali.
+if (dilewati.length > 0) {
+  console.log(`\nDILEWATI (butuh DATABASE_URL): ${dilewati.join(', ')}`)
+  console.log('Jalankan dengan DATABASE_URL terisi untuk memeriksa jalur ini.')
+}
+
 if (gagal.length > 0) {
   console.error(`\nGAGAL: ${gagal.join(', ')}`)
   process.exit(1)
 }
-console.log(`\nOK — check: ${berkas.length} berkas lulus`)
+const lulus = berkas.length - dilewati.length
+console.log(`\nOK — check: ${lulus} berkas lulus${dilewati.length > 0 ? `, ${dilewati.length} dilewati` : ''}`)
