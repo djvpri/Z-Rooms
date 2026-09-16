@@ -9,8 +9,37 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, formatTanggal, inisial, statusTagihanColor, statusTagihanLabel, namaPenyewa } from '@/lib/utils'
+import { riwayatNamaSchema } from '@/lib/penyewa'
+import PenyewaUbahModal, { type PenyewaUbah } from '@/components/penyewa/PenyewaUbahModal'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Bentuk baris penyewa untuk modal ubah. Hanya identitas — data sewa tidak ikut
+ * karena diubah dari tab Booking, bukan dari sini.
+ */
+function ringkasUbah(p: {
+  id: string; nama: string | null; nik: string | null; noHp: string | null
+  email: string | null; pekerjaan: string | null; alamatAsal: string | null
+  tipeEntitas: 'INDIVIDU' | 'PERUSAHAAN'; namaPerusahaan: string | null; npwp: string | null
+  riwayatNama: unknown
+  _count: { sewa: number }
+}): PenyewaUbah {
+  return {
+    id: p.id,
+    nama: p.nama,
+    nik: p.nik,
+    noHp: p.noHp,
+    email: p.email,
+    pekerjaan: p.pekerjaan,
+    alamatAsal: p.alamatAsal,
+    tipeEntitas: p.tipeEntitas,
+    namaPerusahaan: p.namaPerusahaan,
+    npwp: p.npwp,
+    jumlahSewa: p._count.sewa,
+    riwayatNama: riwayatNamaSchema.safeParse(p.riwayatNama).data ?? [],
+  }
+}
 
 export default async function PenyewaPage() {
   const session = await auth()
@@ -30,6 +59,9 @@ export default async function PenyewaPage() {
           tagihan: { orderBy: { createdAt: 'desc' }, take: 1 },
         },
       },
+      // Dihitung juga dari properti aktif saja — angka "Nx sewa" di modal harus
+      // sama dengan kolom Sewa di tabel, bukan total lintas properti.
+      _count: { select: { sewa: { where: { kamar: { propertiId: properti.id } } } } },
     },
     orderBy: { createdAt: 'desc' },
   })
@@ -124,7 +156,7 @@ export default async function PenyewaPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  {['Nama', 'Kontak', 'NIK', 'Alamat', 'Sewa', 'Terakhir', 'Status terakhir'].map(h => (
+                  {['Nama', 'Kontak', 'NIK', 'Alamat', 'Sewa', 'Terakhir', 'Status terakhir', ''].map(h => (
                     <th key={h} className="text-left py-2 text-xs font-medium text-gray-400">{h}</th>
                   ))}
                 </tr>
@@ -166,6 +198,9 @@ export default async function PenyewaPage() {
                           </span>
                         )}
                       </td>
+                      <td className="py-2.5 text-right">
+                        <PenyewaUbahModal penyewa={ringkasUbah(p)} />
+                      </td>
                     </tr>
                   )
                 })}
@@ -195,6 +230,7 @@ export default async function PenyewaPage() {
                         {statusTagihanLabel(tagihan.status)}
                       </span>
                     )}
+                    <PenyewaUbahModal penyewa={ringkasUbah(p)} />
                   </div>
                   <div className="text-xs text-gray-500 ml-8">
                     {wa ? <a href={wa} target="_blank" rel="noreferrer" className="hover:text-teal-600">{p.noHp}</a> : '-'}

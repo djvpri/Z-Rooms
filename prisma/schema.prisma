@@ -230,6 +230,10 @@ model Penyewa {
   tipeEntitas  TipeEntitas @default(INDIVIDU)
   namaPerusahaan String?
   npwp         String?
+  // Jejak nama lama, diisi saat nama penyewa diubah: [{nama, digantiPada}].
+  // Sewa & Tagihan hanya menyimpan penyewaId, jadi tanpa ini nama di dokumen
+  // lama tak bisa dilacak lagi setelah penyewa mengganti namanya.
+  riwayatNama  Json?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
