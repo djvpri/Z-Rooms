@@ -12,9 +12,9 @@
 // Perhitungannya tak digandakan di sini: harga & status punya aturannya sendiri
 // di lib/tipeKamar dan lib/bayar, dan menyalinnya ke client akan membuat dua
 // sumber yang bisa berbeda.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Sliders } from 'react-bootstrap-icons'
+import { ChevronDown, ChevronUp, Sliders, ArrowCounterclockwise } from 'react-bootstrap-icons'
 
 /** Satu kolom tabel: kunci, judul, nilai mentah untuk sorting, sel ReactNode. */
 export type KolomKamar = {
@@ -37,6 +37,10 @@ export type BarisKamar = {
  *  barisnya tak bisa dikenali. */
 const WAJIB = new Set(['nomor'])
 
+/** Kunci penyimpanan preferensi tabel (localStorage). Berversi supaya bentuk
+ *  lama bisa ditinggalkan tanpa membingungkan pembacanya. */
+const KUNCI_SIMPAN = 'zxroom.kamar.tabel.v1'
+
 export default function TabelKamar({ baris, kunciAwal }: { baris: BarisKamar[]; kunciAwal: string[] }) {
   // Kolom yang tampil + urutannya mengikuti kunciAwal (dari server, jadi
   // urutan bawaan tetap satu tempat dengan definisinya).
@@ -45,8 +49,38 @@ export default function TabelKamar({ baris, kunciAwal }: { baris: BarisKamar[]; 
   const [naik, setNaik] = useState(true)
   const [panelBuka, setPanelBuka] = useState(false)
 
+  // Pengaturan kolom & urutan disimpan di localStorage supaya tahan refresh.
+  // Dibaca di useEffect, BUKAN saat useState dibuat: render pertama harus sama
+  // dengan yang di-render server (HTML-nya dihasilkan di server), kalau tidak
+  // React mengeluh hydration mismatch.
+  useEffect(() => {
+    try {
+      const mentah = localStorage.getItem(KUNCI_SIMPAN)
+      if (!mentah) return
+      const simpan = JSON.parse(mentah) as { tampil?: unknown; urutKolom?: unknown; naik?: unknown }
+      if (Array.isArray(simpan.tampil)) {
+        // Hanya kunci yang masih ada di kunciAwal. Kolom yang dihapus dari kode
+        // tak boleh ikut terpasang walau masih tercatat di penyimpanan.
+        const sah = simpan.tampil.filter((x): x is string => typeof x === 'string' && kunciAwal.includes(x))
+        if (sah.length > 0) setTampil(sah)
+      }
+      if (typeof simpan.urutKolom === 'string' && kunciAwal.includes(simpan.urutKolom)) setUrutKolom(simpan.urutKolom)
+      if (typeof simpan.naik === 'boolean') setNaik(simpan.naik)
+    } catch {
+      // Penyimpanan rusak / diblokir (mode privat, storage penuh) — pakai
+      // bawaan. Preferensi tampilan bukan alasan untuk menggagalkan halaman.
+    }
+  }, [kunciAwal])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ tampil, urutKolom, naik }))
+    } catch { /* diblokir — lewati, tabel tetap jalan */ }
+  }, [tampil, urutKolom, naik])
+
   const semua = baris[0]?.kolom ?? []
   const aktif = semua.filter(k => tampil.includes(k.kunci))
+  const adaUbah = urutKolom != null || tampil.length !== kunciAwal.length
 
   const toggleKolom = (kunci: string) =>
     setTampil(t => t.includes(kunci)
@@ -57,6 +91,8 @@ export default function TabelKamar({ baris, kunciAwal }: { baris: BarisKamar[]; 
     if (urutKolom === kunci) setNaik(n => !n)
     else { setUrutKolom(kunci); setNaik(true) }
   }
+
+  const reset = () => { setTampil(kunciAwal); setUrutKolom(null); setNaik(true) }
 
   // Urutkan. null/undefined selalu di bawah, apa pun arahnya — baris kosong
   // menumpuk di satu ujung, bukan menyelip di tengah.
@@ -75,8 +111,19 @@ export default function TabelKamar({ baris, kunciAwal }: { baris: BarisKamar[]; 
   return (
     <div>
       {/* Pemilih kolom. Ditutup secara bawaan supaya tabelnya tak tertutup panel
-          saat halaman dibuka. */}
-      <div className="flex justify-end mb-2">
+          saat halaman dibuka. Tombol "Atur ulang" hanya muncul kalau ada yang
+          diubah — kalau selalu ada, ia jadi tombol mati yang bikin ragu. */}
+      <div className="flex justify-end items-center gap-1 mb-2">
+        {adaUbah && (
+          <button
+            type="button"
+            onClick={reset}
+            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-gray-50"
+          >
+            <ArrowCounterclockwise size={12} />
+            Atur ulang
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setPanelBuka(b => !b)}

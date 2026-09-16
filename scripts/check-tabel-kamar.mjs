@@ -102,4 +102,67 @@ assert.equal(nomorUrut(urutkan(baris, null, true)), 'a,b,c', 'tanpa sort tak men
   assert.ok(src.includes('kunciAwal.filter(x => t.includes(x) || x === kunci)'), 'urutan hidupkan kembali masih sama')
 }
 
-console.log('OK — check-tabel-kamar: 13 blok assertion lulus')
+// --- Pemulihan preferensi dari localStorage (aturan dari useEffect pertama) ---
+
+/** Salinan aturan pemulihan: saring yang tak dikenal, jangan pasang yang kosong. */
+const pulihkan = (mentah, kunciAwal) => {
+  const hasil = { tampil: kunciAwal, urutKolom: null, naik: true }
+  if (!mentah) return hasil
+  let simpan
+  try { simpan = JSON.parse(mentah) } catch { return hasil }
+  if (Array.isArray(simpan.tampil)) {
+    const sah = simpan.tampil.filter(x => typeof x === 'string' && kunciAwal.includes(x))
+    if (sah.length > 0) hasil.tampil = sah
+  }
+  if (typeof simpan.urutKolom === 'string' && kunciAwal.includes(simpan.urutKolom)) hasil.urutKolom = simpan.urutKolom
+  if (typeof simpan.naik === 'boolean') hasil.naik = simpan.naik
+  return hasil
+}
+
+// 9. Preferensi tersimpan dipulihkan apa adanya.
+{
+  const simpan = JSON.stringify({ tampil: ['nomor', 'status'], urutKolom: 'status', naik: false })
+  const h = pulihkan(simpan, KOLOM)
+  assert.deepEqual(h.tampil, ['nomor', 'status'], 'pilihan kolom dipulihkan')
+  assert.equal(h.urutKolom, 'status', 'kolom urut dipulihkan')
+  assert.equal(h.naik, false, 'arah urut dipulihkan')
+}
+
+// 10. Kolom yang sudah TIDAK ADA di kode dibuang. Kalau tidak, tabel bisa
+//     ter-render dengan kolom hantu setelah kolomnya dihapus dari kode.
+{
+  const simpan = JSON.stringify({ tampil: ['nomor', 'kolomHantu'], urutKolom: 'sudahDihapus', naik: true })
+  const h = pulihkan(simpan, KOLOM)
+  assert.deepEqual(h.tampil, ['nomor'], 'kolom hantu dibuang')
+  assert.equal(h.urutKolom, null, 'urut ke kolom hantu diabaikan')
+}
+
+// 11. Penyimpanan rusak / kosong -> kembali ke bawaan, TIDAK melempar error.
+//     Preferensi tampilan tak boleh menggagalkan halaman.
+{
+  for (const buruk of [null, '', '{bukan json', '[]', '{"tampil":"bukan array"}', '{"naik":"ya"}']) {
+    const h = pulihkan(buruk, KOLOM)
+    assert.deepEqual(h.tampil, KOLOM, `bawaan dipakai untuk masukan ${JSON.stringify(buruk)}`)
+    assert.equal(h.urutKolom, null, `tanpa urut untuk masukan ${JSON.stringify(buruk)}`)
+    assert.equal(h.naik, true, `arah bawaan untuk masukan ${JSON.stringify(buruk)}`)
+  }
+}
+
+// 12. Daftar kolom kosong setelah disaring -> jangan pasang (tabel tanpa kolom
+//     sama sekali lebih buruk daripada bawaan).
+{
+  const simpan = JSON.stringify({ tampil: ['kolomHantu'] })
+  assert.deepEqual(pulihkan(simpan, KOLOM).tampil, KOLOM, 'semua hantu -> pakai bawaan')
+}
+
+// 13. Aturan pemulihan masih ada di komponen, dan kuncinya memakai versi.
+{
+  const src = readFileSync(new URL('../components/kamar/TabelKamar.tsx', import.meta.url), 'utf8')
+  assert.ok(src.includes('kunciAwal.includes(x)'), 'komponen masih menyaring kunci tak dikenal')
+  assert.ok(src.includes('if (sah.length > 0) setTampil(sah)'), 'komponen tak memasang daftar kolom kosong')
+  assert.ok(src.includes('if (typeof simpan.naik === \'boolean\')'), 'komponen masih memvalidasi tipe arah urut')
+  assert.ok(src.includes("'zxroom.kamar.tabel.v1'"), 'kunci penyimpanan berversi')
+  assert.ok(src.includes('localStorage.setItem(KUNCI_SIMPAN'), 'hasil perubahan disimpan')
+}
+
+console.log('OK — check-tabel-kamar: 22 blok assertion lulus')
