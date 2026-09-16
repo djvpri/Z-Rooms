@@ -25,6 +25,7 @@ export function formatTanggal(date: Date | string, opts?: Intl.DateTimeFormatOpt
 }
 
 // Tanggal + jam (WIB) untuk struk/nota. Zona ditulis eksplisit: server bisa
+// Tanggal + jam (WIB) untuk struk/nota. Zona ditulis eksplisit: server bisa
 // jalan di UTC, dan tanpa ini jam yang diketik kasir bergeser 7 jam di struk.
 // Dipakai lewat impor (bukan disalin) supaya skrip check-struk-jam.mjs
 // benar-benar menguji format yang tampil, bukan salinannya.
@@ -33,6 +34,28 @@ export function tglJam(iso: string) {
     day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
   })
+}
+
+// Gabung tanggal "YYYY-MM-DD" + jam "HH:mm" jadi Date pada jam WIB.
+//
+// Kenapa perlu: `<input type="date">` mengirim "2026-09-16" tanpa zona, dan
+// `new Date("2026-09-16")` menafsirkannya sebagai tengah malam UTC = 07:00 WIB.
+// Kasir memilih 16 September lalu tersimpan jam 7 pagi hari itu — dan tanggal
+// cetaknya masih benar, jadi salahnya tak kelihatan sampai jamnya diperiksa.
+// Zona ditulis eksplisit seperti tglJam: server jalan di UTC.
+//
+// `jam` kosong atau tak sah -> 00:00 WIB. Penggabungan sengaja TIDAK pernah
+// mengembalikan Invalid Date selama tanggalnya sah, supaya satu jam yang salah
+// ketik tak menggagalkan seluruh booking; jamnya diambil dari dropdown, jadi
+// kasus itu hanya mungkin dari kiriman luar.
+export function tglJamJadiDate(tanggal: string, jam?: string | null): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((tanggal ?? '').trim())
+  if (!m) return new Date(NaN)
+  const j = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec((jam ?? '').trim())
+  const hh = j ? Number(j[1]) : 0
+  const mm = j ? Number(j[2]) : 0
+  // WIB = UTC+7 tanpa DST, jadi offset-nya konstan.
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), hh - 7, mm))
 }
 
 // "16 Sep 12:00" — kapan sebuah kamar akan tersedia lagi. Dipakai tab Kamar

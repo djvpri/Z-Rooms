@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { tglJamJadiDate } from '@/lib/utils'
 import { z } from 'zod'
 import { addDays, addMonths, addYears } from 'date-fns'
 
@@ -22,6 +23,10 @@ const bookingSchema = z.object({
   kamarId: z.string(),
   periodeSewa: z.enum(['HARIAN', 'BULANAN', 'TAHUNAN']),
   tanggalMasuk: z.string(),
+  // Jam masuk "HH:mm" 24 jam, dipilih kasir dari dropdown. Opsional supaya
+  // pemanggil lama (mis. skrip/uji) yang hanya mengirim tanggal tetap jalan —
+  // tanpa jam, dianggap 00:00 WIB.
+  jamMasuk: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'Jam masuk harus format 24 jam, contoh 14:30').optional(),
   durasi: z.number().min(1).default(1), // jumlah hari/bulan/tahun
   deposit: z.number().default(0),
   metodeBayar: z.enum(['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA']).default('TUNAI'),
@@ -58,7 +63,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kamar tidak tersedia' }, { status: 400 })
   }
 
-  const masuk = new Date(d.tanggalMasuk)
+  // Gabung tanggal + jam masuk jadi satu Date pada jam WIB. Sebelumnya hanya
+  // `new Date(d.tanggalMasuk)`: `<input type="date">` mengirim "2026-09-16"
+  // tanpa zona, dan bakunya tengah malam UTC — jam 7 pagi WIB, bukan tengah
+  // malam. Jam masuk yang dipilih kasir dulu juga tak pernah sampai ke sini.
+  const masuk = tglJamJadiDate(d.tanggalMasuk, d.jamMasuk)
   if (isNaN(masuk.getTime())) {
     return NextResponse.json({ error: 'Tanggal masuk tidak valid' }, { status: 400 })
   }

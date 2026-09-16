@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate } from '@/lib/utils'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
-  periodeSewa: string; tanggalMasuk: string; jamMasuk: string; tanggalKeluar: string
+  periodeSewa: string; tanggalMasuk: string; tanggalKeluar: string
   durasi: number
   harga: number; deposit: number; metodeBayar: string; bayarSekarang: boolean
   catatan: string; tanggalCetak: string
@@ -44,6 +44,13 @@ type PropertiNota = {
 }
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
+
+// Pilihan jam masuk, 24 jam penuh. Dropdown, bukan input teks: kasir tak bisa
+// salah ketik, dan tak ada jebakan AM/PM seperti `<input type="time">` yang
+// tampilannya ikut locale browser (en-US memaksa AM/PM walau lang="id-ID").
+// Urut menaik apa adanya, "00:00" sampai "23:00".
+const JAM_MASUK = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`)
+
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
 export default function BookingPage() {
@@ -225,24 +232,9 @@ export default function BookingPage() {
       setError('Pilih kamar, tanggal masuk, dan jam masuk.')
       return
     }
-    // Jam 24 jam "HH:mm" (input-nya teks, bukan type=time — lihat komentar di
-    // form). Terima "9:30" dengan menambahkan nol di depan, tapi tolak yang
-    // di luar 00:00-23:59: `new Date` menerima "T24:00" dan menggeser hari,
-    // jadi jangan andalkan isNaN saja.
-    const cocokJam = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(form.jamMasuk.trim())
-    if (!cocokJam) {
-      setError('Jam masuk harus format 24 jam, contoh 14:30.')
-      return
-    }
-    const jam24 = `${cocokJam[1].padStart(2, '0')}:${cocokJam[2]}`
-    // Gabung tanggal + jam jadi satu waktu. Server simpan apa adanya, jadi
-    // offset WIB (+07:00) ditulis eksplisit di sini supaya jam yang diketik
-    // kasir utuh — `new Date('2026-09-15')` saja = 00:00 UTC = 07:00 WIB.
-    const masuk = new Date(`${form.tanggalMasuk}T${jam24}:00+07:00`)
-    if (isNaN(masuk.getTime())) {
-      setError('Tanggal atau jam masuk tidak valid.')
-      return
-    }
+    // Tak ada validasi format jam di sini: nilainya datang dari dropdown berisi
+    // 24 pilihan "00:00".."23:00", jadi tak ada yang bisa diketik salah.
+    // Server tetap memvalidasi lewat skema zod — kiriman luar tak dilindungi UI.
     setLoading(true)
     setError('')
     try {
@@ -251,7 +243,6 @@ export default function BookingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          tanggalMasuk: masuk.toISOString(),
           tipeEntitas: activeTab,
           durasi: Number(form.durasi),
           deposit: Number(form.deposit) || 0,
@@ -281,8 +272,12 @@ export default function BookingPage() {
         kamarNomor: kamarDipilih?.nomor ?? '',
         kamarTipe: kamarDipilih?.tipe?.nama ?? '',
         periodeSewa: form.periodeSewa,
-        tanggalMasuk: hasil.masuk ?? masuk.toISOString(),
-        jamMasuk: form.jamMasuk,
+        // Nota memakai waktu yang dikembalikan server (sudah digabung dengan
+        // jam masuk, zona WIB), bukan tanggal mentah dari form — jadi yang
+        // tercetak persis yang tersimpan. Kalau respons cacat dan `masuk`
+        // hilang, pakai hasil gabungan lokal supaya nota tak mencetak
+        // "Invalid Date".
+        tanggalMasuk: hasil.masuk ?? tglJamJadiDate(form.tanggalMasuk, form.jamMasuk).toISOString(),
         tanggalKeluar: hasil.keluar ?? '',
         durasi: Number(form.durasi),
         harga: hargaNum,
@@ -593,18 +588,12 @@ export default function BookingPage() {
             </div>
             <div>
               <label className="form-label">Jam masuk *</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
-                maxLength={5}
-                placeholder="HH:mm"
-                title="Format 24 jam, contoh 14:30"
-                className="form-input"
-                value={form.jamMasuk}
-                onChange={e => set('jamMasuk', e.target.value)}
-                required
-              />
+              <select className="form-input" value={form.jamMasuk} onChange={e => set('jamMasuk', e.target.value)} required>
+                <option value="">-- Pilih jam --</option>
+                {JAM_MASUK.map(j => (
+                  <option key={j} value={j}>{j}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>

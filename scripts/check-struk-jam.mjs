@@ -9,10 +9,13 @@
 // tsx yang mengimpor .ts: jalankan `npm run check` (pakai tsx), BUKAN `node`
 // polos — Node tak paham sintaks TypeScript.
 import assert from 'node:assert/strict'
-import { tglJam, tglJamSingkat } from '../lib/utils.ts'
+import { tglJam, tglJamSingkat, tglJamJadiDate } from '../lib/utils.ts'
 
-// Gabungan tanggal + jam seperti di handleSubmit.
-const gabung = (tgl, jam) => new Date(`${tgl}T${jam}:00+07:00`)
+// Gabungan tanggal + jam sekarang impor dari lib/utils.ts — dulu berkas ini
+// menyalin rumusnya sendiri (`new Date(\`${tgl}T${jam}:00+07:00\`)`), dan
+// salinan itu tak akan ketahuan kalau produksi berubah. Produksi memakai
+// tglJamJadiDate(), jadi itu yang diuji di sini.
+const gabung = tglJamJadiDate
 
 // 1. Kasir ketik 15 Sep 2026, 14:30 -> jam itu yang harus muncul, bukan bergeser.
 const m1 = gabung('2026-09-15', '14:30')
@@ -74,4 +77,35 @@ assert.ok(tglJam(gabung('2026-09-15', '09:05').toISOString()).includes('09.05'),
   assert.ok(dini.includes('02:00'), `02:00 WIB, dapat "${dini}"`)
 }
 
-console.log('OK — check-struk-jam: 19 blok assertion lulus')
+// 10. tglJamJadiDate: penggabungan tanggal + jam masuk yang dipakai server.
+//     Jam masuk kini dari dropdown dan benar-benar tersimpan, jadi rumus ini
+//     yang menentukan jam yang tercetak di nota.
+{
+  // Nilai dropdown normal.
+  assert.equal(gabung('2026-09-16', '14:00').toISOString(), '2026-09-16T07:00:00.000Z')
+  assert.equal(gabung('2026-09-16', '00:00').toISOString(), '2026-09-15T17:00:00.000Z')
+  assert.equal(gabung('2026-09-16', '23:00').toISOString(), '2026-09-16T16:00:00.000Z')
+
+  // Jam kosong/tak sah -> 00:00 WIB, BUKAN Invalid Date: satu jam aneh tak
+  // boleh menggagalkan seluruh booking. Tanggalnya tetap seperti dipilih.
+  assert.equal(gabung('2026-09-16', '').toISOString(), '2026-09-15T17:00:00.000Z')
+  assert.equal(gabung('2026-09-16', null).toISOString(), '2026-09-15T17:00:00.000Z')
+  assert.equal(gabung('2026-09-16', '99:99').toISOString(), '2026-09-15T17:00:00.000Z')
+
+  // Tanggal tak sah -> Invalid Date, supaya route balas 400 (bukan menyimpan
+  // waktu acak). Tanggal selalu datang dari <input type="date">.
+  assert.ok(isNaN(gabung('', '14:00').getTime()))
+  assert.ok(isNaN(gabung('16-09-2026', '14:00').getTime()))
+
+  // Regresi tanggal: `new Date('2026-09-16')` polos = 00:00 UTC = 07:00 WIB,
+  // sehingga pemesanan "16 September" tersimpan jam 7 pagi hari itu. Zona
+  // harus eksplisit WIB, dan tengah malam WIB memang jatuh di tanggal UTC
+  // sebelumnya.
+  assert.equal(gabung('2026-09-16').toISOString().slice(0, 10), '2026-09-15')
+  assert.ok(tglJam(gabung('2026-09-16', '00:00').toISOString()).includes('16 September'))
+
+  // Jam masuk yang dipilih benar-benar sampai ke nota.
+  assert.ok(tglJam(gabung('2026-09-16', '20:00').toISOString()).includes('20.00'))
+}
+
+console.log('OK — check-struk-jam: 22 blok assertion lulus')
