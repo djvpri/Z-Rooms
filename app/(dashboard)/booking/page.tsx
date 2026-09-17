@@ -245,7 +245,11 @@ export default function BookingPage() {
   // untuk tanggal setelah penghuninya keluar — jadi yang ditampilkan adalah
   // "terisi sampai kapan", bukan larangan.
   const sewaAktif = kamarDipilih?.sewa?.find(s => s.statusSewa === 'AKTIF') ?? null
-  const pesananMenunggu = kamarDipilih?.sewa?.filter(s => s.statusSewa === 'PENDING') ?? []
+  // Diurut tanggal masuk: panel menyebut tanggal pesanan satu per satu, dan
+  // urutan datang dari API/DB tak dijamin menaik.
+  const pesananMenunggu = (kamarDipilih?.sewa?.filter(s => s.statusSewa === 'PENDING') ?? [])
+    .slice()
+    .sort((a, b) => new Date(a.tanggalMasuk).getTime() - new Date(b.tanggalMasuk).getTime())
   // Rentang waktu kamar benar-benar kosong. Kasir butuh ini, bukan satu tanggal
   // "aman": booking boleh SEBELUM jam masuk penghuni berikutnya dan SETELAH jam
   // keluar penghuni sebelumnya, jadi menampilkan satu batas saja menyembunyikan
@@ -641,7 +645,10 @@ export default function BookingPage() {
               penghuni berikutnya dan SETELAH jam keluar penghuni sebelumnya,
               jadi satu tanggal saja menyembunyikan celah yang sah.
               "Sedang dihuni" hanya kalau sewa AKTIF memang sudah berjalan —
-              sewa berjadwal masa depan adalah pesanan, bukan penghuni. */}
+              sewa berjadwal masa depan adalah pesanan, bukan penghuni.
+              Pesanan yang mengantre disebut TANGGALNYA satu per satu: dulu
+              cuma jumlahnya yang tampil, jadi setelah kasir booking 17 Sep,
+              pesanan 20 Sep seolah hilang dari layar. */}
           {kamarDipilih && (sewaAktif || pesananMenunggu.length > 0) && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               {sewaAktif && new Date(sewaAktif.tanggalMasuk) <= new Date()
@@ -650,7 +657,14 @@ export default function BookingPage() {
                   ? <>Kamar ini sudah dibooking untuk tanggal{' '}</>
                   : <>Kamar ini kosong, tetapi sudah dipesan untuk tanggal{' '}</>}
               <strong>{tglJamSingkat(batasCheckout(new Date((sewaAktif ?? pesananMenunggu[0]).tanggalKeluar), aturanJadwal), awalJendela)}</strong>.
-              {pesananMenunggu.length > 0 && <> Ada {pesananMenunggu.length} pesanan menunggu.</>}
+              {pesananMenunggu.length > 0 && (
+                <> Berikutnya sudah dipesan: {pesananMenunggu.map((p, i) => (
+                  <span key={i}>
+                    {i > 0 && ', '}
+                    <strong>{tglJamSingkat(new Date(p.tanggalMasuk), awalJendela)}</strong>
+                  </span>
+                ))}.</>
+              )}
               {celah.length > 0
                 ? <> Kamar kosong: {celah.map((c, i) => (
                     <span key={i}>
