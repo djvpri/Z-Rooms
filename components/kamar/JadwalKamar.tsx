@@ -102,6 +102,15 @@ export default function JadwalKamar({
   )
 }
 
+/** Gaya bawaan pemicu jadwal: harus TERLIHAT seperti tombol, bukan teks biasa
+ *  bergaris bawah — user tak akan tahu nomor kamar bisa diklik kalau bentuknya
+ *  cuma teks. */
+const GAYA_PEMICU =
+  'inline-flex items-center justify-center rounded-md border border-gray-300 bg-white ' +
+  'px-2 py-0.5 text-xs font-semibold text-gray-700 shadow-sm transition-colors ' +
+  'hover:border-teal-400 hover:bg-teal-50 hover:text-teal-700 ' +
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400'
+
 /** Pembungkus: apa pun isinya jadi tombol yang membuka jadwal.
  *
  *  Sengaja BUKAN pembungkus kartu utuh: kartu kamar berisi tombol Ubah dan
@@ -125,7 +134,12 @@ export function PemicuJadwal({
   const [buka, setBuka] = useState(false)
   return (
     <>
-      <button type="button" onClick={() => setBuka(true)} className={className} title="Lihat jadwal 14 hari">
+      <button
+        type="button"
+        onClick={() => setBuka(true)}
+        className={`${GAYA_PEMICU} ${className}`}
+        title="Lihat jadwal 14 hari"
+      >
         {children}
       </button>
       {buka && (

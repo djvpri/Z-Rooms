@@ -189,7 +189,7 @@ export default async function KamarPage() {
                 sewa={k.sewa}
                 aturan={aturan}
                 sekarang={sekarang}
-                className="font-semibold text-sm underline decoration-dotted decoration-gray-400/60 underline-offset-2 hover:decoration-gray-700"
+                className="text-[13px]"
               >
                 {k.nomor}
               </PemicuJadwal>
@@ -304,7 +304,7 @@ export default async function KamarPage() {
                       sewa={k.sewa}
                       aturan={aturan}
                       sekarang={sekarang}
-                      className="font-medium text-gray-800 underline decoration-dotted decoration-gray-400/60 underline-offset-2"
+                      className="text-gray-800"
                     >{k.nomor}</PemicuJadwal> },
                   { kunci: 'tipe', judul: 'Tipe', nilai: namaTipe(k.tipe),
                     sel: <span className="text-gray-600">{namaTipe(k.tipe)}</span> },
@@ -360,7 +360,7 @@ export default async function KamarPage() {
                       sewa={k.sewa}
                       aturan={aturan}
                       sekarang={sekarang}
-                      className="font-medium text-gray-800 text-sm underline decoration-dotted decoration-gray-400/60 underline-offset-2"
+                      className="text-[13px] text-gray-800"
                     >
                       {k.nomor}
                     </PemicuJadwal>
