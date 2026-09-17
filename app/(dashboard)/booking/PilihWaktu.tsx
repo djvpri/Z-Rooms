@@ -59,11 +59,16 @@ type Props = {
   // Jam yang sengaja tidak ditawarkan meski tak terpakai sewa — mis. sudah
   // lewat untuk hari ini. Ditandai sama seperti jam terpakai.
   jamLewat?: Set<string>
+  // Sewa bulanan/tahunan tak butuh jam: penyewa masuk tanggal berapa pun
+  // dianggap mulai pukul 00:00. Grid jam disembunyikan supaya kasir tak
+  // merasa ada yang harus dipilih. Nilainya tetap dikirim ('00:00') karena
+  // `tanggalKeluar` dan nota menghitung dari jam, jadi data lama tetap utuh.
+  tanpaJam?: boolean
   onPilih: (tanggal: string, jam: string) => void
 }
 
 export default function PilihWaktu({
-  tanggal, jam, tanggalPilihan, jamTerpakai, jamLewat, onPilih,
+  tanggal, jam, tanggalPilihan, jamTerpakai, jamLewat, tanpaJam, onPilih,
 }: Props) {
   const terkunci = (j: string) => jamTerpakai.has(j) || !!jamLewat?.has(j)
 
@@ -102,8 +107,9 @@ export default function PilihWaktu({
         </div>
       </div>
 
-      <div>
-        <label className="form-label">Jam masuk *</label>
+      {!tanpaJam && (
+        <div>
+          <label className="form-label">Jam masuk *</label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto pr-1">
           {JAM_MASUK.map(j => {
             const mati = terkunci(j)
@@ -134,7 +140,8 @@ export default function PilihWaktu({
             )
           })}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

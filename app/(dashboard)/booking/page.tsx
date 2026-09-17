@@ -664,7 +664,24 @@ export default function BookingPage() {
             </div>
             <div>
               <label className="form-label">Periode sewa</label>
-              <select className="form-input" value={form.periodeSewa} onChange={e => set('periodeSewa', e.target.value)}>
+              <select
+                className="form-input"
+                value={form.periodeSewa}
+                onChange={e => {
+                  const p = e.target.value
+                  // Ganti periode = jam lama ikut disesuaikan. Pindah dari
+                  // Harian ke Bulanan, jam "14:00" yang sudah dipilih jadi basi
+                  // (grid jamnya hilang) — dipatok 00:00 supaya yang tersimpan
+                  // sama dengan yang terlihat kasir. Arah sebaliknya (Bulanan →
+                  // Harian) direset ke '' karena jam 00:00 warisan bukan pilihan
+                  // sadar, dan kasir harus memilih jam sungguhan.
+                  setForm(f => ({
+                    ...f,
+                    periodeSewa: p,
+                    jamMasuk: p === 'HARIAN' ? (f.jamMasuk === '00:00' ? '' : f.jamMasuk) : '00:00',
+                  }))
+                }}
+              >
                 {PERIODE.map(p => (
                   <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
                 ))}
@@ -714,7 +731,10 @@ export default function BookingPage() {
             tanggalPilihan={tanggalPilihan}
             jamTerpakai={jamTerpakai}
             jamLewat={jamLewat}
-            onPilih={(t, j) => setForm(f => ({ ...f, tanggalMasuk: t, jamMasuk: j }))}
+            // Bulanan/tahunan tak butuh jam — masuk dianggap pukul 00:00.
+            // Jam tetap disimpan supaya perhitungan & nota tak berubah.
+            tanpaJam={form.periodeSewa !== 'HARIAN'}
+            onPilih={(t, j) => setForm(f => ({ ...f, tanggalMasuk: t, jamMasuk: j || '00:00' }))}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -724,15 +744,20 @@ export default function BookingPage() {
             <div className="flex items-end">
               {/* Tombol "Sekarang" tetap ada: mengisi chips + jam sekaligus
                   lebih cepat daripada memilih dua kali, dan itu kasus paling
-                  sering (penyewa datang langsung). */}
+                  sering (penyewa datang langsung). Untuk bulanan/tahunan
+                  jamnya dipatok 00:00 — sejalan dengan grid jam yang
+                  disembunyikan, jadi tak ada jam "tersembunyi" ikut tersimpan. */}
               <button
                 type="button"
                 onClick={() => {
                   const s = sekarangWib()
-                  setForm(f => ({ ...f, tanggalMasuk: s.tanggal, jamMasuk: s.jam }))
+                  const harian = form.periodeSewa === 'HARIAN'
+                  setForm(f => ({ ...f, tanggalMasuk: s.tanggal, jamMasuk: harian ? s.jam : '00:00' }))
                 }}
                 className="inline-flex h-10 items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-3 text-xs font-medium text-teal-700 transition-colors hover:border-teal-400 hover:bg-teal-100"
-                title="Isi tanggal & jam dengan waktu sekarang (dibulatkan ke jam terdekat)"
+                title={form.periodeSewa === 'HARIAN'
+                  ? 'Isi tanggal & jam dengan waktu sekarang (dibulatkan ke jam terdekat)'
+                  : 'Isi tanggal masuk dengan hari ini'}
               >
                 <Clock className="h-3.5 w-3.5" />
                 Pakai waktu sekarang
