@@ -99,6 +99,16 @@ export function sekarangWib(now: Date = new Date()): { tanggal: string; jam: str
   return { tanggal: akhir.tanggal, jam: akhir.jam }
 }
 
+// Tanggal terakhir bulan yang memuat `tanggal` ("2026-09-17" -> "2026-09-30").
+// Dipakai chips tanggal di form booking: batasnya "sampai akhir bulan" supaya
+// bisa dijelaskan ke kasir tanpa menghitung.
+export function akhirBulan(tanggal: string) {
+  const [y, m] = tanggal.split('-').map(Number)
+  // Hari ke-0 bulan berikutnya = hari terakhir bulan ini. Lewat UTC supaya
+  // mesin yang zonanya bukan WIB tak menggeser hasilnya.
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+}
+
 // "16 Sep 12:00" — kapan sebuah kamar akan tersedia lagi. Dipakai tab Kamar
 // supaya kasir tahu kapan bisa menerima penyewa berikutnya. Zona eksplisit
 // seperti tglJam: server jalan di UTC, tanpa ini jamnya bergeser 7 jam.

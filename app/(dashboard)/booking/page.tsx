@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib, akhirBulan } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
-import { celahKosong } from '@/lib/jadwalKamar'
+import { celahKosong, bolehDipesan } from '@/lib/jadwalKamar'
+import { tanggalKeluar } from '@/lib/sewa'
+import PilihWaktu, { JAM_MASUK, daftarTanggal } from './PilihWaktu'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -58,12 +60,6 @@ type PropertiNota = {
 }
 
 const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
-
-// Pilihan jam masuk, 24 jam penuh. Dropdown, bukan input teks: kasir tak bisa
-// salah ketik, dan tak ada jebakan AM/PM seperti `<input type="time">` yang
-// tampilannya ikut locale browser (en-US memaksa AM/PM walau lang="id-ID").
-// Urut menaik apa adanya, "00:00" sampai "23:00".
-const JAM_MASUK = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`)
 
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
@@ -272,6 +268,43 @@ export default function BookingPage() {
         new Date(awalJendela.getTime() + 90 * 86400_000),
       ).slice(0, 3)
     : []
+
+  // Chips tanggal: hari ini sampai akhir bulan berjalan. Akhir bulan dipilih
+  // (bukan "14 hari ke depan") supaya batasnya bisa dijelaskan ke kasir tanpa
+  // menghitung — "sampai tanggal 30" lebih mudah dipercaya daripada "sampai 14
+  // hari lagi". Booking lebih jauh memakai daftar pesanan; di sini yang dibantu
+  // adalah isian cepat.
+  const tanggalPilihan = daftarTanggal(tglKini, akhirBulan(tglKini))
+
+  // Jam yang tidak bisa dipilih untuk tanggal yang sedang aktif.
+  // Dihitung dari `bolehDipesan`, bukan dari perbandingan tanggal sendiri:
+  // aturan bentrok (cek irisan rentang) sudah tinggal di lib, dan menyalinnya
+  // di sini berarti dua tempat yang bisa berbeda pendapat dengan server.
+  const jamTerpakai = new Set(
+    JAM_MASUK.filter(j => {
+      if (!form.tanggalMasuk) return false
+      const masuk = tglJamJadiDate(form.tanggalMasuk, j)
+      // Durasi yang sedang dipilih — jam ini dinilai sebagai "kalau saya
+      // memesan mulai jam ini". `tanggalKeluar` dari lib/sewa.ts, fungsi yang
+      // SAMA dipakai route server (app/api/booking/route.ts:89). Menyalin
+      // logika durasinya ke sini berarti dua tempat yang bisa berbeda pendapat
+      // dengan validasi server.
+      const keluar = tanggalKeluar(masuk, form.periodeSewa as 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN', form.durasi)
+      return !bolehDipesan(
+        { mulai: masuk, selesai: keluar },
+        kamarDipilih?.sewa ?? [],
+        aturanJadwal,
+      ).boleh
+    }),
+  )
+
+  // Jam yang sudah lewat untuk HARI INI saja. Tanggal lain tak perlu: seluruh
+  // harinya masih di depan.
+  const jamLewat = new Set(
+    form.tanggalMasuk === tglKini
+      ? JAM_MASUK.filter(j => j < jamKini)
+      : [],
+  )
 
   function set(key: string, val: string | number | boolean) {
     setForm(f => ({ ...f, [key]: val }))
@@ -675,37 +708,35 @@ export default function BookingPage() {
                 : <> Tidak ada celah kosong dalam 90 hari ke depan.</>}
             </p>
           )}
+          <PilihWaktu
+            tanggal={form.tanggalMasuk}
+            jam={form.jamMasuk}
+            tanggalPilihan={tanggalPilihan}
+            jamTerpakai={jamTerpakai}
+            jamLewat={jamLewat}
+            onPilih={(t, j) => setForm(f => ({ ...f, tanggalMasuk: t, jamMasuk: j }))}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="form-label mb-0">Tanggal masuk *</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const s = sekarangWib()
-                    setForm(f => ({ ...f, tanggalMasuk: s.tanggal, jamMasuk: s.jam }))
-                  }}
-                  className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 transition-colors hover:border-teal-400 hover:bg-teal-100"
-                  title="Isi tanggal & jam dengan waktu sekarang (dibulatkan ke jam terdekat)"
-                >
-                  <Clock className="h-3 w-3" />
-                  Sekarang
-                </button>
-              </div>
-              <input type="date" className="form-input" value={form.tanggalMasuk} onChange={e => set('tanggalMasuk', e.target.value)} required />
-            </div>
-            <div>
-              <label className="form-label">Jam masuk *</label>
-              <select className="form-input" value={form.jamMasuk} onChange={e => set('jamMasuk', e.target.value)} required>
-                <option value="">-- Pilih jam --</option>
-                {JAM_MASUK.map(j => (
-                  <option key={j} value={j}>{j}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>
               <input type="number" min={1} max={36} className="form-input" value={form.durasi} onChange={e => set('durasi', Number(e.target.value))} />
+            </div>
+            <div className="flex items-end">
+              {/* Tombol "Sekarang" tetap ada: mengisi chips + jam sekaligus
+                  lebih cepat daripada memilih dua kali, dan itu kasus paling
+                  sering (penyewa datang langsung). */}
+              <button
+                type="button"
+                onClick={() => {
+                  const s = sekarangWib()
+                  setForm(f => ({ ...f, tanggalMasuk: s.tanggal, jamMasuk: s.jam }))
+                }}
+                className="inline-flex h-10 items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-3 text-xs font-medium text-teal-700 transition-colors hover:border-teal-400 hover:bg-teal-100"
+                title="Isi tanggal & jam dengan waktu sekarang (dibulatkan ke jam terdekat)"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                Pakai waktu sekarang
+              </button>
             </div>
           </div>
 

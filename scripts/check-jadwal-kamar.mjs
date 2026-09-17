@@ -13,7 +13,10 @@ import assert from 'node:assert/strict'
 import {
   bolehDipesan, statusUntuk, lepasPada, celahKosong, penghalangUntuk,
 } from '../lib/jadwalKamar.ts'
-import { tglJamSingkat } from '../lib/utils.ts'
+import { tglJamSingkat, akhirBulan } from '../lib/utils.ts'
+// Diimpor dari komponen yang benar-benar dipakai halaman booking, bukan disalin.
+// Prefiks .tsx: modul ini komponen React (butuh JSX), tapi fungsinya murni.
+import { daftarTanggal, labelChip, JAM_MASUK } from '../app/(dashboard)/booking/PilihWaktu.tsx'
 
 const aturan = { jamCheckout: '12:00', toleransiCheckout: 0 }
 const aturanTol = { jamCheckout: '12:00', toleransiCheckout: 120 }   // +2 jam
@@ -322,4 +325,34 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
     'pemanggil lama tetap jalan')
 }
 
-console.log('OK — check-jadwal-kamar: 16 blok assertion lulus')
+// 17. Chips tanggal & grid jam (app/(dashboard)/booking/PilihWaktu.tsx).
+//     Batas "sampai akhir bulan" dan label harinya dipakai kasir untuk memilih
+//     tanggal; salah bulan/hari berarti booking tercatat di tanggal lain.
+{
+  assert.equal(akhirBulan('2026-09-17'), '2026-09-30')
+  assert.equal(akhirBulan('2026-02-05'), '2026-02-28')
+  // Tahun kabisat — Februari 29 ada, bukan 28.
+  assert.equal(akhirBulan('2028-02-05'), '2028-02-29')
+  assert.equal(akhirBulan('2026-12-31'), '2026-12-31')
+
+  const chips = daftarTanggal('2026-09-28', '2026-09-30')
+  assert.deepEqual(chips, ['2026-09-28', '2026-09-29', '2026-09-30'])
+
+  // Satu hari: tepat satu chip, bukan nol dan bukan dua.
+  assert.deepEqual(daftarTanggal('2026-09-30', '2026-09-30'), ['2026-09-30'])
+
+  // Menyeberang akhir bulan: 30 Sep -> 2 Okt.
+  assert.deepEqual(daftarTanggal('2026-09-29', '2026-10-02'),
+    ['2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02'])
+
+  // Nama hari harus benar. 2026-09-17 = Kamis.
+  assert.equal(labelChip('2026-09-17'), 'Kam, 17 Sep')
+  assert.equal(labelChip('2026-09-20'), 'Min, 20 Sep')
+
+  // Grid jam 24 penuh, urut, dua digit.
+  assert.equal(JAM_MASUK.length, 24)
+  assert.equal(JAM_MASUK[0], '00:00')
+  assert.equal(JAM_MASUK[23], '23:00')
+
+  console.log('OK — check-jadwal-kamar: 17 blok assertion lulus')
+}
