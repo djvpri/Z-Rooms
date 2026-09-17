@@ -56,13 +56,19 @@ export async function POST(req: NextRequest) {
   if (!properti) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
 
   // Tarif kini milik tipe kamar — ambil lewat relasi, bukan dari kamar langsung.
-  // Sewa yang sedang AKTIF ikut diambil: kamar yang terisi TETAP boleh dibooking
-  // untuk tanggal setelah penghuninya keluar (lihat lib/jadwalKamar.ts).
+  // Sewa AKTIF (penghuni sekarang) DAN PENDING (sudah memesan setelahnya) ikut
+  // diambil: kamar yang terisi tetap boleh dibooking untuk tanggal setelah
+  // penghuninya keluar, TETAPI tanggal itu harus setelah SEMUA sewa yang masih
+  // memegang kamar berakhir. Dulu hanya AKTIF yang diambil, sehingga dua
+  // booking bisa sama-sama tersimpan PENDING untuk kamar yang sama.
   const kamar = await prisma.kamar.findFirst({
     where: { id: d.kamarId, propertiId: properti.id },
     include: {
       tipe: { include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } } },
-      sewa: { where: { statusSewa: 'AKTIF' }, select: { statusSewa: true, tanggalMasuk: true, tanggalKeluar: true }, take: 1 },
+      sewa: {
+        where: { statusSewa: { in: ['AKTIF', 'PENDING'] } },
+        select: { statusSewa: true, tanggalMasuk: true, tanggalKeluar: true },
+      },
     },
   })
   if (!kamar) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
@@ -85,8 +91,10 @@ export async function POST(req: NextRequest) {
   // Aturan properti diperlukan untuk tahu kapan kamar benar-benar dilepas
   // penghuni sekarang (jam check-out + toleransi), bukan tanggalKeluar mentah.
   const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
-  const sewaAktif = kamar.sewa[0] ?? null
-  const izin = bolehDipesan(masuk, sewaAktif, aturan)
+  const sewaAktif = kamar.sewa.find(s => s.statusSewa === 'AKTIF') ?? null
+  // Validasi lawan SELURUH sewa non-selesai kamar ini (AKTIF + PENDING), bukan
+  // cuma penghuni sekarang — lihat lepasTerakhir() di lib/jadwalKamar.ts.
+  const izin = bolehDipesan(masuk, kamar.sewa, aturan)
   if (!izin.boleh) {
     return NextResponse.json({ error: izin.pesan }, { status: 400 })
   }

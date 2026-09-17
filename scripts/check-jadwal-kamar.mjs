@@ -6,7 +6,7 @@
 // Aturan ini yang paling mahal kalau salah: dua penyewa bisa diklaim kamar yang
 // sama. Karena itu diimpornya dari lib aslinya, BUKAN disalin.
 import assert from 'node:assert/strict'
-import { bolehDipesan, statusUntuk, lepasPada } from '../lib/jadwalKamar.ts'
+import { bolehDipesan, statusUntuk, lepasPada, lepasTerakhir } from '../lib/jadwalKamar.ts'
 
 const aturan = { jamCheckout: '12:00', toleransiCheckout: 0 }
 const aturanTol = { jamCheckout: '12:00', toleransiCheckout: 120 }   // +2 jam
@@ -46,7 +46,7 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 {
   const r = bolehDipesan(new Date('2026-09-20T10:00:00+07:00'), sewaAktif, aturan)
   assert.equal(r.boleh, false, 'masuk saat masih dihuni -> tolak')
-  assert.match(r.pesan, /masih dihuni sampai/, 'pesan menyebut kamar masih dihuni')
+  assert.match(r.pesan, /masih terpakai sampai/, 'pesan menyebut kamar masih terpakai')
   assert.match(r.pesan, /1 Okt/, 'pesan menyebut tanggal bebasnya')
 }
 
@@ -86,4 +86,68 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
     'masuk 1 Okt 12:00 sudah bebas')
 }
 
-console.log('OK — check-jadwal-kamar: 12 blok assertion lulus')
+// 9. CELAH YANG PERNAH TERBUKTI: satu kamar punya AKTIF (keluar 20 Sep) plus
+//    DUA PENDING (22 Sep dan 25 Sep) yang tumpang tindih. Dulu validasi hanya
+//    melihat penghuni pertama, jadi booking 23 Sep lolos padahal PENDING 25 Sep
+//    masih memegang kamar. Sekarang seluruh sewa non-selesai dihitung.
+{
+  const aktif = {
+    statusSewa: 'AKTIF',
+    tanggalMasuk: new Date('2026-09-18T00:00:00+07:00'),
+    tanggalKeluar: new Date('2026-09-20T00:00:00+07:00'),
+  }
+  const pending22 = {
+    statusSewa: 'PENDING',
+    tanggalMasuk: new Date('2026-09-22T00:00:00+07:00'),
+    tanggalKeluar: new Date('2026-09-23T00:00:00+07:00'),
+  }
+  const pending25 = {
+    statusSewa: 'PENDING',
+    tanggalMasuk: new Date('2026-09-25T00:00:00+07:00'),
+    tanggalKeluar: new Date('2026-09-26T00:00:00+07:00'),
+  }
+  const daftar = [aktif, pending22, pending25]
+
+  // Batas terakhir = keluar PENDING 25 Sep 12:00, bukan 20 Sep.
+  assert.equal(
+    lepasTerakhir(daftar, aturan).toISOString(),
+    new Date('2026-09-26T12:00:00+07:00').toISOString(),
+    'batas = akhir sewa terakhir, bukan akhir penghuni pertama',
+  )
+  assert.equal(bolehDipesan(new Date('2026-09-23T10:00:00+07:00'), daftar, aturan).boleh, false,
+    'booking di sela antrean -> tolak (dulu lolos)')
+  assert.equal(bolehDipesan(new Date('2026-09-25T10:00:00+07:00'), daftar, aturan).boleh, false,
+    'masuk saat PENDING 25 Sep masih memegang -> tolak')
+  assert.equal(bolehDipesan(new Date('2026-09-26T12:00:00+07:00'), daftar, aturan).boleh, true,
+    'tepat setelah sewa terakhir lepas -> boleh')
+}
+
+// 10. Jam masuk identik pun bentrok (keputusan owner: 1 kamar = 1 orang).
+//     Tanggal sama, jam sama -> tidak boleh.
+{
+  const s = {
+    statusSewa: 'PENDING',
+    tanggalMasuk: new Date('2026-09-22T14:00:00+07:00'),
+    tanggalKeluar: new Date('2026-09-23T14:00:00+07:00'),
+  }
+  const r = bolehDipesan(new Date('2026-09-22T14:00:00+07:00'), s, aturan)
+  assert.equal(r.boleh, false, 'tanggal & jam identik -> bentrok')
+  assert.match(r.pesan, /masih terpakai sampai/, 'pesan menyebut kapan kamar terpakai sampai')
+}
+
+// 11. Daftar kosong (kamar tanpa sewa non-selesai) -> bebas.
+{
+  assert.equal(lepasTerakhir([], aturan), null, 'tak ada sewa -> tak ada batas')
+  assert.equal(bolehDipesan(new Date('2026-09-05T10:00:00+07:00'), [], aturan).boleh, true,
+    'daftar kosong -> boleh')
+}
+
+// 12. Kompatibilitas pemanggil lama: satu sewa (atau null) tetap diterima.
+{
+  assert.equal(bolehDipesan(new Date('2026-09-20T10:00:00+07:00'), sewaAktif, aturan).boleh, false,
+    'satu sewa saja masih dinormalkan ke daftar')
+  assert.equal(bolehDipesan(new Date('2026-10-02T08:00:00+07:00'), sewaAktif, aturan).boleh, true,
+    'setelah lepas -> boleh')
+}
+
+console.log('OK — check-jadwal-kamar: 18 blok assertion lulus')

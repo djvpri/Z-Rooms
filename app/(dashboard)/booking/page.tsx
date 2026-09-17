@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
+import { lepasTerakhir } from '@/lib/jadwalKamar'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -245,8 +246,12 @@ export default function BookingPage() {
   // "terisi sampai kapan", bukan larangan.
   const sewaAktif = kamarDipilih?.sewa?.find(s => s.statusSewa === 'AKTIF') ?? null
   const pesananMenunggu = kamarDipilih?.sewa?.filter(s => s.statusSewa === 'PENDING') ?? []
-  const batasLepas = sewaAktif && propertiNota
-    ? batasCheckout(new Date(sewaAktif.tanggalKeluar), propertiNota)
+  // Tanggal masuk paling awal yang TIDAK bentrok: setelah seluruh sewa yang
+  // masih memegang kamar berakhir (penghuni sekarang + semua pesanan menunggu).
+  // Menampilkan batas penghuni sekarang saja akan menyarankan tanggal yang
+  // justru ditolak server karena ada PENDING di antaranya.
+  const batasLepas = kamarDipilih?.sewa?.length
+    ? lepasTerakhir(kamarDipilih.sewa, propertiNota ?? { jamCheckout: '12:00', toleransiCheckout: 0 })
     : null
 
   function set(key: string, val: string | number | boolean) {
@@ -617,20 +622,20 @@ export default function BookingPage() {
 
           {/* Kamar terisi tetap boleh dibooking setelah penghuninya keluar.
               Ditampilkan sebagai keadaan + tanggal aman, bukan larangan —
-              kasir bisa langsung memilih tanggal yang benar tanpa menebak. */}
-          {sewaAktif && batasLepas && (
+              kasir bisa langsung memilih tanggal yang benar tanpa menebak.
+              Tanggal amannya dihitung setelah pesanan TERAKHIR, bukan cuma
+              setelah penghuni sekarang: kalau ada antrean, tanggal itu yang
+              dipakai server untuk menolak. */}
+          {batasLepas && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}
-              <strong>{tglJamSingkat(batasLepas)}</strong>. Booking tetap bisa dibuat untuk tanggal
-              masuk setelah itu.
+              {sewaAktif
+                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}</>
+                : <>Kamar ini kosong, tetapi sudah dipesan.{' '}</>}
+              Tanggal masuk paling awal yang tidak bentrok:{' '}
+              <strong>{tglJamSingkat(batasLepas)}</strong>.
               {pesananMenunggu.length > 0 && (
-                <> Sudah ada {pesananMenunggu.length} pesanan menunggu setelahnya.</>
+                <> Sudah ada {pesananMenunggu.length} pesanan menunggu.</>
               )}
-            </p>
-          )}
-          {!sewaAktif && pesananMenunggu.length > 0 && (
-            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-2">
-              Kamar ini kosong, tetapi sudah ada {pesananMenunggu.length} pesanan menunggu.
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
