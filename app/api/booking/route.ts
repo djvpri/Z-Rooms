@@ -91,17 +91,18 @@ export async function POST(req: NextRequest) {
   // Aturan properti diperlukan untuk tahu kapan kamar benar-benar dilepas
   // penghuni sekarang (jam check-out + toleransi), bukan tanggalKeluar mentah.
   const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
-  const sewaAktif = kamar.sewa.find(s => s.statusSewa === 'AKTIF') ?? null
-  // Validasi lawan SELURUH sewa non-selesai kamar ini (AKTIF + PENDING), bukan
-  // cuma penghuni sekarang — lihat lepasTerakhir() di lib/jadwalKamar.ts.
-  const izin = bolehDipesan(masuk, kamar.sewa, aturan)
+  // Validasi lawan SELURUH sewa non-selesai kamar ini (AKTIF + PENDING), pakai
+  // RENTANG baru (masuk..keluar) — bukan cuma tanggal masuknya. Boleh booking
+  // sebelum jam masuk penghuni berikutnya, dan setelah jam keluar penghuni
+  // sebelumnya; yang dilarang hanya rentang yang beririsan.
+  const izin = bolehDipesan({ mulai: masuk, selesai: keluar }, kamar.sewa, aturan)
   if (!izin.boleh) {
     return NextResponse.json({ error: izin.pesan }, { status: 400 })
   }
-  // Kamar masih dihuni -> sewa MENUNGGU, bukan menempati. Kamarnya tetap
-  // TERISI sampai penghuni sekarang checkout; tanpa ini kamar tampak kosong
-  // padahal masih ada orang di dalamnya.
-  const statusSewaBaru = statusUntuk(masuk, sewaAktif, aturan)
+  // Kamar masih dipegang orang lain -> sewa MENUNGGU, bukan menempati. Kamarnya
+  // tetap TERISI sampai penghuni sekarang checkout; tanpa ini kamar tampak
+  // kosong padahal masih ada orang di dalamnya.
+  const statusSewaBaru = statusUntuk(masuk, kamar.sewa, aturan)
 
   const harga = Number(kamar.tipe?.harga[0]?.harga ?? 0)
 

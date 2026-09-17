@@ -1,7 +1,7 @@
 // lib/jadwalKamar.ts
 //
-// Aturan satu kamar dua penghuni berurutan: penghuni sekarang + penyewa
-// berikutnya yang sudah memesan.
+// Aturan satu kamar satu orang pada satu waktu: sewa boleh berurutan, tapi
+// rentang waktunya tidak boleh beririsan.
 //
 // Dipisah ke sini supaya bisa diuji tanpa DB — aturan "bentrok atau tidak" ini
 // yang paling mudah salah dan paling mahal akibatnya (dua orang diklaim kamar
@@ -16,7 +16,7 @@ export type SewaJadwal = {
 } | null
 
 /** Sewa yang masih memegang kamar: sedang dihuni (AKTIF) atau sudah memesan
- *  (PENDING). Sewa SELESAI/DIBATALKAN tidak ikut.
+ *  (PENDING). Sewa SELESAI/DIBATALKAN tidak lagi memegang kamar.
  *
  *  Tanggal menerima string juga: di server nilainya `Date` dari Prisma, tapi
  *  lewat JSON API jadi string ISO — dan halaman booking memanggil aturan ini
@@ -25,6 +25,19 @@ export type SewaNonSelesai = {
   statusSewa: string
   tanggalMasuk: Date | string
   tanggalKeluar: Date | string
+}
+
+/** Rentang waktu satu sewa: kapan orangnya menempati, sampai kapan. */
+export interface RentangSewa {
+  mulai: Date
+  selesai: Date
+}
+
+/** Satu sewa yang menghalangi booking baru, dipakai untuk menyusun pesan. */
+export interface Penghalang {
+  mulai: Date
+  lepas: Date
+  statusSewa: string
 }
 
 /**
@@ -39,73 +52,133 @@ export function lepasPada(sewaAktif: SewaJadwal, aturan: AturanCheckout): Date |
   return batasCheckout(sewaAktif.tanggalKeluar, aturan)
 }
 
-/**
- * Kapan kamar benar-benar bebas, dihitung dari SELURUH sewa non-selesai
- * (AKTIF + PENDING), bukan cuma penghuni sekarang.
- *
- * Kenapa bukan `sewaAktif` saja: kamar bisa punya 2+ sewa berurutan yang
- * tersimpan sebagai PENDING. Kalau yang dibandingkan hanya penghuni sekarang,
- * booking ketiga lolos begitu tanggalnya lewat batas sewa PERTAMA — padahal
- * sewa PENDING di antaranya masih memegang kamar. Akibatnya satu kamar
- * terpesan dua kali (terbukti nyata: dua PENDING tumpang tindih tersimpan).
- *
- * PENDING memakai `tanggalKeluar` PENDING itu sendiri, tanpa toleransi
- * dihitung dua kali — batasCheckout() sudah memasukkan toleransi properti.
- * Kamar tanpa sewa non-selesai -> null.
- */
-export function lepasTerakhir(sewa: SewaNonSelesai[], aturan: AturanCheckout): Date | null {
-  if (sewa.length === 0) return null
-  let akhir = 0
-  let ada = false
-  for (const s of sewa) {
-    const b = batasCheckout(new Date(s.tanggalKeluar), aturan).getTime()
-    if (!ada || b > akhir) { akhir = b; ada = true }
+/** Rentang waktu satu sewa non-selesai. Mulai = tanggal & jam masuk apa adanya;
+ *  selesai = batas check-out properti (jam check-out + toleransi), BUKAN
+ *  tanggalKeluar mentah. */
+export function rentangSewa(s: SewaNonSelesai, aturan: AturanCheckout): RentangSewa {
+  return {
+    mulai: new Date(s.tanggalMasuk),
+    selesai: batasCheckout(new Date(s.tanggalKeluar), aturan),
   }
-  return ada ? new Date(akhir) : null
 }
 
 /**
- * Boleh tidaknya mencatat sewa baru yang masuk pada `masuk`.
+ * Sewa mana saja yang beririsan dengan `baru` — artinya booking baru TIDAK
+ * boleh dicatat.
  *
- * Aturan (diputuskan owner): kamar yang sedang terisi TETAP bisa dibooking,
- * asal tanggal masuknya tidak mendahului saat SELURUH sewa yang masih memegang
- * kamar berakhir — termasuk pesanan yang sudah mengantre (PENDING). Satu kamar
- * hanya untuk satu orang: jam masuk yang sama persis pun bentrok.
+ * Dua rentang tidak beririsan kalau salah satu benar: yang baru selesai
+ * SEBELUM yang lama mulai, atau yang baru mulai SETELAH kamar dilepas.
  *
- * Toleransi sengaja TIDAK diikutkan di sini: kasir butuh tanggal aman yang
- * tak bisa disalahkan, dan batasCheckout sudah memasukkan toleransi properti.
+ * Aturan (diputuskan owner): "kamar ada jam masuk dan jam keluarnya — kalau
+ * dibooking sebelum jam masuk harusnya bisa, dan setelah jam keluar juga
+ * harusnya bisa." Karena itu yang dibandingkan adalah rentang, BUKAN satu
+ * batas tunggal: memakai batas tunggal (sewa terakhir) akan ikut menolak
+ * booking yang tanggalnya jatuh di celah kosong sebelum sebuah pesanan.
+ *
+ * Sisi yang dibandingkan sengaja sejenis: `baru.mulai` vs `lama.selesai`
+ * (dua-duanya momen "kapan boleh menempati") dan `baru.selesai` vs
+ * `lama.mulai` (dua-duanya momen "kapan orang datang").
+ *
+ * Batasnya inklusif di kedua ujung: masuk tepat pada jam check-out boleh
+ * (kamar sudah kosong saat itu), dan keluar tepat saat penghuni berikutnya
+ * masuk juga boleh (tidak ada yang bertumpuk).
+ */
+export function penghalangUntuk(
+  baru: RentangSewa,
+  sewa: SewaNonSelesai[],
+  aturan: AturanCheckout,
+): Penghalang[] {
+  const halangan: Penghalang[] = []
+  for (const s of sewa) {
+    const r = rentangSewa(s, aturan)
+    const selesaiSebelum = baru.selesai.getTime() <= r.mulai.getTime()
+    const mulaiSetelahLepas = baru.mulai.getTime() >= r.selesai.getTime()
+    if (!selesaiSebelum && !mulaiSetelahLepas) {
+      halangan.push({ mulai: r.mulai, lepas: r.selesai, statusSewa: s.statusSewa })
+    }
+  }
+  return halangan.sort((a, b) => a.mulai.getTime() - b.mulai.getTime())
+}
+
+/**
+ * Rentang kosong yang menganggur di antara sewa-sewa kamar ini, dibatasi
+ * `dari`–`sampai`. Dipakai halaman booking untuk memberi tahu kasir KAPAN
+ * kamar benar-benar kosong, bukan cuma sampai kapan terpakai.
+ */
+export function celahKosong(
+  sewa: SewaNonSelesai[],
+  aturan: AturanCheckout,
+  dari: Date,
+  sampai: Date,
+): RentangSewa[] {
+  const terpakai = sewa
+    .map(s => rentangSewa(s, aturan))
+    .sort((a, b) => a.mulai.getTime() - b.mulai.getTime())
+
+  const celah: RentangSewa[] = []
+  let kursor = dari
+  for (const r of terpakai) {
+    if (r.mulai.getTime() > kursor.getTime()) {
+      celah.push({ mulai: kursor, selesai: r.mulai })
+    }
+    if (r.selesai.getTime() > kursor.getTime()) kursor = r.selesai
+  }
+  if (kursor.getTime() < sampai.getTime()) celah.push({ mulai: kursor, selesai: sampai })
+  return celah
+}
+
+/**
+ * Boleh tidaknya mencatat sewa baru pada rentang `baru`.
+ *
+ * Kamar kosong selalu boleh. Kalau ada sewa yang masih memegang kamar, booking
+ * hanya boleh kalau rentangnya tidak beririsan dengan salah satu pun — jadi
+ * boleh SEBELUM jam masuk penghuni berikutnya, dan boleh SETELAH jam keluar
+ * penghuni sebelumnya.
+ *
+ * Satu kamar satu orang: jam masuk yang identik pun bentrok.
  */
 export function bolehDipesan(
+  baru: RentangSewa,
+  sewa: SewaNonSelesai[] | SewaJadwal,
+  aturan: AturanCheckout,
+): { boleh: true; pesan: null; halangan: [] } | { boleh: false; pesan: string; halangan: Penghalang[] } {
+  // Pemanggil lama boleh mengirim satu sewa (atau null) — dinormalkan di sini.
+  const daftar: SewaNonSelesai[] = Array.isArray(sewa) ? sewa : sewa ? [sewa] : []
+  const halangan = penghalangUntuk(baru, daftar, aturan)
+  if (halangan.length === 0) return { boleh: true, pesan: null, halangan: [] }
+
+  const pertama = halangan[0]
+  // Pesan menyebut rentang sewa yang menghalangi, supaya kasir tahu KAPAN
+  // kamar terpakai dan bisa memilih tanggal yang benar tanpa menebak.
+  const lanjutan = halangan.length > 1 ? ` (dan ${halangan.length - 1} sewa lain)` : ''
+  return {
+    boleh: false,
+    halangan,
+    pesan:
+      `Kamar sudah terpakai ${tglJamSingkat(pertama.mulai)} sampai ${tglJamSingkat(pertama.lepas)}${lanjutan}. ` +
+      `Pilih tanggal masuk setelah ${tglJamSingkat(pertama.lepas)}, atau tanggal keluar sebelum ${tglJamSingkat(pertama.mulai)}.`,
+  }
+}
+
+/**
+ * Status catatan baru: AKTIF kalau dia yang menempati kamar lebih dulu,
+ * PENDING kalau masih ada sewa yang mendahuluinya.
+ *
+ * Yang menentukan BUKAN "ada penghuni sekarang atau tidak", tapi urutan
+ * `tanggalMasuk` di antara seluruh sewa non-selesai kamar itu. Contoh yang
+ * bikin beda: kamar kosong tapi sudah ada pesanan 20 Sep, lalu kasir booking
+ * 17 Sep — sewa 17 Sep yang menempati lebih dulu, jadi AKTIF; yang 20 Sep
+ * tetap PENDING. Sebaliknya booking 22 Sep di antara pesanan 20 & 25 Sep
+ * ditolak lebih awal, jadi tak pernah sampai ke sini.
+ */
+export function statusUntuk(
   masuk: Date,
   sewa: SewaNonSelesai[] | SewaJadwal,
   aturan: AturanCheckout,
-): { boleh: true; pesan: null; lepas: Date | null } | { boleh: false; pesan: string; lepas: Date } {
-  // Pemanggil lama boleh mengirim satu sewa (atau null) — dinormalkan di sini.
+): 'AKTIF' | 'PENDING' {
   const daftar: SewaNonSelesai[] = Array.isArray(sewa) ? sewa : sewa ? [sewa] : []
-  const lepas = lepasTerakhir(daftar, aturan)
-  if (!lepas) return { boleh: true, pesan: null, lepas: null }
-
-  if (masuk.getTime() < lepas.getTime()) {
-    return {
-      boleh: false,
-      lepas,
-      pesan:
-        `Kamar masih terpakai sampai ${tglJamSingkat(lepas)}. ` +
-        `Tanggal masuk paling awal ${tglJamSingkat(lepas)}.`,
-    }
-  }
-  return { boleh: true, pesan: null, lepas }
-}
-
-/**
- * Status sewa untuk catatan baru: PENDING kalau kamar masih terpakai, AKTIF
- * kalau kamar kosong.
- *
- * Selalu dinilai relatif ke penghuni SEKARANG (`sewaAktif`), bukan ke antrean:
- * pesanan yang masuk saat kamar kosong memang LANGSUNG menempati (AKTIF),
- * walaupun antreannya panjang.
- */
-export function statusUntuk(masuk: Date, sewaAktif: SewaJadwal, aturan: AturanCheckout): 'AKTIF' | 'PENDING' {
-  const sewaSekarang = sewaAktif ? [sewaAktif] : []
-  return bolehDipesan(masuk, sewaSekarang, aturan).boleh && sewaAktif ? 'PENDING' : 'AKTIF'
+  if (daftar.length === 0) return 'AKTIF'
+  // Ada sewa yang mulai lebih dulu (atau tepat bersamaan) -> masih mengantre.
+  const didahului = daftar.some(s => new Date(s.tanggalMasuk).getTime() <= masuk.getTime())
+  return didahului ? 'PENDING' : 'AKTIF'
 }

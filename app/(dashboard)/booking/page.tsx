@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
-import { lepasTerakhir } from '@/lib/jadwalKamar'
+import { celahKosong } from '@/lib/jadwalKamar'
 
 type NotaBooking = {
   nama: string; noHp: string; kamarNomor: string; kamarTipe: string
@@ -246,13 +246,16 @@ export default function BookingPage() {
   // "terisi sampai kapan", bukan larangan.
   const sewaAktif = kamarDipilih?.sewa?.find(s => s.statusSewa === 'AKTIF') ?? null
   const pesananMenunggu = kamarDipilih?.sewa?.filter(s => s.statusSewa === 'PENDING') ?? []
-  // Tanggal masuk paling awal yang TIDAK bentrok: setelah seluruh sewa yang
-  // masih memegang kamar berakhir (penghuni sekarang + semua pesanan menunggu).
-  // Menampilkan batas penghuni sekarang saja akan menyarankan tanggal yang
-  // justru ditolak server karena ada PENDING di antaranya.
-  const batasLepas = kamarDipilih?.sewa?.length
-    ? lepasTerakhir(kamarDipilih.sewa, propertiNota ?? { jamCheckout: '12:00', toleransiCheckout: 0 })
-    : null
+  // Rentang waktu kamar benar-benar kosong. Kasir butuh ini, bukan satu tanggal
+  // "aman": booking boleh SEBELUM jam masuk penghuni berikutnya dan SETELAH jam
+  // keluar penghuni sebelumnya, jadi menampilkan satu batas saja menyembunyikan
+  // celah kosong yang sah. Dihitung dari jendela hari ini sampai 1 tahun.
+  const aturanJadwal = propertiNota ?? { jamCheckout: '12:00', toleransiCheckout: 0 }
+  const awalJendela = new Date(`${sekarangWib().tanggal}T${sekarangWib().jam}:00+07:00`)
+  const celah = kamarDipilih?.sewa?.length
+    ? celahKosong(kamarDipilih.sewa, aturanJadwal, awalJendela, new Date(awalJendela.getTime() + 365 * 86400_000))
+        .slice(0, 3)
+    : []
 
   function set(key: string, val: string | number | boolean) {
     setForm(f => ({ ...f, [key]: val }))
@@ -620,22 +623,26 @@ export default function BookingPage() {
             </div>
           </div>
 
-          {/* Kamar terisi tetap boleh dibooking setelah penghuninya keluar.
-              Ditampilkan sebagai keadaan + tanggal aman, bukan larangan —
-              kasir bisa langsung memilih tanggal yang benar tanpa menebak.
-              Tanggal amannya dihitung setelah pesanan TERAKHIR, bukan cuma
-              setelah penghuni sekarang: kalau ada antrean, tanggal itu yang
-              dipakai server untuk menolak. */}
-          {batasLepas && (
+          {/* Kamar terisi tetap boleh dibooking — tapi hanya pada rentang yang
+              benar-benar kosong. Yang ditampilkan adalah rentang kosongnya,
+              bukan satu tanggal "aman": booking boleh SEBELUM jam masuk
+              penghuni berikutnya dan SETELAH jam keluar penghuni sebelumnya,
+              jadi satu tanggal saja menyembunyikan celah yang sah. */}
+          {kamarDipilih && (sewaAktif || pesananMenunggu.length > 0) && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
               {sewaAktif
-                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}</>
-                : <>Kamar ini kosong, tetapi sudah dipesan.{' '}</>}
-              Tanggal masuk paling awal yang tidak bentrok:{' '}
-              <strong>{tglJamSingkat(batasLepas)}</strong>.
-              {pesananMenunggu.length > 0 && (
-                <> Sudah ada {pesananMenunggu.length} pesanan menunggu.</>
-              )}
+                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}
+                    <strong>{tglJamSingkat(batasCheckout(new Date(sewaAktif.tanggalKeluar), aturanJadwal))}</strong>.</>
+                : <>Kamar ini kosong, tetapi sudah dipesan.</>}
+              {pesananMenunggu.length > 0 && <> Ada {pesananMenunggu.length} pesanan menunggu.</>}
+              {celah.length > 0
+                ? <> Kamar kosong: {celah.map((c, i) => (
+                    <span key={i}>
+                      {i > 0 && ', '}
+                      <strong>{tglJamSingkat(c.mulai)} → {tglJamSingkat(c.selesai)}</strong>
+                    </span>
+                  ))}.</>
+                : <> Tidak ada celah kosong dalam setahun ke depan.</>}
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
