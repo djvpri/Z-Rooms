@@ -100,15 +100,14 @@ export default async function KamarPage() {
     kamar
       .filter(x => x.status === 'TERSEDIA' && x.id !== asalId)
       .map(x => {
-        // Tarif HARIAN untuk kamar tujuan pindah — diwarisi dari tipenya.
-        // (Dulu BULANAN, sisa dari masa sebelum Z-Rooms fokus sewa harian.)
-        const hb = hargaEfektif(x, 'HARIAN')
+        // Tarif Bulanan untuk kamar tujuan pindah — diwarisi dari tipenya.
+        const hb = hargaEfektif(x, 'BULANAN')
         return {
           id: x.id,
           nomor: x.nomor,
           tipe: namaTipe(x.tipe),
-          hargaHarian: hb > 0 ? hb : null,
-          deposit: hb > 0 ? depositEfektif(x, 'HARIAN') : null,
+          hargaBulanan: hb > 0 ? hb : null,
+          deposit: hb > 0 ? depositEfektif(x, 'BULANAN') : null,
         }
       })
 
@@ -176,7 +175,7 @@ export default async function KamarPage() {
       ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
-          const hargaHarian = hargaEfektif(k, 'HARIAN')
+          const hargaBulanan = hargaEfektif(k, 'BULANAN')
           const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
           const penyewa = sewaAktif?.penyewa
           return (
@@ -194,9 +193,9 @@ export default async function KamarPage() {
                 {k.nomor}
               </PemicuJadwal>
               <p className="text-xs mt-0.5 opacity-75">{namaTipe(k.tipe)}</p>
-              {hargaHarian > 0 && (
+              {hargaBulanan > 0 && (
                 <p className="text-xs mt-1 font-medium">
-                  {formatRupiah(hargaHarian)}<span className="opacity-60">/hari</span>
+                  {formatRupiah(hargaBulanan)}<span className="opacity-60">/bulan</span>
                 </p>
               )}
               <p className="text-xs mt-1 opacity-60 truncate">
@@ -270,7 +269,7 @@ export default async function KamarPage() {
             kunciAwal={KOLOM_BAWAAN}
             prefAwal={properti.prefTabelKamar ?? null}
             baris={kamar.map(k => {
-              const hargaHarian = hargaEfektif(k, 'HARIAN')
+              const hargaBulanan = hargaEfektif(k, 'BULANAN')
               const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
               const penyewa = sewaAktif?.penyewa
               const fasilitas = fasilitasEfektif(k)
@@ -310,8 +309,8 @@ export default async function KamarPage() {
                     sel: <span className="text-gray-600">{namaTipe(k.tipe)}</span> },
                   { kunci: 'luas', judul: 'Luas', nilai: k.luas ?? null,
                     sel: <span className="text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</span> },
-                  { kunci: 'harga', judul: 'Harga/hari', nilai: hargaHarian || null,
-                    sel: <span className="text-gray-700">{hargaHarian > 0 ? formatRupiah(hargaHarian) : '-'}</span> },
+                  { kunci: 'harga', judul: 'Harga/bulan', nilai: hargaBulanan || null,
+                    sel: <span className="text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</span> },
                   { kunci: 'status', judul: 'Status', nilai: statusKamarLabel(k.status),
                     sel: <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span> },
                   { kunci: 'penyewa', judul: 'Penyewa', nilai: namaPenyewaAktif,
@@ -348,7 +347,7 @@ export default async function KamarPage() {
         {/* Mobile cards */}
         <div className="md:hidden space-y-2">
           {kamar.map(k => {
-            const hargaHarian = hargaEfektif(k, 'HARIAN')
+            const hargaBulanan = hargaEfektif(k, 'BULANAN')
             const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
             const penyewa = sewaAktif?.penyewa
             return (
@@ -376,7 +375,7 @@ export default async function KamarPage() {
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {namaTipe(k.tipe)}{k.luas ? ` · ${k.luas}m²` : ''}
-                    {hargaHarian > 0 ? ` · ${formatRupiah(hargaHarian)}/hari` : ''}
+                    {hargaBulanan > 0 ? ` · ${formatRupiah(hargaBulanan)}/bulan` : ''}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {(() => { const f = fasilitasEfektif(k); return f.slice(0, 2).join(', ') + (f.length > 2 ? '…' : '') })()}

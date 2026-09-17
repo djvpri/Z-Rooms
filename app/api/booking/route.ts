@@ -23,9 +23,8 @@ const bookingSchema = z.object({
   npwp: z.string().optional(),
   // Sewa
   kamarId: z.string(),
-  // Z-Rooms difokuskan sewa harian: booking BARU hanya boleh HARIAN. Nilai
-  // lain tetap diterima skema supaya error-nya jelas ("sewa harian saja"),
-  // bukan "invalid enum". Sewa LAMA berperiode lain tetap ada dan terbaca.
+  // Periode sewa yang bisa dibooking BARU. Sewa lama berperiode MINGGUAN tetap
+  // ada di DB dan terbaca; MINGGUAN tak ditawarkan form, jadi tak ada di sini.
   periodeSewa: z.enum(['HARIAN', 'BULANAN', 'TAHUNAN']),
   tanggalMasuk: z.string(),
   // Jam masuk "HH:mm" 24 jam, dipilih kasir dari dropdown. Opsional supaya
@@ -50,12 +49,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const d = parsed.data
-
-  // Pengekangan periode ada DI SINI, bukan cuma di UI: sembunyikan dropdown saja
-  // bisa dilewati pemanggil langsung ke API.
-  if (d.periodeSewa !== 'HARIAN') {
-    return NextResponse.json({ error: 'Sewa harian saja' }, { status: 400 })
-  }
 
   // Cek kamar tersedia — SEKALIGUS pastikan kamar ini milik properti si pemanggil.
   // Tanpa filter properti, siapa pun yang tahu kamarId bisa membooking kamar

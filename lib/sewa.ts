@@ -13,10 +13,9 @@ import type { PeriodeSewa } from '@prisma/client'
 /** Periode yang dikenal sistem (nilai enum `PeriodeSewa`). Semuanya masih
  *  dihitung `tanggalKeluar` supaya sewa LAMA tetap akurat.
  *
- *  Sejak Z-Rooms difokuskan sewa harian, hanya HARIAN yang ditawarkan saat
- *  booking dan diisi tarifnya di pengaturan tipe kamar. Tipe ini tetap
- *  mencakup keempatnya karena data lama berperiode lain masih dibaca dan
- *  ditampilkan (label nota, durasi, tanggal keluar). */
+ *  Booking baru menawarkan HARIAN, BULANAN, dan TAHUNAN. MINGGUAN tak
+ *  ditawarkan form, tapi tetap dikenal di sini karena sewa lama berperiode itu
+ *  masih dibaca dan ditampilkan (label nota, durasi, tanggal keluar). */
 export type PeriodeDikenal = 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN'
 
 /**

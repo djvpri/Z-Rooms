@@ -126,12 +126,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Kamar tujuan pakai periodeSewa sendiri (bisa beda dari kamar asal),
       // jadi tanggalKeluar dihitung dari harga kamar tujuan.
       //
-      // Periode dikunci HARIAN — Z-Rooms fokus sewa harian. Jangan ambil
-      // harga[0]: urutannya tak dijamin, dan tarif BULANAN bisa kebetulan
-      // pertama sehingga sewa pindahan tanpa sengaja jadi sebulan.
-      const hargaTujuan = tujuan.tipe?.harga.find(h => h.periodeSewa === 'HARIAN')
-      const hargaBaru = Number(hargaTujuan?.harga ?? sewa.hargaSewa)
-      const keluarBaru = tanggalKeluar(pindah, 'HARIAN', d.durasi)
+      // Jangan ambil harga[0]: urutannya tak dijamin. Periode dipilih dari tarif
+      // PERTAMA YANG ADA pada kamar tujuan — kamar yang hanya disewakan bulanan
+      // tetap bisa dituju, dan sewa pindahannya ikut bulanan. HARIAN diutamakan
+      // kalau ada, karena itu yang paling umum di properti ini.
+      const tarifTujuan = tujuan.tipe?.harga ?? []
+      const dipilih = tarifTujuan.find(h => h.periodeSewa === 'HARIAN') ?? tarifTujuan[0]
+      const periodeBaru = (dipilih?.periodeSewa ?? sewa.periodeSewa) as typeof sewa.periodeSewa
+      const hargaBaru = Number(dipilih?.harga ?? sewa.hargaSewa)
+      const keluarBaru = tanggalKeluar(pindah, periodeBaru, d.durasi)
 
       // Deposit pindah apa adanya — tanpa baris Pengeluaran/Pembayaran, karena
       // uangnya tidak berpindah tangan.
@@ -143,7 +146,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: {
           kamarId: tujuan.id,
           penyewaId: sewa.penyewaId,
-          periodeSewa: 'HARIAN',
+          periodeSewa: periodeBaru,
           tanggalMasuk: pindah,
           tanggalKeluar: keluarBaru,
           hargaSewa: hargaBaru,
