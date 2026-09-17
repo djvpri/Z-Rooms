@@ -12,28 +12,46 @@ import type { AturanCheckout } from './checkout'
 /** Owner minta "hingga 14 hari kedepan". */
 export const HARI = 14
 
-/** "2026-09-17" dari komponen LOKAL.
- *
- *  Bukan `toISOString()`: itu mengonversi ke UTC, dan untuk WIB (UTC+7) jam
- *  00:00–06:59 tanggalnya mundur sehari. Kunci tanggal yang salah = kolom
- *  tanggalnya meleset satu hari. */
-export function kunciTanggal(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+/** Offset WIB dalam menit. Dipakai untuk membandingkan momen UTC dengan jam
+ *  dinding WIB tanpa bergantung TZ mesin. */
+export const WIB_MENIT = 7 * 60
+
+/** Momen UTC -> menit dinding WIB, dihitung dari tengah malam UTC hari itu.
+ *  Selisih dua momen tak terpengaruh titik acuan, jadi aman dipakai
+ *  dibandingkan dengan jam lokal apa pun zona mesinnya. */
+function menitWib(d: Date): number {
+  return d.getTime() / 60000 + WIB_MENIT
 }
 
-/** Kunci tanggal mulai hari ini sampai H+13. */
-export function daftarHari(sekarang: Date, jumlah = HARI): string[] {
-  const hasil: string[] = []
-  for (let i = 0; i < jumlah; i++) {
-    hasil.push(kunciTanggal(new Date(sekarang.getFullYear(), sekarang.getMonth(), sekarang.getDate() + i)))
-  }
-  return hasil
+/** "YYYY-MM-DD" dari komponen UTC — pasangan `daftarHari`, karena nilai yang
+ *  dioper sudah digeser ke WIB dan ditambah hari dalam UTC. */
+function kunciTanggalWib(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`
 }
 
 /** "08:00" dari index jam 0..23. */
 export function labelJam(j: number): string {
   return `${String(j).padStart(2, '0')}:00`
+}
+
+/** Kunci tanggal mulai hari ini sampai H+13, dalam WIB.
+ *
+ *  Hari dihitung pada kalender WIB, bukan kalender mesin: container produksi
+ *  jalan TZ=UTC, jadi pukul 00:00–06:59 WIB masih terbaca "kemarin" dan
+ *  seluruh jendela 14 hari bergeser sehari. Kasir di Indonesia melihat jadwal
+ *  mulai dari hari ini menurut kalendernya, bukan menurut UTC.
+ *
+ *  Digeser ke WIB dulu, lalu ditambah hari memakai UTC supaya penambahan hari
+ *  tak diganggu pergantian DST/offset mesin. */
+export function daftarHari(sekarang: Date, jumlah = HARI): string[] {
+  const hasil: string[] = []
+  const dasar = new Date(sekarang.getTime() + WIB_MENIT * 60000)
+  for (let i = 0; i < jumlah; i++) {
+    const d = new Date(Date.UTC(dasar.getUTCFullYear(), dasar.getUTCMonth(), dasar.getUTCDate() + i))
+    hasil.push(kunciTanggalWib(d))
+  }
+  return hasil
 }
 
 /**
@@ -43,6 +61,13 @@ export function labelJam(j: number): string {
  * peduli sewa mulai di tengah jam. Sewa yang mulai 14:30 tetap mengunci jam
  * 14:00: pada jam itu kamar memang belum bisa dihuni, dan menampilkannya bebas
  * akan membuat kasir menjanjikan kamar yang masih ditempati.
+ *
+ * Jam dibandingkan pada WIB, bukan zona mesin. `batasCheckout` mengembalikan
+ * momen dalam UTC (12:00 WIB = 05:00 UTC), sedangkan jam grid mewakili jam
+ * dinding WIB. Tanpa konversi, container yang jalan TZ=UTC menandai jam 5..11
+ * pada hari check-out sebagai BEBAS — tujuh jam terakhir sebelum kamar benar-
+ * benar dilepas tampil hijau, dan kasir bisa menjanjikan kamar yang masih
+ * dihuni. Dibuktikan: TZ=UTC -> 19 Sep terpakai 0..4, TZ=Asia/Jakarta -> 0..11.
  */
 export function petaTerpakai(
   sewa: SewaNonSelesai[],
@@ -54,15 +79,15 @@ export function petaTerpakai(
 
   for (const s of sewa) {
     const { mulai, selesai } = rentangSewa(s, aturan)
+    const a = menitWib(mulai)
+    const b = menitWib(selesai)
     for (const t of hari) {
       const [y, m, d] = t.split('-').map(Number)
       const set = peta.get(t)!
+      // Menit tengah malam UTC tanggal t — acuan yang sama dengan menitWib.
+      const dasar = Date.UTC(y, m - 1, d) / 60000
       for (let j = 0; j < 24; j++) {
-        const jamMulai = new Date(y, m - 1, d, j, 0, 0, 0)
-        const jamSelesai = new Date(y, m - 1, d, j + 1, 0, 0, 0)
-        if (jamMulai.getTime() < selesai.getTime() && jamSelesai.getTime() > mulai.getTime()) {
-          set.add(j)
-        }
+        if (dasar + j * 60 < b && dasar + (j + 1) * 60 > a) set.add(j)
       }
     }
   }

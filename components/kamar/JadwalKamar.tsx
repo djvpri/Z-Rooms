@@ -61,10 +61,14 @@ export default function JadwalKamar({
                 <th className="sticky left-0 bg-white z-10 w-12" />
                 {hari.map(t => {
                   const [y, m, d] = t.split('-').map(Number)
-                  const dt = new Date(y, m - 1, d)
+                  // Hari-dalam-minggu dihitung di UTC, bukan lokal: kunci `t`
+                  // sudah tanggal WIB, dan komponen ini bisa ikut ter-render di
+                  // server (TZ=UTC) — di sana `new Date(y, m-1, d)` jatuh 07:00
+                  // WIB dan namanya benar, tapi mesin TZ lain bisa meleset.
+                  const dt = new Date(Date.UTC(y, m - 1, d))
                   return (
                     <th key={t} className="font-normal px-1 pb-1 text-center text-gray-500 whitespace-nowrap">
-                      <span className="block text-gray-400">{HARI_SINGKAT[dt.getDay()]}</span>
+                      <span className="block text-gray-400">{HARI_SINGKAT[dt.getUTCDay()]}</span>
                       <span className="block">{d}/{m}</span>
                     </th>
                   )

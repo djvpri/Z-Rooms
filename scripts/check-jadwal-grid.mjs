@@ -8,12 +8,20 @@
 //
 // Diimpor dari lib aslinya, BUKAN disalin.
 import assert from 'node:assert/strict'
-import { daftarHari, petaTerpakai, labelJam, kunciTanggal, HARI } from '../lib/jadwalGrid.ts'
+import { daftarHari, petaTerpakai, labelJam, HARI } from '../lib/jadwalGrid.ts'
 
 const aturan = { jamCheckout: '12:00', toleransiCheckout: 0 }
 
-/** Sewa dengan komponen waktu LOKAL (WIB), bukan UTC. */
-const s = (y, m, d, j = 0, mi = 0) => new Date(y, m - 1, d, j, mi)
+/**
+ * Momen pada jam dinding WIB.
+ *
+ * SENGAJA bukan `new Date(y, m, d, j, mi)`: bentuk itu memakai zona MESIN, jadi
+ * hasilnya berubah-ubah menurut TZ — di container produksi (TZ=UTC) "17 Sep
+ * 09:00" jadi 16:00 WIB dan seluruh ekspektasi meleset 7 jam. Menulis offset
+ * +07:00 membuat angka di test berarti WIB di mesin mana pun.
+ */
+const s = (y, m, d, j = 0, mi = 0) =>
+  new Date(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(j).padStart(2, '0')}:${String(mi).padStart(2, '0')}:00+07:00`)
 
 const sekarang = s(2026, 9, 17, 10, 0)
 
@@ -39,11 +47,12 @@ const hariThn = daftarHari(s(2026, 12, 25))
 assert.equal(hariThn[0], '2026-12-25')
 assert.equal(hariThn[7], '2027-01-01')
 
-// Kunci tanggal pakai komponen LOKAL. toISOString() untuk 17 Sep 00:00 WIB
-// akan jadi 16 Sep 17:00 UTC — salah sehari. Ini menjaganya.
-assert.equal(kunciTanggal(s(2026, 9, 17, 0, 0)), '2026-09-17')
-assert.equal(kunciTanggal(s(2026, 9, 1)), '2026-09-01')
-assert.equal(kunciTanggal(s(2026, 9, 9)), '2026-09-09')
+// Dini hari WIB: 17 Sep 00:30 WIB masih tanggal 17 menurut kasir, walau di UTC
+// itu masih 16 Sep. Jendela harus mulai dari 17, bukan mundur sehari.
+assert.equal(daftarHari(s(2026, 9, 17, 0, 30))[0], '2026-09-17', 'dini hari WIB tak mundur sehari')
+assert.equal(daftarHari(s(2026, 9, 17, 6, 59))[0], '2026-09-17', '06:59 WIB masih hari yang sama')
+assert.equal(daftarHari(s(2026, 9, 17, 23, 59))[0], '2026-09-17', '23:59 WIB tetap hari yang sama')
+assert.equal(daftarHari(s(2026, 12, 31, 0, 30))[0], '2026-12-31', 'malam tahun baru tetap tanggal 31')
 
 assert.equal(labelJam(0), '00:00')
 assert.equal(labelJam(9), '09:00')
@@ -67,7 +76,9 @@ const jam = t => [...(peta.get(t) ?? [])].sort((a, b) => a - b)
 assert.deepEqual(jam('2026-09-17'), Array.from({ length: 15 }, (_, i) => i + 9))
 // 18 Sep: terisi penuh.
 assert.equal(jam('2026-09-18').length, 24)
-// 19 Sep: lepas 12:00 -> 0..11 terpakai, 12..23 bebas.
+// 19 Sep: kamar dilepas jam check-out 12:00 -> 0..11 terpakai, 12..23 bebas.
+// SENGAJA bukan jam `tanggalKeluar` (09:00): sisi Selesai memakai jam
+// check-out properti, dan grid harus bicara angka yang sama dengan nota.
 assert.deepEqual(jam('2026-09-19'), Array.from({ length: 12 }, (_, i) => i))
 // 20 Sep: kosong di antara dua sewa.
 assert.deepEqual(jam('2026-09-20'), [])
@@ -82,6 +93,12 @@ assert.deepEqual(jam('2026-09-30'), [])
 
 // Jumlah total = jam terpakai sewa 1 (15+24+12=51) + sewa 2 (10+24+12=46).
 assert.equal(hari.reduce((n, t) => n + jam(t).length, 0), 97)
+
+// Angka di atas tak boleh berubah menurut zona waktu mesin. Sebelum diperbaiki,
+// container TZ=UTC menandai 19 Sep hanya 0..4 (jam 5..11 tampak bebas) karena
+// jam dibangun dari komponen lokal sementara batasCheckout mengembalikan UTC.
+// Invariant ini yang mengunci perbaikan itu.
+assert.equal(jam('2026-09-19').length, 12, 'sisi selesai memakai jam check-out, bukan jam mesin')
 
 // Hanya hari di jendela yang muncul — 16 Sep dan 1 Okt tak boleh ada.
 assert.equal(peta.has('2026-09-16'), false, 'sebelum hari ini tak masuk jendela')
