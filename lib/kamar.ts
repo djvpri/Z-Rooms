@@ -30,7 +30,11 @@ export const createKamarSchema = z.object({
   // Tipe kini master data (model TipeKamar) dan WAJIB: kamar tanpa tipe tak
   // punya tarif, jadi tak bisa disewakan.
   tipeId: z.string().min(1, 'Tipe kamar wajib dipilih.'),
-  luas: luas.optional(),
+  // `.nullable()`: form mengirim `null` saat kolom luas dikosongkan (lihat
+  // KamarTambahModal) — bukan menghilangkan fieldnya. Tanpa ini tambah kamar
+  // gagal "Expected number, received null". PATCH lewat updateKamarSchema juga
+  // menerima null, jadi kedua jalur memperlakukan luas kosong dengan cara sama.
+  luas: luas.nullable().optional(),
 })
 
 // Semua opsional — pemanggil boleh mengirim sebagian saja. `luas: null` berarti
