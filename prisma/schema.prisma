@@ -96,6 +96,12 @@ model Properti {
   plan        String        @default("free")
   planExpires DateTime?
 
+  // Preferensi tampilan tabel kamar (kolom mana yang tampil & urutannya), JSON
+  // teks. Per-PROPERTI, bukan per-user: semua staf properti ini melihat tabel
+  // yang sama, jadi tak ada dua kasir dengan tampilan berbeda di meja yang sama.
+  // NULL = belum pernah diatur -> halaman memakai urutan bawaan.
+  prefTabelKamar String?
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

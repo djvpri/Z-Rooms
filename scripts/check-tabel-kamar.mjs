@@ -2,13 +2,14 @@
 //
 // Menguji pemilih kolom & pengurutan TabelKamar (components/kamar/TabelKamar.tsx).
 //
-// Komponennya React client, jadi tak bisa di-render di sini. Yang diuji adalah
-// ATURAN-nya, disalin persis dari komponen. Salinan memang kelemahan: kalau
-// aturan di komponen berubah dan di sini tidak, test tetap lulus. Karena itu
-// blok 5 sengaja membaca berkas komponennya untuk memastikan aturan yang
-// diuji masih ada di sana — bukan sekadar menyalin.
+// Komponennya React client, jadi tak bisa di-render di sini. Aturan PEMULIHAN
+// preferensi diimpor langsung dari komponen (pulihkan()) — bukan disalin, jadi
+// kalau aturannya berubah test ikut berubah. Aturan pengurutan & pemilih kolom
+// tak bisa diimpor (ada di dalam komponen), jadi disalin; blok penutup membaca
+// berkas komponennya untuk memastikan salinan itu masih cocok.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { pulihkan } from '../components/kamar/TabelKamar.tsx'
 
 // --- Salinan aturan dari TabelKamar.tsx ---
 
@@ -102,22 +103,7 @@ assert.equal(nomorUrut(urutkan(baris, null, true)), 'a,b,c', 'tanpa sort tak men
   assert.ok(src.includes('kunciAwal.filter(x => t.includes(x) || x === kunci)'), 'urutan hidupkan kembali masih sama')
 }
 
-// --- Pemulihan preferensi dari localStorage (aturan dari useEffect pertama) ---
-
-/** Salinan aturan pemulihan: saring yang tak dikenal, jangan pasang yang kosong. */
-const pulihkan = (mentah, kunciAwal) => {
-  const hasil = { tampil: kunciAwal, urutKolom: null, naik: true }
-  if (!mentah) return hasil
-  let simpan
-  try { simpan = JSON.parse(mentah) } catch { return hasil }
-  if (Array.isArray(simpan.tampil)) {
-    const sah = simpan.tampil.filter(x => typeof x === 'string' && kunciAwal.includes(x))
-    if (sah.length > 0) hasil.tampil = sah
-  }
-  if (typeof simpan.urutKolom === 'string' && kunciAwal.includes(simpan.urutKolom)) hasil.urutKolom = simpan.urutKolom
-  if (typeof simpan.naik === 'boolean') hasil.naik = simpan.naik
-  return hasil
-}
+// --- Pemulihan preferensi tersimpan (pulihkan() dari komponen) ---
 
 // 9. Preferensi tersimpan dipulihkan apa adanya.
 {
@@ -159,10 +145,10 @@ const pulihkan = (mentah, kunciAwal) => {
 {
   const src = readFileSync(new URL('../components/kamar/TabelKamar.tsx', import.meta.url), 'utf8')
   assert.ok(src.includes('kunciAwal.includes(x)'), 'komponen masih menyaring kunci tak dikenal')
-  assert.ok(src.includes('if (sah.length > 0) setTampil(sah)'), 'komponen tak memasang daftar kolom kosong')
-  assert.ok(src.includes('if (typeof simpan.naik === \'boolean\')'), 'komponen masih memvalidasi tipe arah urut')
-  assert.ok(src.includes("'zxroom.kamar.tabel.v1'"), 'kunci penyimpanan berversi')
-  assert.ok(src.includes('localStorage.setItem(KUNCI_SIMPAN'), 'hasil perubahan disimpan')
+  assert.ok(src.includes('if (sah.length > 0) hasil.tampil = sah'), 'komponen tak memasang daftar kolom kosong')
+  assert.ok(src.includes("typeof simpan.naik === 'boolean'"), 'komponen masih memvalidasi tipe arah urut')
+  assert.ok(src.includes('/api/properti/pref-tabel-kamar'), 'perubahan disimpan ke properti (DB), bukan localStorage')
+  assert.ok(!src.includes('localStorage'), 'localStorage tak lagi dipakai')
 }
 
 console.log('OK — check-tabel-kamar: 22 blok assertion lulus')

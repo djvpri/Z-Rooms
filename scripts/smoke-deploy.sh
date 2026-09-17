@@ -84,6 +84,7 @@ minta /lisensi             '307,302'  'terproteksi -> redirect login'
 #    dipanggil DENGAN sesi — itu uji lapis integrasi, bukan smoke. ─────────
 minta /api/properti        '307'      'middleware lindungi sebelum route'
 minta /api/properti/aktif  '307'      'route identitas properti (dipakai nota)'
+minta /api/properti/pref-tabel-kamar '307' 'preferensi tabel kamar (per properti)'
 minta /api/kamar           '307'      'middleware lindungi sebelum route'
 minta /api/booking         '307'      'middleware lindungi sebelum route'
 minta /api/keuangan        '307'      'middleware lindungi sebelum route'

@@ -37,45 +37,64 @@ export type BarisKamar = {
  *  barisnya tak bisa dikenali. */
 const WAJIB = new Set(['nomor'])
 
-/** Kunci penyimpanan preferensi tabel (localStorage). Berversi supaya bentuk
- *  lama bisa ditinggalkan tanpa membingungkan pembacanya. */
-const KUNCI_SIMPAN = 'zxroom.kamar.tabel.v1'
+/**
+ * Baca preferensi tersimpan jadi nilai yang aman dipakai.
+ *
+ * Pengaman (semua diuji di scripts/check-tabel-kamar.mjs):
+ *   - kunci tak dikenal dibuang; kalau kolom dihapus dari kode, preferensi lama
+ *     tak menghasilkan kolom hantu
+ *   - daftar yang tersisa kosong -> pakai bawaan (tabel tanpa kolom lebih buruk)
+ *   - JSON rusak / null -> pakai bawaan, tanpa melempar error
+ *
+ * Nilai dari DB diperlakukan sama seperti masukan luar biasa: bentuknya JSON
+ * yang ditulis versi kode sebelumnya, jadi bisa saja tak cocok lagi.
+ */
+export function pulihkan(mentah: string | null, kunciAwal: string[]) {
+  const hasil = { tampil: kunciAwal, urutKolom: null as string | null, naik: true }
+  if (!mentah) return hasil
+  let simpan: { tampil?: unknown; urutKolom?: unknown; naik?: unknown }
+  try { simpan = JSON.parse(mentah) } catch { return hasil }
+  if (!simpan || typeof simpan !== 'object') return hasil
 
-export default function TabelKamar({ baris, kunciAwal }: { baris: BarisKamar[]; kunciAwal: string[] }) {
+  if (Array.isArray(simpan.tampil)) {
+    const sah = simpan.tampil.filter((x): x is string => typeof x === 'string' && kunciAwal.includes(x))
+    if (sah.length > 0) hasil.tampil = sah
+  }
+  if (typeof simpan.urutKolom === 'string' && kunciAwal.includes(simpan.urutKolom)) hasil.urutKolom = simpan.urutKolom
+  if (typeof simpan.naik === 'boolean') hasil.naik = simpan.naik
+  return hasil
+}
+
+export default function TabelKamar({ baris, kunciAwal, prefAwal }: {
+  baris: BarisKamar[]
+  kunciAwal: string[]
+  /** Preferensi tersimpan properti ini (JSON), null kalau belum pernah diatur. */
+  prefAwal: string | null
+}) {
+  // Nilai awal dibaca dari DB (server mengirimnya), jadi render pertama di
+  // client sudah sama dengan HTML server — tak ada hydration mismatch, dan
+  // tabel tak berkedip balik ke bawaan dulu.
+  const awal = pulihkan(prefAwal, kunciAwal)
   // Kolom yang tampil + urutannya mengikuti kunciAwal (dari server, jadi
   // urutan bawaan tetap satu tempat dengan definisinya).
-  const [tampil, setTampil] = useState<string[]>(kunciAwal)
-  const [urutKolom, setUrutKolom] = useState<string | null>(null)
-  const [naik, setNaik] = useState(true)
+  const [tampil, setTampil] = useState<string[]>(awal.tampil)
+  const [urutKolom, setUrutKolom] = useState<string | null>(awal.urutKolom)
+  const [naik, setNaik] = useState(awal.naik)
   const [panelBuka, setPanelBuka] = useState(false)
 
-  // Pengaturan kolom & urutan disimpan di localStorage supaya tahan refresh.
-  // Dibaca di useEffect, BUKAN saat useState dibuat: render pertama harus sama
-  // dengan yang di-render server (HTML-nya dihasilkan di server), kalau tidak
-  // React mengeluh hydration mismatch.
+  // Tulis balik ke properti. Tanpa await-penuh dari pemakaian: kasir tak perlu
+  // menunggu jaringan tiap kali mencentang kolom, dan kegagalan simpan tak
+  // menggagalkan tampilan — tabelnya sudah berubah di layar.
   useEffect(() => {
-    try {
-      const mentah = localStorage.getItem(KUNCI_SIMPAN)
-      if (!mentah) return
-      const simpan = JSON.parse(mentah) as { tampil?: unknown; urutKolom?: unknown; naik?: unknown }
-      if (Array.isArray(simpan.tampil)) {
-        // Hanya kunci yang masih ada di kunciAwal. Kolom yang dihapus dari kode
-        // tak boleh ikut terpasang walau masih tercatat di penyimpanan.
-        const sah = simpan.tampil.filter((x): x is string => typeof x === 'string' && kunciAwal.includes(x))
-        if (sah.length > 0) setTampil(sah)
-      }
-      if (typeof simpan.urutKolom === 'string' && kunciAwal.includes(simpan.urutKolom)) setUrutKolom(simpan.urutKolom)
-      if (typeof simpan.naik === 'boolean') setNaik(simpan.naik)
-    } catch {
-      // Penyimpanan rusak / diblokir (mode privat, storage penuh) — pakai
-      // bawaan. Preferensi tampilan bukan alasan untuk menggagalkan halaman.
-    }
-  }, [kunciAwal])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(KUNCI_SIMPAN, JSON.stringify({ tampil, urutKolom, naik }))
-    } catch { /* diblokir — lewati, tabel tetap jalan */ }
+    const pref = JSON.stringify({ tampil, urutKolom, naik })
+    const t = setTimeout(() => {
+      fetch('/api/properti/pref-tabel-kamar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pref }),
+      }).catch(() => { /* offline / sesi habis — tampilan tetap jalan */ })
+    }, 400)   // digabung supaya klik beruntun tak jadi banyak request
+    return () => clearTimeout(t)
   }, [tampil, urutKolom, naik])
 
   const semua = baris[0]?.kolom ?? []

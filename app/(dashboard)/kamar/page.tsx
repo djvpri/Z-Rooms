@@ -242,6 +242,7 @@ export default async function KamarPage() {
         <div className="hidden md:block">
           <TabelKamar
             kunciAwal={KOLOM_BAWAAN}
+            prefAwal={properti.prefTabelKamar ?? null}
             baris={kamar.map(k => {
               const hargaBulanan = hargaEfektif(k, 'BULANAN')
               const hargaHarian = hargaEfektif(k, 'HARIAN')
