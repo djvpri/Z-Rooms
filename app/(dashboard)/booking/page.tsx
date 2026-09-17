@@ -2,11 +2,12 @@
 // app/(dashboard)/booking/page.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
+import { Printer, PersonFill, BuildingFill, FloppyFill, Clock, Calendar3 } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib, akhirBulan } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
 import { celahKosong, bolehDipesan } from '@/lib/jadwalKamar'
 import { tanggalKeluar, type PeriodeDikenal } from '@/lib/sewa'
+import JadwalKamar from '@/components/kamar/JadwalKamar'
 import PilihWaktu, { JAM_MASUK, daftarTanggal } from './PilihWaktu'
 
 type NotaBooking = {
@@ -86,6 +87,17 @@ export default function BookingPage() {
     kamarId: '', periodeSewa: 'HARIAN', tanggalMasuk: '', jamMasuk: '', durasi: 1,
     deposit: '', metodeBayar: 'TUNAI', bayarSekarang: true, catatan: '',
   })
+
+  // Modal jadwal 14 hari kamar terpilih — dipakai saat kamar yang dipilih sudah
+  // terisi/terpesan. Pertanyaan kasir begitu kamar berstatus terisi persis
+  // "tanggal 20 jam segini sudah bisa masuk belum", dan jawabannya ada di grid;
+  // ringkasan teks di bawah cuma menyebut tanggal lepas, bukan per jam.
+  const [jadwalBuka, setJadwalBuka] = useState(false)
+
+  // Ganti kamar sementara modal terbuka = jadwalnya sudah bukan kamar yang
+  // dilihat kasir. Ditutup otomatis daripada menampilkan grid kamar lama
+  // di bawah judul kamar baru.
+  useEffect(() => { setJadwalBuka(false) }, [form.kamarId])
 
   // Pembacaan KTP. Hanya berarti di mode penyewa baru.
   const [bacaKtpLoading, setBacaKtpLoading] = useState(false)
@@ -700,30 +712,44 @@ export default function BookingPage() {
               cuma jumlahnya yang tampil, jadi setelah kasir booking 17 Sep,
               pesanan 20 Sep seolah hilang dari layar. */}
           {kamarDipilih && (sewaAktif || pesananMenunggu.length > 0) && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              {sewaAktif && new Date(sewaAktif.tanggalMasuk) <= new Date()
-                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}</>
-                : sewaAktif
-                  ? <>Kamar ini sudah dibooking untuk tanggal{' '}</>
-                  : <>Kamar ini kosong, tetapi sudah dipesan untuk tanggal{' '}</>}
-              <strong>{tglJamSingkat(batasCheckout(new Date((sewaAktif ?? pesananMenunggu[0]).tanggalKeluar), aturanJadwal), awalJendela)}</strong>.
-              {pesananMenunggu.length > 0 && (
-                <> Berikutnya sudah dipesan: {pesananMenunggu.map((p, i) => (
-                  <span key={i}>
-                    {i > 0 && ', '}
-                    <strong>{tglJamSingkat(new Date(p.tanggalMasuk), awalJendela)}</strong>
-                  </span>
-                ))}.</>
-              )}
-              {celah.length > 0
-                ? <> Kamar kosong: {celah.map((c, i) => (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <p>
+                {sewaAktif && new Date(sewaAktif.tanggalMasuk) <= new Date()
+                  ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}</>
+                  : sewaAktif
+                    ? <>Kamar ini sudah dibooking untuk tanggal{' '}</>
+                    : <>Kamar ini kosong, tetapi sudah dipesan untuk tanggal{' '}</>}
+                <strong>{tglJamSingkat(batasCheckout(new Date((sewaAktif ?? pesananMenunggu[0]).tanggalKeluar), aturanJadwal), awalJendela)}</strong>.
+                {pesananMenunggu.length > 0 && (
+                  <> Berikutnya sudah dipesan: {pesananMenunggu.map((p, i) => (
                     <span key={i}>
                       {i > 0 && ', '}
-                      <strong>{tglJamSingkat(c.mulai, awalJendela)} → {tglJamSingkat(c.selesai, awalJendela)}</strong>
+                      <strong>{tglJamSingkat(new Date(p.tanggalMasuk), awalJendela)}</strong>
                     </span>
                   ))}.</>
-                : <> Tidak ada celah kosong dalam 90 hari ke depan.</>}
-            </p>
+                )}
+                {celah.length > 0
+                  ? <> Kamar kosong: {celah.map((c, i) => (
+                      <span key={i}>
+                        {i > 0 && ', '}
+                        <strong>{tglJamSingkat(c.mulai, awalJendela)} → {tglJamSingkat(c.selesai, awalJendela)}</strong>
+                      </span>
+                    ))}.</>
+                  : <> Tidak ada celah kosong dalam 90 hari ke depan.</>}
+              </p>
+              {/* Ringkasan di atas menyebut RENTANG kosong, bukan per jam. Kasir
+                  yang mau tahu "jam 8 pagi tanggal 20 sudah lepas belum" tak
+                  bisa menjawabnya dari teks itu, jadi jalannya dibuka ke grid
+                  yang sama dengan tab Kamar. */}
+              <button
+                type="button"
+                onClick={() => setJadwalBuka(true)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-800 shadow-sm transition-colors hover:border-amber-500 hover:bg-amber-100"
+              >
+                <Calendar3 className="h-3.5 w-3.5" />
+                Lihat jadwal 14 hari
+              </button>
+            </div>
           )}
           <PilihWaktu
             tanggal={form.tanggalMasuk}
@@ -984,6 +1010,20 @@ export default function BookingPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal jadwal kamar terpilih. Komponen yang sama dengan tab Kamar —
+          bukan salinannya, supaya aturan warna kuningnya cuma punya satu
+          sumber. `sekarang` pakai awalJendela: titik waktu yang sama dengan
+          yang dipakai menyusun ringkasan & chips di halaman ini. */}
+      {jadwalBuka && kamarDipilih && (
+        <JadwalKamar
+          nomor={kamarDipilih.nomor}
+          sewa={kamarDipilih.sewa ?? []}
+          aturan={aturanJadwal}
+          sekarang={awalJendela}
+          onTutup={() => setJadwalBuka(false)}
+        />
       )}
     </div>
   )
