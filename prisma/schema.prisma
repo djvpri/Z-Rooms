@@ -398,3 +398,29 @@ enum TipeNotifikasi {
   PEMELIHARAAN
   INFO
 }
+
+// ───────────────────────────────────────────────
+// LOG ERROR (diagnosa remote)
+// ───────────────────────────────────────────────
+// Log error dari peramban kasir, dikirim lewat tombol di tab Pengaturan.
+//
+// Bukan audit trail: baris di sini dihapus otomatis setelah 12 jam (lihat
+// app/api/log/route.ts). Tujuannya cuma menjawab "apa yang rusak di HP/PC
+// kasir tadi" tanpa harus ke sana.
+//
+// propertiId sengaja TANPA relasi: log harus tetap tersimpan walau properti
+// dihapus, dan menghapus properti tak boleh ikut memutus riwayat diagnosa.
+// Kalau nanti perlu dirujuk, simpan sebagai String bebas.
+model LogKasir {
+  id         String   @id @default(cuid())
+  propertiId String?
+  // Penanda perangkat. ZXRoom berbasis web, jadi "device" = satu peramban:
+  // kasir bisa buka dari HP, tablet, atau PC yang sama-sama tak bernama.
+  perangkat  String
+  // Nama yang diketik kasir (mis. "HP kasir depan"), supaya tahu siapa.
+  nama       String?
+  konten     String
+  createdAt  DateTime @default(now())
+
+  @@index([propertiId, createdAt])
+}
