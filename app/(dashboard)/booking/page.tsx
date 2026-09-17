@@ -59,6 +59,8 @@ type PropertiNota = {
   toleransiCheckout: number
 }
 
+const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
+
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
 export default function BookingPage() {
@@ -661,11 +663,12 @@ export default function BookingPage() {
               </select>
             </div>
             <div>
-              {/* Periode dikunci harian: Z-Rooms difokuskan untuk sewa harian.
-                  Sewa lama berperiode lain tetap tampil apa adanya di daftar dan
-                  nota — yang tak ditawarkan lagi hanya sewa BARU. */}
               <label className="form-label">Periode sewa</label>
-              <div className="form-input flex items-center bg-gray-50 text-gray-700">Harian</div>
+              <select className="form-input" value={form.periodeSewa} onChange={e => set('periodeSewa', e.target.value)}>
+                {PERIODE.map(p => (
+                  <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -715,7 +718,7 @@ export default function BookingPage() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Durasi (hari)</label>
+              <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>
               <input type="number" min={1} max={36} className="form-input" value={form.durasi} onChange={e => set('durasi', Number(e.target.value))} />
             </div>
             <div className="flex items-end">
