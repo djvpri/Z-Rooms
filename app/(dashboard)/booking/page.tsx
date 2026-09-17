@@ -249,12 +249,24 @@ export default function BookingPage() {
   // Rentang waktu kamar benar-benar kosong. Kasir butuh ini, bukan satu tanggal
   // "aman": booking boleh SEBELUM jam masuk penghuni berikutnya dan SETELAH jam
   // keluar penghuni sebelumnya, jadi menampilkan satu batas saja menyembunyikan
-  // celah kosong yang sah. Dihitung dari jendela hari ini sampai 1 tahun.
+  // celah kosong yang sah.
+  //
+  // Satu titik waktu dipakai untuk `dari` dan `sampai` — dua panggilan `new
+  // Date()` terpisah bisa jatuh beda milidetik, dan begitu `sampai` < `dari`
+  // celah ekornya terbalik ("21 Sep -> 17 Sep").
+  //
+  // Jendelanya 90 hari: kamar sewaan jarang dipesan lebih jauh dari itu, dan
+  // jendela panjang bikin celah terakhir tampak seperti rentang terbalik.
   const aturanJadwal = propertiNota ?? { jamCheckout: '12:00', toleransiCheckout: 0 }
-  const awalJendela = new Date(`${sekarangWib().tanggal}T${sekarangWib().jam}:00+07:00`)
+  const { tanggal: tglKini, jam: jamKini } = sekarangWib()
+  const awalJendela = new Date(`${tglKini}T${jamKini}:00+07:00`)
   const celah = kamarDipilih?.sewa?.length
-    ? celahKosong(kamarDipilih.sewa, aturanJadwal, awalJendela, new Date(awalJendela.getTime() + 365 * 86400_000))
-        .slice(0, 3)
+    ? celahKosong(
+        kamarDipilih.sewa,
+        aturanJadwal,
+        awalJendela,
+        new Date(awalJendela.getTime() + 90 * 86400_000),
+      ).slice(0, 3)
     : []
 
   function set(key: string, val: string | number | boolean) {
@@ -627,22 +639,26 @@ export default function BookingPage() {
               benar-benar kosong. Yang ditampilkan adalah rentang kosongnya,
               bukan satu tanggal "aman": booking boleh SEBELUM jam masuk
               penghuni berikutnya dan SETELAH jam keluar penghuni sebelumnya,
-              jadi satu tanggal saja menyembunyikan celah yang sah. */}
+              jadi satu tanggal saja menyembunyikan celah yang sah.
+              "Sedang dihuni" hanya kalau sewa AKTIF memang sudah berjalan —
+              sewa berjadwal masa depan adalah pesanan, bukan penghuni. */}
           {kamarDipilih && (sewaAktif || pesananMenunggu.length > 0) && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              {sewaAktif
-                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}
-                    <strong>{tglJamSingkat(batasCheckout(new Date(sewaAktif.tanggalKeluar), aturanJadwal))}</strong>.</>
-                : <>Kamar ini kosong, tetapi sudah dipesan.</>}
+              {sewaAktif && new Date(sewaAktif.tanggalMasuk) <= new Date()
+                ? <>Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}</>
+                : sewaAktif
+                  ? <>Kamar ini sudah dibooking untuk tanggal{' '}</>
+                  : <>Kamar ini kosong, tetapi sudah dipesan untuk tanggal{' '}</>}
+              <strong>{tglJamSingkat(batasCheckout(new Date((sewaAktif ?? pesananMenunggu[0]).tanggalKeluar), aturanJadwal), awalJendela)}</strong>.
               {pesananMenunggu.length > 0 && <> Ada {pesananMenunggu.length} pesanan menunggu.</>}
               {celah.length > 0
                 ? <> Kamar kosong: {celah.map((c, i) => (
                     <span key={i}>
                       {i > 0 && ', '}
-                      <strong>{tglJamSingkat(c.mulai)} → {tglJamSingkat(c.selesai)}</strong>
+                      <strong>{tglJamSingkat(c.mulai, awalJendela)} → {tglJamSingkat(c.selesai, awalJendela)}</strong>
                     </span>
                   ))}.</>
-                : <> Tidak ada celah kosong dalam setahun ke depan.</>}
+                : <> Tidak ada celah kosong dalam 90 hari ke depan.</>}
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

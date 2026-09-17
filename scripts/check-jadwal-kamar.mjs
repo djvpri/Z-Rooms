@@ -13,6 +13,7 @@ import assert from 'node:assert/strict'
 import {
   bolehDipesan, statusUntuk, lepasPada, celahKosong, penghalangUntuk,
 } from '../lib/jadwalKamar.ts'
+import { tglJamSingkat } from '../lib/utils.ts'
 
 const aturan = { jamCheckout: '12:00', toleransiCheckout: 0 }
 const aturanTol = { jamCheckout: '12:00', toleransiCheckout: 120 }   // +2 jam
@@ -248,6 +249,49 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
   assert.equal(celahNol.length, 0, 'sewa menutupi jendela -> tak ada celah')
 }
 
+// 13b. REGRESI: celah ekor pernah tampil terbalik ("21 Sep -> 17 Sep") karena
+//      `sampai` dihitung dari `Date.now()` sementara `dari` dari waktu WIB —
+//      begitu `sampai` jatuh sebelum `dari`, celah penutupnya terbalik.
+//      Tiap celah yang keluar dari fungsi ini WAJIB punya selesai > mulai,
+//      apa pun bentuk jendelanya.
+{
+  const daftar = [
+    { statusSewa: 'PENDING', tanggalMasuk: new Date('2026-09-20T14:00:00+07:00'), tanggalKeluar: new Date('2026-09-21T14:00:00+07:00') },
+    { statusSewa: 'PENDING', tanggalMasuk: new Date('2026-09-19T08:00:00+07:00'), tanggalKeluar: new Date('2026-09-20T08:00:00+07:00') },
+  ]
+  const dari = new Date('2026-09-17T09:00:00+07:00')
+  const sampai = new Date('2027-09-17T09:00:00+07:00')
+
+  for (const c of celahKosong(daftar, aturan, dari, sampai)) {
+    assert.ok(c.selesai.getTime() > c.mulai.getTime(),
+      `celah ${c.mulai.toISOString()} -> ${c.selesai.toISOString()} terbalik`)
+    assert.ok(c.mulai.getTime() >= dari.getTime(), 'celah tidak boleh mulai sebelum jendela')
+    assert.ok(c.selesai.getTime() <= sampai.getTime(), 'celah tidak boleh lewat jendela')
+  }
+
+  // Jendela terbalik -> tak ada celah sama sekali (bukan satu celah terbalik).
+  assert.deepEqual(celahKosong(daftar, aturan, sampai, dari), [],
+    'jendela terbalik -> daftar kosong')
+
+  // Jendela berdurasi nol -> tak ada celah.
+  assert.deepEqual(celahKosong(daftar, aturan, dari, dari), [],
+    'jendela nol -> daftar kosong')
+
+  // Sewa yang sudah lewat seluruhnya tidak menyisakan celah palsu di depan.
+  const sudahLewat = celahKosong(
+    [{ statusSewa: 'PENDING', tanggalMasuk: new Date('2026-08-01T08:00:00+07:00'), tanggalKeluar: new Date('2026-08-02T08:00:00+07:00') }],
+    aturan, dari, new Date('2026-09-25T00:00:00+07:00'))
+  assert.equal(sudahLewat.length, 1, 'sewa yang sudah lewat -> satu celah, bukan dua')
+  assert.equal(sudahLewat[0].mulai.toISOString(), dari.toISOString(),
+    'celah mulai dari jendela, bukan dari sewa lama')
+
+  // Sewa mulai TEPAT di awal jendela: tak ada celah di depannya.
+  const singgung = celahKosong(
+    [{ statusSewa: 'PENDING', tanggalMasuk: new Date('2026-09-18T00:00:00+07:00'), tanggalKeluar: new Date('2026-09-19T00:00:00+07:00') }],
+    aturan, new Date('2026-09-18T00:00:00+07:00'), new Date('2026-09-18T00:00:00+07:00'))
+  assert.deepEqual(singgung, [], 'sewa mulai tepat di ujung jendela -> tak ada celah')
+}
+
 // 14. penghalangUntuk(): urut, dan sewa yang tak beririsan tidak ikut.
 {
   const daftar = [
@@ -262,4 +306,20 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
   assert.equal(takAda.length, 0, 'rentang di celah kosong -> tak ada penghalang')
 }
 
-console.log('OK — check-jadwal-kamar: 14 blok assertion lulus')
+// 15. tglJamSingkat(): celah yang menyeberang tahun pernah terbaca terbalik
+//     ("21 Sep -> 17 Sep") karena tahun tidak dicetak. Sekarang tahun ikut
+//     HANYA kalau beda dari acuan — label panjang di kasus umum itu mahal.
+{
+  const acuan = new Date('2026-09-17T09:00:00+07:00')
+  const samaTahun = tglJamSingkat(new Date('2026-09-20T14:00:00+07:00'), acuan)
+  assert.doesNotMatch(samaTahun, /202\d/, 'tahun sama -> tak dicetak')
+
+  const bedaTahun = tglJamSingkat(new Date('2027-09-17T09:00:00+07:00'), acuan)
+  assert.match(bedaTahun, /2027/, 'tahun beda -> dicetak, celah tak tampak terbalik')
+
+  // Tanpa acuan tetap jalan (memakai tahun berjalan).
+  assert.equal(typeof tglJamSingkat(new Date('2026-09-20T14:00:00+07:00')), 'string',
+    'pemanggil lama tetap jalan')
+}
+
+console.log('OK — check-jadwal-kamar: 16 blok assertion lulus')

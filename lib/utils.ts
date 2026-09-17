@@ -102,12 +102,20 @@ export function sekarangWib(now: Date = new Date()): { tanggal: string; jam: str
 // "16 Sep 12:00" — kapan sebuah kamar akan tersedia lagi. Dipakai tab Kamar
 // supaya kasir tahu kapan bisa menerima penyewa berikutnya. Zona eksplisit
 // seperti tglJam: server jalan di UTC, tanpa ini jamnya bergeser 7 jam.
-export function tglJamSingkat(date: Date | string) {
-  return new Date(date).toLocaleString('id-ID', {
+//
+// Tahun cuma ikut kalau beda dari tahun `acuan`. Tanpa ini, celah yang
+// menyeberang tahun terbaca terbalik: "21 Sep → 17 Sep" (padahal 17 Sep tahun
+// berikutnya). Menampilkan tahun selalu membuat label panjang di kasus umum
+// yang justru paling sering dilihat, jadi hanya disertakan saat perlu.
+export function tglJamSingkat(date: Date | string, acuan: Date | string = new Date()) {
+  const d = new Date(date)
+  const opsi: Intl.DateTimeFormatOptions = {
     day: 'numeric', month: 'short',
     hour: '2-digit', minute: '2-digit',
     timeZone: 'Asia/Jakarta',
-  }).replace(/\./g, ':')
+  }
+  if (d.getFullYear() !== new Date(acuan).getFullYear()) opsi.year = 'numeric'
+  return d.toLocaleString('id-ID', opsi).replace(/\./g, ':')
 }
 
 export function namaPenyewa(nama?: string | null) {

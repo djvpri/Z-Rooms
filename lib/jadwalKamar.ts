@@ -104,6 +104,11 @@ export function penghalangUntuk(
  * Rentang kosong yang menganggur di antara sewa-sewa kamar ini, dibatasi
  * `dari`–`sampai`. Dipakai halaman booking untuk memberi tahu kasir KAPAN
  * kamar benar-benar kosong, bukan cuma sampai kapan terpakai.
+ *
+ * Hanya celah yang masih berguna yang dikembalikan: sewa yang sudah lewat
+ * seluruhnya diabaikan, dan celah berdurasi nol (sekadar bersinggungan) tidak
+ * dilaporkan — menampilkan "kosong dari sini sampai sini" yang justru terbalik
+ * atau kosong hanya membingungkan kasir.
  */
 export function celahKosong(
   sewa: SewaNonSelesai[],
@@ -111,20 +116,28 @@ export function celahKosong(
   dari: Date,
   sampai: Date,
 ): RentangSewa[] {
+  // Jendela terbalik atau kosong -> memang tak ada yang bisa dilaporkan.
+  if (sampai.getTime() <= dari.getTime()) return []
+
   const terpakai = sewa
     .map(s => rentangSewa(s, aturan))
+    // Sewa yang berakhir sebelum jendela mulai tak menyisakan celah apa pun.
+    .filter(r => r.selesai.getTime() > dari.getTime())
     .sort((a, b) => a.mulai.getTime() - b.mulai.getTime())
 
   const celah: RentangSewa[] = []
   let kursor = dari
   for (const r of terpakai) {
+    // Celah nol (bersinggungan persis) tidak dilaporkan: tak ada ruang untuk
+    // siapa pun di situ.
     if (r.mulai.getTime() > kursor.getTime()) {
       celah.push({ mulai: kursor, selesai: r.mulai })
     }
+    // Sewa boleh tumpang tindih (data lama memang begitu) — kursor hanya maju.
     if (r.selesai.getTime() > kursor.getTime()) kursor = r.selesai
   }
   if (kursor.getTime() < sampai.getTime()) celah.push({ mulai: kursor, selesai: sampai })
-  return celah
+  return celah.filter(c => c.selesai.getTime() > c.mulai.getTime())
 }
 
 /**
