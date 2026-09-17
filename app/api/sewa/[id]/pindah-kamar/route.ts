@@ -125,9 +125,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       // Kamar tujuan pakai periodeSewa sendiri (bisa beda dari kamar asal),
       // jadi tanggalKeluar dihitung dari harga kamar tujuan.
-      const hargaTujuan = Number(tujuan.tipe?.harga[0]?.harga ?? sewa.hargaSewa)
-      const periode = tujuan.tipe?.harga[0]?.periodeSewa ?? sewa.periodeSewa
-      const keluarBaru = tanggalKeluar(pindah, periode, d.durasi)
+      //
+      // Periode dikunci HARIAN — Z-Rooms fokus sewa harian. Jangan ambil
+      // harga[0]: urutannya tak dijamin, dan tarif BULANAN bisa kebetulan
+      // pertama sehingga sewa pindahan tanpa sengaja jadi sebulan.
+      const hargaTujuan = tujuan.tipe?.harga.find(h => h.periodeSewa === 'HARIAN')
+      const hargaBaru = Number(hargaTujuan?.harga ?? sewa.hargaSewa)
+      const keluarBaru = tanggalKeluar(pindah, 'HARIAN', d.durasi)
 
       // Deposit pindah apa adanya — tanpa baris Pengeluaran/Pembayaran, karena
       // uangnya tidak berpindah tangan.
@@ -139,10 +143,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: {
           kamarId: tujuan.id,
           penyewaId: sewa.penyewaId,
-          periodeSewa: periode,
+          periodeSewa: 'HARIAN',
           tanggalMasuk: pindah,
           tanggalKeluar: keluarBaru,
-          hargaSewa: Number(hargaTujuan),
+          hargaSewa: hargaBaru,
           deposit: depositLama,
           statusSewa: 'AKTIF',
           metodeBayar: sewa.metodeBayar,
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await tx.tagihan.create({
         data: {
           sewaId: sewaBaru.id,
-          nominal: Number(hargaTujuan),
+          nominal: hargaBaru,
           periodeDari: pindah,
           periodeHingga: keluarBaru,
           jatuhTempo: addDays(pindah, 3),
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         kamarTujuan: tujuan.nomor,
         depositPindah: depositLama,
         kurangDeposit,
-        tagihanBaru: Number(hargaTujuan) + kurangDeposit,
+        tagihanBaru: hargaBaru + kurangDeposit,
         sisaTagihanLama: sisaTagihan,
         tanggalKeluar: keluarBaru,
       }

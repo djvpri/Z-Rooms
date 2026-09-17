@@ -10,6 +10,7 @@ import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
 import TabelKamar from '@/components/kamar/TabelKamar'
+import { PemicuJadwal } from '@/components/kamar/JadwalKamar'
 import { DoorClosedFill } from 'react-bootstrap-icons'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic'
 // Urutan kolom bawaan tabel kamar (desktop). Dipakai sebagai urutan awal dan
 // urutan saat kolom dihidupkan lagi lewat panel pemilih kolom.
 const KOLOM_BAWAAN = [
-  'nomor', 'tipe', 'luas', 'hargaHarian', 'harga', 'status',
+  'nomor', 'tipe', 'luas', 'harga', 'status',
   'penyewa', 'bayar', 'mulai', 'selesai', 'fasilitas',
 ]
 
@@ -99,14 +100,15 @@ export default async function KamarPage() {
     kamar
       .filter(x => x.status === 'TERSEDIA' && x.id !== asalId)
       .map(x => {
-        // Tarif Bulanan untuk kamar tujuan pindah — diwarisi dari tipenya.
-        const hb = hargaEfektif(x, 'BULANAN')
+        // Tarif HARIAN untuk kamar tujuan pindah — diwarisi dari tipenya.
+        // (Dulu BULANAN, sisa dari masa sebelum Z-Rooms fokus sewa harian.)
+        const hb = hargaEfektif(x, 'HARIAN')
         return {
           id: x.id,
           nomor: x.nomor,
           tipe: namaTipe(x.tipe),
-          hargaBulanan: hb > 0 ? hb : null,
-          deposit: hb > 0 ? depositEfektif(x, 'BULANAN') : null,
+          hargaHarian: hb > 0 ? hb : null,
+          deposit: hb > 0 ? depositEfektif(x, 'HARIAN') : null,
         }
       })
 
@@ -174,19 +176,27 @@ export default async function KamarPage() {
       ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
-          const hargaBulanan = hargaEfektif(k, 'BULANAN')
+          const hargaHarian = hargaEfektif(k, 'HARIAN')
           const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
           const penyewa = sewaAktif?.penyewa
           return (
             <div
               key={k.id}
-              className={`rounded-xl border p-3 text-center ${statusKamarColor(k.status)}`}
+              className={`rounded-xl border p-3 text-center h-full ${statusKamarColor(k.status)}`}
             >
-              <p className="font-semibold text-sm">{k.nomor}</p>
+              <PemicuJadwal
+                nomor={k.nomor}
+                sewa={k.sewa}
+                aturan={aturan}
+                sekarang={sekarang}
+                className="font-semibold text-sm underline decoration-dotted decoration-gray-400/60 underline-offset-2 hover:decoration-gray-700"
+              >
+                {k.nomor}
+              </PemicuJadwal>
               <p className="text-xs mt-0.5 opacity-75">{namaTipe(k.tipe)}</p>
-              {hargaBulanan > 0 && (
+              {hargaHarian > 0 && (
                 <p className="text-xs mt-1 font-medium">
-                  {formatRupiah(hargaBulanan)}<span className="opacity-60">/bln</span>
+                  {formatRupiah(hargaHarian)}<span className="opacity-60">/hari</span>
                 </p>
               )}
               <p className="text-xs mt-1 opacity-60 truncate">
@@ -260,7 +270,6 @@ export default async function KamarPage() {
             kunciAwal={KOLOM_BAWAAN}
             prefAwal={properti.prefTabelKamar ?? null}
             baris={kamar.map(k => {
-              const hargaBulanan = hargaEfektif(k, 'BULANAN')
               const hargaHarian = hargaEfektif(k, 'HARIAN')
               const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
               const penyewa = sewaAktif?.penyewa
@@ -290,15 +299,19 @@ export default async function KamarPage() {
                 ),
                 kolom: [
                   { kunci: 'nomor', judul: 'Nomor', nilai: k.nomor,
-                    sel: <span className="font-medium text-gray-800">{k.nomor}</span> },
+                    sel: <PemicuJadwal
+                      nomor={k.nomor}
+                      sewa={k.sewa}
+                      aturan={aturan}
+                      sekarang={sekarang}
+                      className="font-medium text-gray-800 underline decoration-dotted decoration-gray-400/60 underline-offset-2"
+                    >{k.nomor}</PemicuJadwal> },
                   { kunci: 'tipe', judul: 'Tipe', nilai: namaTipe(k.tipe),
                     sel: <span className="text-gray-600">{namaTipe(k.tipe)}</span> },
                   { kunci: 'luas', judul: 'Luas', nilai: k.luas ?? null,
                     sel: <span className="text-gray-500">{k.luas ? `${k.luas} m²` : '-'}</span> },
-                  { kunci: 'hargaHarian', judul: 'Harga/hari', nilai: hargaHarian || null,
+                  { kunci: 'harga', judul: 'Harga/hari', nilai: hargaHarian || null,
                     sel: <span className="text-gray-700">{hargaHarian > 0 ? formatRupiah(hargaHarian) : '-'}</span> },
-                  { kunci: 'harga', judul: 'Harga/bln', nilai: hargaBulanan || null,
-                    sel: <span className="text-gray-700">{hargaBulanan > 0 ? formatRupiah(hargaBulanan) : '-'}</span> },
                   { kunci: 'status', judul: 'Status', nilai: statusKamarLabel(k.status),
                     sel: <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span> },
                   { kunci: 'penyewa', judul: 'Penyewa', nilai: namaPenyewaAktif,
@@ -335,14 +348,22 @@ export default async function KamarPage() {
         {/* Mobile cards */}
         <div className="md:hidden space-y-2">
           {kamar.map(k => {
-            const hargaBulanan = hargaEfektif(k, 'BULANAN')
+            const hargaHarian = hargaEfektif(k, 'HARIAN')
             const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
             const penyewa = sewaAktif?.penyewa
             return (
               <div key={k.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-800 text-sm">{k.nomor}</span>
+                    <PemicuJadwal
+                      nomor={k.nomor}
+                      sewa={k.sewa}
+                      aturan={aturan}
+                      sekarang={sekarang}
+                      className="font-medium text-gray-800 text-sm underline decoration-dotted decoration-gray-400/60 underline-offset-2"
+                    >
+                      {k.nomor}
+                    </PemicuJadwal>
                     <span className={`badge text-[10px] ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span>
                     {sewaAktif && (() => {
                       const bayar = ringkasBayar(sewaAktif.tagihan, sekarang)
@@ -355,7 +376,7 @@ export default async function KamarPage() {
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {namaTipe(k.tipe)}{k.luas ? ` · ${k.luas}m²` : ''}
-                    {hargaBulanan > 0 ? ` · ${formatRupiah(hargaBulanan)}/bln` : ''}
+                    {hargaHarian > 0 ? ` · ${formatRupiah(hargaHarian)}/hari` : ''}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {penyewa ? namaPenyewa(penyewa.nama) : '-'} · {(() => { const f = fasilitasEfektif(k); return f.slice(0, 2).join(', ') + (f.length > 2 ? '…' : '') })()}

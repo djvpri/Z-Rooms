@@ -347,9 +347,13 @@ export default function TipeKamarPage() {
                 </div>
 
                 <div>
+                  {/* Z-Rooms fokus sewa harian: hanya tarif harian yang diisi.
+                      Tarif periode lain tetap tersimpan di DB untuk sewa LAMA —
+                      kolomnya cuma tak ditawarkan lagi. Grid 1 kolom, bukan 4,
+                      karena cuma satu isian. */}
                   <label className="form-label">Harga sewa per tipe</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {PERIODE_SEWA.map((p) => (
+                  <div className="max-w-[12rem]">
+                    {PERIODE_SEWA.filter((p) => p === 'HARIAN').map((p) => (
                       <div key={p}>
                         <label htmlFor={`harga-${p}`} className="text-xs text-gray-500">{LABEL_PERIODE[p]}</label>
                         <input
@@ -361,7 +365,7 @@ export default function TipeKamarPage() {
                     ))}
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    Semua kamar bertipe ini memakai harga di sini. Kosongkan kolom yang tidak disewakan.
+                    Semua kamar bertipe ini memakai harga di sini.
                   </p>
                 </div>
 

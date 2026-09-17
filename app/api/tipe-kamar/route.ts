@@ -39,7 +39,15 @@ const tipeSchema = z.object({
  * Tulis ulang daftar harga tipe: baris yang dikirim di-upsert, periode yang
  * tidak ikut dikirim dihapus. Cara ini bikin form harga bisa "kosongkan kolom
  * Bulanan" tanpa perlu endpoint hapus terpisah.
+ *
+ * PENGECUALIAN periode non-harian: form kini hanya mengirim HARIAN (Z-Rooms
+ * fokus sewa harian), jadi BULANAN/TAHUNAN akan selalu masuk daftar "tak
+ * dikirim" dan tarifnya terhapus tiap kali tipe kamar disimpan — padahal sewa
+ * lama masih memakainya. Karena itu periode non-harian tak pernah dihapus lagi;
+ * barisnya dibiarkan apa adanya. Hapus manual lewat DB kalau memang mau dibuang.
  */
+const PERIODE_DIKEKALKAN: readonly string[] = PERIODE_SEWA.filter(p => p !== 'HARIAN')
+
 async function simpanHarga(tipeKamarId: string, daftar: z.infer<typeof hargaSchema>[]) {
   const periodeDikirim = new Set(daftar.map(h => h.periodeSewa))
   for (const h of daftar) {
@@ -59,7 +67,9 @@ async function simpanHarga(tipeKamarId: string, daftar: z.infer<typeof hargaSche
       },
     })
   }
-  const takDikirim = PERIODE_SEWA.filter(p => !periodeDikirim.has(p))
+  const takDikirim = PERIODE_SEWA.filter(
+    p => !periodeDikirim.has(p) && !PERIODE_DIKEKALKAN.includes(p),
+  )
   if (takDikirim.length > 0) {
     await prisma.hargaTipe.deleteMany({
       where: { tipeKamarId, periodeSewa: { in: [...takDikirim] } },

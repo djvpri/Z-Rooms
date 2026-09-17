@@ -16,7 +16,7 @@ export interface KamarTersedia {
   id: string
   nomor: string
   tipe: string
-  hargaBulanan: number | null
+  hargaHarian: number | null
   deposit: number | null
 }
 
@@ -344,7 +344,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                         <option value="">— pilih kamar —</option>
                         {kamarTersedia.map(k => (
                           <option key={k.id} value={k.id}>
-                            {k.nomor} · {k.tipe}{k.hargaBulanan ? ` · ${formatRupiah(k.hargaBulanan)}` : ''}
+                            {k.nomor} · {k.tipe}{k.hargaHarian ? ` · ${formatRupiah(k.hargaHarian)}` : ''}
                           </option>
                         ))}
                       </select>
@@ -358,7 +358,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                       </div>
                       <div>
                         <label className="form-label">
-                          Durasi ({sewa.periodeSewa === 'HARIAN' ? 'hari' : sewa.periodeSewa === 'MINGGUAN' ? 'minggu' : sewa.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})
+                          Durasi (hari)
                         </label>
                         <input type="number" className="form-input" value={durasi} min={1}
                           onChange={e => setDurasi(e.target.value)} />
@@ -386,7 +386,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                         </div>
                         <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
                           <span className="text-gray-500">Harga kamar baru</span>
-                          <span className="text-gray-800">{tujuan.hargaBulanan ? formatRupiah(tujuan.hargaBulanan) : '—'}</span>
+                          <span className="text-gray-800">{tujuan.hargaHarian ? formatRupiah(tujuan.hargaHarian) : '—'}</span>
                         </div>
                       </div>
                     )}

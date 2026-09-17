@@ -6,7 +6,7 @@ import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-boot
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib, akhirBulan } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
 import { celahKosong, bolehDipesan } from '@/lib/jadwalKamar'
-import { tanggalKeluar } from '@/lib/sewa'
+import { tanggalKeluar, type PeriodeDikenal } from '@/lib/sewa'
 import PilihWaktu, { JAM_MASUK, daftarTanggal } from './PilihWaktu'
 
 type NotaBooking = {
@@ -58,8 +58,6 @@ type PropertiNota = {
   jamCheckout: string
   toleransiCheckout: number
 }
-
-const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
 
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
@@ -289,7 +287,7 @@ export default function BookingPage() {
       // SAMA dipakai route server (app/api/booking/route.ts:89). Menyalin
       // logika durasinya ke sini berarti dua tempat yang bisa berbeda pendapat
       // dengan validasi server.
-      const keluar = tanggalKeluar(masuk, form.periodeSewa as 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN', form.durasi)
+      const keluar = tanggalKeluar(masuk, form.periodeSewa as PeriodeDikenal, form.durasi)
       return !bolehDipesan(
         { mulai: masuk, selesai: keluar },
         kamarDipilih?.sewa ?? [],
@@ -663,12 +661,11 @@ export default function BookingPage() {
               </select>
             </div>
             <div>
+              {/* Periode dikunci harian: Z-Rooms difokuskan untuk sewa harian.
+                  Sewa lama berperiode lain tetap tampil apa adanya di daftar dan
+                  nota — yang tak ditawarkan lagi hanya sewa BARU. */}
               <label className="form-label">Periode sewa</label>
-              <select className="form-input" value={form.periodeSewa} onChange={e => set('periodeSewa', e.target.value)}>
-                {PERIODE.map(p => (
-                  <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
-                ))}
-              </select>
+              <div className="form-input flex items-center bg-gray-50 text-gray-700">Harian</div>
             </div>
           </div>
 
@@ -718,7 +715,7 @@ export default function BookingPage() {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>
+              <label className="form-label">Durasi (hari)</label>
               <input type="number" min={1} max={36} className="form-input" value={form.durasi} onChange={e => set('durasi', Number(e.target.value))} />
             </div>
             <div className="flex items-end">
