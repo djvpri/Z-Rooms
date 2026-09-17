@@ -7,6 +7,7 @@ import { tglJamJadiDate } from '@/lib/utils'
 import { z } from 'zod'
 import { addDays } from 'date-fns'
 import { tanggalKeluar } from '@/lib/sewa'
+import { bolehDipesan, statusUntuk } from '@/lib/jadwalKamar'
 
 const bookingSchema = z.object({
   // Penyewa — nama & noHp opsional (penyewa boleh dicatat dulu tanpa data
@@ -55,13 +56,20 @@ export async function POST(req: NextRequest) {
   if (!properti) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
 
   // Tarif kini milik tipe kamar — ambil lewat relasi, bukan dari kamar langsung.
+  // Sewa yang sedang AKTIF ikut diambil: kamar yang terisi TETAP boleh dibooking
+  // untuk tanggal setelah penghuninya keluar (lihat lib/jadwalKamar.ts).
   const kamar = await prisma.kamar.findFirst({
     where: { id: d.kamarId, propertiId: properti.id },
-    include: { tipe: { include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } } } },
+    include: {
+      tipe: { include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } } },
+      sewa: { where: { statusSewa: 'AKTIF' }, select: { statusSewa: true, tanggalMasuk: true, tanggalKeluar: true }, take: 1 },
+    },
   })
   if (!kamar) return NextResponse.json({ error: 'Kamar tidak ditemukan' }, { status: 404 })
-  if (kamar.status !== 'TERSEDIA' && kamar.status !== 'DIPESAN') {
-    return NextResponse.json({ error: 'Kamar tidak tersedia' }, { status: 400 })
+  // Kamar PEMELIHARAAN tetap ditolak — itu bukan "sedang dihuni", itu sengaja
+  // ditarik dari peredaran. Terisi & dipesan dibolehkan; bentroknya dihitung.
+  if (kamar.status === 'PEMELIHARAAN') {
+    return NextResponse.json({ error: 'Kamar sedang dalam pemeliharaan' }, { status: 400 })
   }
 
   // Gabung tanggal + jam masuk jadi satu Date pada jam WIB. Sebelumnya hanya
@@ -73,6 +81,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Tanggal masuk tidak valid' }, { status: 400 })
   }
   const keluar = tanggalKeluar(masuk, d.periodeSewa, d.durasi)
+
+  // Aturan properti diperlukan untuk tahu kapan kamar benar-benar dilepas
+  // penghuni sekarang (jam check-out + toleransi), bukan tanggalKeluar mentah.
+  const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
+  const sewaAktif = kamar.sewa[0] ?? null
+  const izin = bolehDipesan(masuk, sewaAktif, aturan)
+  if (!izin.boleh) {
+    return NextResponse.json({ error: izin.pesan }, { status: 400 })
+  }
+  // Kamar masih dihuni -> sewa MENUNGGU, bukan menempati. Kamarnya tetap
+  // TERISI sampai penghuni sekarang checkout; tanpa ini kamar tampak kosong
+  // padahal masih ada orang di dalamnya.
+  const statusSewaBaru = statusUntuk(masuk, sewaAktif, aturan)
 
   const harga = Number(kamar.tipe?.harga[0]?.harga ?? 0)
 
@@ -129,7 +150,7 @@ export async function POST(req: NextRequest) {
         tanggalKeluar: keluar,
         hargaSewa: Number(harga),
         deposit: d.deposit,
-        statusSewa: 'AKTIF',
+        statusSewa: statusSewaBaru,
         metodeBayar: d.metodeBayar,
         catatan: d.catatan,
       },

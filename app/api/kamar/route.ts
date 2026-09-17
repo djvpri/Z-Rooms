@@ -32,9 +32,15 @@ export async function GET(req: NextRequest) {
       // /kamar) memakai `hargaRingkas` untuk membacanya.
       tipe: { include: { harga: { where: { aktif: true } } } },
       sewa: {
-        where: { statusSewa: 'AKTIF' },
+        // Sewa AKTIF (penghuni sekarang) DAN PENDING (yang sudah memesan untuk
+        // setelahnya). Booking butuh keduanya: yang AKTIF menentukan kapan kamar
+        // bebas, yang PENDING menunjukkan kamar sudah ada yang menunggu.
+        // Pemanggil lain (halaman Kamar) memakai `sewa[0]` — karena query-nya
+        // sendiri hanya mengambil AKTIF, urutan di sini tak mengubah artinya
+        // di sana.
+        where: { statusSewa: { in: ['AKTIF', 'PENDING'] } },
         include: { penyewa: { select: { nama: true, noHp: true } } },
-        take: 1,
+        orderBy: { statusSewa: 'asc' },   // AKTIF dulu (alfabetis), lalu PENDING
       },
     },
     orderBy: { nomor: 'asc' },

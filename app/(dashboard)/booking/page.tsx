@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock } from 'react-bootstrap-icons'
-import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, sekarangWib } from '@/lib/utils'
+import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
 
 type NotaBooking = {
@@ -21,6 +21,16 @@ type Kamar = {
   // sewa melekat pada tipe, bukan per kamar.
   tipe: { id: string; nama: string; harga: { periodeSewa: string; harga: string }[] } | null
   luas: number | null
+  status?: string
+  // Penghuni sekarang (AKTIF) dan/atau yang sudah memesan untuk setelahnya
+  // (PENDING). Kamar terisi tetap bisa dibooking setelah jam check-out, jadi
+  // kasir perlu tahu terisi sampai kapan — bukan sekadar kamarnya disembunyikan.
+  sewa?: {
+    statusSewa: string
+    tanggalMasuk: string
+    tanggalKeluar: string
+    penyewa?: { nama: string | null; noHp: string | null } | null
+  }[]
 }
 
 type PenyewaHasil = {
@@ -119,7 +129,12 @@ export default function BookingPage() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/kamar?status=TERSEDIA')
+    // Semua kamar, bukan cuma yang TERSEDIA: kamar yang sedang dihuni tetap
+    // boleh dibooking untuk tanggal setelah penghuninya keluar. Penyaringan
+    // dilakukan saat kamar dipilih (lihat aturanBentrok), bukan dengan
+    // menyembunyikan kamarnya — kasir perlu TAHU kamar mana yang terisi dan
+    // sampai kapan, bukan mendapati kamarnya hilang dari daftar.
+    fetch('/api/kamar')
       .then(r => r.json())
       .then(setKamarList)
   }, [])
@@ -224,6 +239,15 @@ export default function BookingPage() {
   // Tarif datang dari tipe kamar, bukan dari kamar langsung.
   const hargaKamar = kamarDipilih?.tipe?.harga.find(h => h.periodeSewa === form.periodeSewa)
   const hargaNum = hargaKamar ? Number(hargaKamar.harga) : 0
+
+  // Penghuni sekarang, kalau ada. Kamar seperti ini tetap boleh dibooking
+  // untuk tanggal setelah penghuninya keluar — jadi yang ditampilkan adalah
+  // "terisi sampai kapan", bukan larangan.
+  const sewaAktif = kamarDipilih?.sewa?.find(s => s.statusSewa === 'AKTIF') ?? null
+  const pesananMenunggu = kamarDipilih?.sewa?.filter(s => s.statusSewa === 'PENDING') ?? []
+  const batasLepas = sewaAktif && propertiNota
+    ? batasCheckout(new Date(sewaAktif.tanggalKeluar), propertiNota)
+    : null
 
   function set(key: string, val: string | number | boolean) {
     setForm(f => ({ ...f, [key]: val }))
@@ -567,11 +591,18 @@ export default function BookingPage() {
               <label className="form-label">Pilih kamar *</label>
               <select className="form-input" value={form.kamarId} onChange={e => set('kamarId', e.target.value)} required>
                 <option value="">-- Pilih kamar --</option>
-                {kamarList.map(k => (
-                  <option key={k.id} value={k.id}>
-                    {k.nomor} — {k.tipe?.nama ?? 'Tanpa tipe'}{k.luas ? ` (${k.luas}m²)` : ''}
-                  </option>
-                ))}
+                {kamarList.map(k => {
+                  const aktif = k.sewa?.find(s => s.statusSewa === 'AKTIF')
+                  const menunggu = k.sewa?.filter(s => s.statusSewa === 'PENDING') ?? []
+                  const ket = aktif
+                    ? ` — terisi${menunggu.length ? `, ${menunggu.length} pesanan menunggu` : ''}`
+                    : menunggu.length ? ` — ${menunggu.length} pesanan menunggu` : ''
+                  return (
+                    <option key={k.id} value={k.id}>
+                      {k.nomor} — {k.tipe?.nama ?? 'Tanpa tipe'}{k.luas ? ` (${k.luas}m²)` : ''}{ket}
+                    </option>
+                  )
+                })}
               </select>
             </div>
             <div>
@@ -584,6 +615,24 @@ export default function BookingPage() {
             </div>
           </div>
 
+          {/* Kamar terisi tetap boleh dibooking setelah penghuninya keluar.
+              Ditampilkan sebagai keadaan + tanggal aman, bukan larangan —
+              kasir bisa langsung memilih tanggal yang benar tanpa menebak. */}
+          {sewaAktif && batasLepas && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              Kamar ini sedang dihuni {sewaAktif.penyewa?.nama ?? 'penyewa'} sampai{' '}
+              <strong>{tglJamSingkat(batasLepas)}</strong>. Booking tetap bisa dibuat untuk tanggal
+              masuk setelah itu.
+              {pesananMenunggu.length > 0 && (
+                <> Sudah ada {pesananMenunggu.length} pesanan menunggu setelahnya.</>
+              )}
+            </p>
+          )}
+          {!sewaAktif && pesananMenunggu.length > 0 && (
+            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+              Kamar ini kosong, tetapi sudah ada {pesananMenunggu.length} pesanan menunggu.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between mb-1">

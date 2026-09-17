@@ -33,7 +33,11 @@ export default async function KamarPage() {
       // fasilitas (untuk kamar yang belum diisi sendiri) dan harga sewa.
       tipe: { select: { id: true, nama: true, fasilitas: true, harga: { where: { aktif: true } } } },
       sewa: {
-        where: { statusSewa: 'AKTIF' },
+        // Penghuni sekarang (AKTIF) DAN penyewa berikutnya yang sudah memesan
+        // (PENDING) — supaya kamar yang sudah ada antrean terlihat, bukan
+        // tampak kosong begitu di-booking. Diurut AKTIF dulu, lalu PENDING
+        // menurut tanggal masuk; pemakai memisahkannya sendiri.
+        where: { statusSewa: { in: ['AKTIF', 'PENDING'] } },
         include: {
           penyewa: { select: { nama: true, noHp: true } },
           // SEMUA tagihan sewa ini, bukan cuma yang belum bayar: badge "sudah
@@ -44,7 +48,7 @@ export default async function KamarPage() {
             select: { nominal: true, status: true, jatuhTempo: true },
           },
         },
-        take: 1,
+        orderBy: [{ statusSewa: 'asc' }, { tanggalMasuk: 'asc' }],
       },
     },
     orderBy: { nomor: 'asc' },
@@ -72,7 +76,7 @@ export default async function KamarPage() {
   const sekarang = new Date()
   const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
   const jumlahLewat = kamar.filter(k => {
-    const s = k.sewa[0]
+    const s = k.sewa.find(x => x.statusSewa === 'AKTIF')
     return s ? cekLewat(s.tanggalKeluar, aturan, sekarang).lewat : false
   }).length
 
@@ -171,7 +175,7 @@ export default async function KamarPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 mb-8">
         {kamar.map(k => {
           const hargaBulanan = hargaEfektif(k, 'BULANAN')
-          const sewaAktif = k.sewa[0]
+          const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
           const penyewa = sewaAktif?.penyewa
           return (
             <div
@@ -215,6 +219,18 @@ export default async function KamarPage() {
                   </p>
                 ) : null
               })()}
+              {/* Penyewa berikutnya yang sudah memesan. Kamar bisa dibooking
+                  sebelum penghuni sekarang keluar, jadi tanpa baris ini kamar
+                  tampak kosong padahal sudah ada yang menunggu. */}
+              {(() => {
+                const akan = k.sewa.filter(x => x.statusSewa === 'PENDING')
+                return akan.length > 0 ? (
+                  <p className="text-[10px] mt-1 px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 inline-block">
+                    Dipesan {tglJamSingkat(akan[0].tanggalMasuk)}
+                    {akan.length > 1 ? ` +${akan.length - 1}` : ''}
+                  </p>
+                ) : null
+              })()}
               {/* Ubah data kamar. Selalu tersedia — nomor, tipe, luas, fasilitas
                   boleh dikoreksi kapan saja; yang tak boleh cuma `status`. */}
               <div className="mt-2">
@@ -246,10 +262,14 @@ export default async function KamarPage() {
             baris={kamar.map(k => {
               const hargaBulanan = hargaEfektif(k, 'BULANAN')
               const hargaHarian = hargaEfektif(k, 'HARIAN')
-              const sewaAktif = k.sewa[0]
+              const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
               const penyewa = sewaAktif?.penyewa
               const fasilitas = fasilitasEfektif(k)
               const namaPenyewaAktif = penyewa ? namaPenyewa(penyewa.nama) : null
+              // Penyewa berikutnya yang sudah memesan (sewa PENDING). Kamar
+              // kosong tapi sudah ada antrean harus terlihat — kalau tidak,
+              // kamar tampak siap dihuni padahal sudah dijanjikan.
+              const akan = k.sewa.filter(x => x.statusSewa === 'PENDING')
               const statusBayar = sewaAktif ? ringkasBayar(sewaAktif.tagihan, sekarang) : null
               const masuk = sewaAktif ? tglJamSingkat(sewaAktif.tanggalMasuk) : null
               const selesai = sewaAktif ? tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan)) : null
@@ -282,7 +302,15 @@ export default async function KamarPage() {
                   { kunci: 'status', judul: 'Status', nilai: statusKamarLabel(k.status),
                     sel: <span className={`badge ${statusKamarColor(k.status)}`}>{statusKamarLabel(k.status)}</span> },
                   { kunci: 'penyewa', judul: 'Penyewa', nilai: namaPenyewaAktif,
-                    sel: <span className="text-gray-600">{namaPenyewaAktif ?? '-'}</span> },
+                    sel: <span className="text-gray-600">
+                      {namaPenyewaAktif ?? '-'}
+                      {akan.length > 0 && (
+                        <span className="ml-1 badge bg-sky-100 text-sky-800 whitespace-nowrap"
+                          title={`Dipesan ${tglJamSingkat(akan[0].tanggalMasuk)}`}>
+                          +{akan.length} pesanan
+                        </span>
+                      )}
+                    </span> },
                   { kunci: 'bayar', judul: 'Bayar', nilai: statusBayar ? statusTagihanLabel(statusBayar.status) : null,
                     sel: statusBayar
                       ? <span className={`badge ${statusTagihanColor(statusBayar.status)}`}>{statusTagihanLabel(statusBayar.status)}</span>
@@ -308,7 +336,7 @@ export default async function KamarPage() {
         <div className="md:hidden space-y-2">
           {kamar.map(k => {
             const hargaBulanan = hargaEfektif(k, 'BULANAN')
-            const sewaAktif = k.sewa[0]
+            const sewaAktif = k.sewa.find(x => x.statusSewa === 'AKTIF')
             const penyewa = sewaAktif?.penyewa
             return (
               <div key={k.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
@@ -339,6 +367,17 @@ export default async function KamarPage() {
                       Selesai {tglJamSingkat(batasCheckout(sewaAktif.tanggalKeluar, aturan))}
                     </div>
                   )}
+                  {/* Pesanan menunggu: kamar bisa dibooking sebelum penghuni
+                      sekarang keluar, jadi antreannya perlu terlihat. */}
+                  {(() => {
+                    const akan = k.sewa.filter(x => x.statusSewa === 'PENDING')
+                    return akan.length > 0 ? (
+                      <div className="text-xs text-sky-700 mt-0.5">
+                        Dipesan {tglJamSingkat(akan[0].tanggalMasuk)}
+                        {akan.length > 1 ? ` +${akan.length - 1}` : ''}
+                      </div>
+                    ) : null
+                  })()}
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
                   <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
