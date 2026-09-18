@@ -21,11 +21,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   PlusLg, MusicNoteBeamed, ExclamationTriangleFill, X, CashCoin,
-  ClockHistory, Printer,
+  ClockHistory, Printer, CupStraw, BarChartLine,
 } from 'react-bootstrap-icons'
 import { AMBANG_MENDESAK_MENIT, TOLERANSI_BOOKING_MENIT, formatDurasi } from '@/lib/karaoke'
 
 type Ruang = { id: string; nama: string; kapasitas: number | null; aktif: boolean }
+type Produk = { id: string; nama: string; hargaJual: string | number; stok: number }
+type BarisMinuman = {
+  id: string
+  produkId: string
+  namaProduk: string
+  hargaSatuan: string | number
+  jumlah: number
+  subtotal: string | number
+}
 type Sesi = {
   id: string
   nomor: string
@@ -40,9 +49,16 @@ type Sesi = {
   status: 'BOOKING' | 'BERJALAN' | 'SELESAI' | 'BATAL'
   catatan: string | null
   ruang?: { id: string; nama: string }
+  minuman?: BarisMinuman[]
 }
 
 const rupiah = (n: unknown) => 'Rp ' + Number(n).toLocaleString('id-ID')
+
+/** "2026-09-18T19:00" untuk input datetime-local, dari waktu server. */
+function keLokalInput(ms: number): string {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000)
+  return d.toISOString().slice(0, 16)
+}
 
 export default function KaraokePage() {
   const [ruang, setRuang] = useState<Ruang[]>([])
@@ -57,9 +73,15 @@ export default function KaraokePage() {
   const [geser, setGeser] = useState(0)
   const [, setDetak] = useState(0)
 
-  const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string } | null>(null)
+  const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string; pada: string } | null>(null)
   const [proses, setProses] = useState(false)
   const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number } } | null>(null)
+
+  // Minuman: katalog produk dimuat sekali (untuk panel minuman), dan sesi yang
+  // panelnya sedang dibuka. Panel dibuka atas permintaan kasir — bukan otomatis
+  // untuk semua kartu, karena tiap panel berarti satu permintaan katalog.
+  const [produk, setProduk] = useState<Produk[]>([])
+  const [panelMinuman, setPanelMinuman] = useState<{ sesiId: string; produkId: string; jumlah: string } | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setDetak((d) => d + 1), 1000)
@@ -130,12 +152,83 @@ export default function KaraokePage() {
           namaPelanggan: formBuka.nama || null,
           durasiMenit: durasi,
           jaminan: formBuka.jaminan ? Number(formBuka.jaminan.replace(/[^\d]/g, '')) : 0,
+          // Kosong = mulai sekarang (BERJALAN). Terisi = BOOKING untuk jam itu.
+          // `new Date(...).toISOString()` mengubah waktu lokal kasir jadi UTC
+          // berlabel, jadi server tak perlu tahu zona waktu perangkat.
+          ...(formBuka.pada ? { pada: new Date(formBuka.pada).toISOString() } : {}),
         }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal membuka sesi.')
-      setPesan(`Sesi ${data.sesi.nomor} dibuka. ${rupiah(data.sesi.totalSewa)} untuk ${data.sesi.jumlahJam} jam.`)
+      const booking = data.sesi.status === 'BOOKING'
+      setPesan(
+        booking
+          ? `Booking ${data.sesi.nomor} untuk ${new Date(data.sesi.mulaiPada).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}. ${rupiah(data.sesi.totalSewa)}.`
+          : `Sesi ${data.sesi.nomor} dibuka. ${rupiah(data.sesi.totalSewa)} untuk ${data.sesi.jumlahJam} jam.`,
+      )
       setFormBuka(null)
+      await muat()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setProses(false)
+    }
+  }
+
+  /** Katalog produk dimuat sekali saat panel pertama dibuka. */
+  async function bukaPanelMinuman(s: Sesi) {
+    setPanelMinuman({ sesiId: s.id, produkId: '', jumlah: '1' })
+    if (produk.length > 0) return
+    try {
+      const res = await fetch('/api/produk', { cache: 'no-store' })
+      const data = await res.json().catch(() => null)
+      if (res.ok) setProduk(data?.produk ?? [])
+    } catch {
+      // Diamkan: katalog gagal dimuat bukan alasan memblokir kasir. Panel tetap
+      // terbuka dan pesannya muncul saat kasir menekan Tambah.
+      setProduk([])
+    }
+  }
+
+  async function tambahMinuman(e: React.FormEvent) {
+    e.preventDefault()
+    if (!panelMinuman?.produkId) return
+    setError('')
+    setPesan('')
+    setProses(true)
+    try {
+      const res = await fetch(`/api/karaoke/sesi/${panelMinuman.sesiId}/minuman`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produkId: panelMinuman.produkId, jumlah: Number(panelMinuman.jumlah || 1) }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        // STOK_KURANG datang sebagai `pesan`, bukan `error.message` — bentuk ini
+        // dipakai bersama jalur penjualan barang.
+        throw new Error(data?.pesan ?? data?.error?.message ?? 'Gagal menambah minuman.')
+      }
+      setPesan(`${data.baris.namaProduk} × ${data.baris.jumlah} ditambahkan. Total jadi ${rupiah(data.total)}.`)
+      if (data.peringatanJaminan) setError(data.peringatanJaminan)
+      setPanelMinuman({ ...panelMinuman, produkId: '', jumlah: '1' })
+      await muat()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setProses(false)
+    }
+  }
+
+  async function hapusMinuman(sesiId: string, baris: BarisMinuman) {
+    if (!window.confirm(`Hapus ${baris.namaProduk} × ${baris.jumlah} dari sesi ini? Stok dikembalikan.`)) return
+    setError('')
+    setPesan('')
+    setProses(true)
+    try {
+      const res = await fetch(`/api/karaoke/sesi/${sesiId}/minuman?itemId=${baris.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal menghapus minuman.')
+      setPesan(data?.pesan ?? 'Minuman dihapus.')
       await muat()
     } catch (e) {
       setError((e as Error).message)
@@ -208,9 +301,14 @@ export default function KaraokePage() {
             {ruang.length} ruang · {berjalan} sedang dipakai
           </p>
         </div>
-        <Link href="/pengaturan/karaoke" className="btn btn-ghost text-xs">
-          <MusicNoteBeamed aria-hidden="true" /> Tarif
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/karaoke/laporan" className="btn btn-ghost text-xs">
+            <BarChartLine aria-hidden="true" /> Laporan
+          </Link>
+          <Link href="/pengaturan/karaoke" className="btn btn-ghost text-xs">
+            <MusicNoteBeamed aria-hidden="true" /> Tarif
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -244,9 +342,20 @@ export default function KaraokePage() {
               sesi={s}
               sekarang={sekarang}
               proses={proses}
-              onBuka={() => setFormBuka({ ruangId: r.id, nama: '', jam: '1', menit: '0', jaminan: '' })}
+              onBuka={() => setFormBuka({ ruangId: r.id, nama: '', jam: '1', menit: '0', jaminan: '', pada: '' })}
               onTutup={s ? () => tutupSesi(s) : undefined}
               onBatal={s ? () => batalSesi(s) : undefined}
+              onMinuman={s && s.status === 'BERJALAN' ? () => void bukaPanelMinuman(s) : undefined}
+              onHapusMinuman={s ? (b) => void hapusMinuman(s.id, b) : undefined}
+              minumanDibuka={panelMinuman?.sesiId === s?.id}
+              panel={
+                panelMinuman && panelMinuman.sesiId === s?.id
+                  ? { produkId: panelMinuman.produkId, jumlah: panelMinuman.jumlah }
+                  : undefined
+              }
+              produk={produk}
+              onPanel={(p) => setPanelMinuman((f) => (f ? { ...f, ...p } : f))}
+              onSimpanMinuman={tambahMinuman}
             />
           )
         })}
@@ -316,9 +425,43 @@ export default function KaraokePage() {
               </span>
             </label>
 
+            <label className="block mb-4">
+              <span className="block text-xs text-gray-500 mb-1">Mulai</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`btn text-xs flex-1 ${formBuka.pada ? 'btn-ghost' : 'btn-primary'}`}
+                  onClick={() => setFormBuka((f) => (f ? { ...f, pada: '' } : f))}
+                >
+                  Sekarang
+                </button>
+                <button
+                  type="button"
+                  className={`btn text-xs flex-1 ${formBuka.pada ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setFormBuka((f) => (f ? { ...f, pada: keLokalInput(Date.now() + geser + 3600000) } : f))}
+                >
+                  Booking (nanti)
+                </button>
+              </div>
+              {formBuka.pada && (
+                <input
+                  className="input w-full mt-2"
+                  type="datetime-local"
+                  required
+                  value={formBuka.pada}
+                  onChange={(e) => setFormBuka((f) => (f ? { ...f, pada: e.target.value } : f))}
+                />
+              )}
+              <span className="block text-[11px] text-gray-400 mt-1">
+                {formBuka.pada
+                  ? 'Booking memegang ruang 15 menit setelah jam ini. Lewat itu ruang dianggap lepas.'
+                  : 'Sesi berjalan mulai sekarang.'}
+              </span>
+            </label>
+
             <div className="flex gap-2">
               <button type="submit" className="btn btn-primary flex-1" disabled={proses}>
-                <PlusLg aria-hidden="true" /> {proses ? 'Membuka…' : 'Mulai'}
+                <PlusLg aria-hidden="true" /> {proses ? 'Menyimpan…' : formBuka.pada ? 'Booking' : 'Mulai'}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setFormBuka(null)}>
                 Batal
@@ -347,6 +490,13 @@ function KartuRuang({
   onBuka,
   onTutup,
   onBatal,
+  onMinuman,
+  onHapusMinuman,
+  minumanDibuka,
+  panel,
+  produk,
+  onPanel,
+  onSimpanMinuman,
 }: {
   ruang: Ruang
   sesi?: Sesi
@@ -355,6 +505,13 @@ function KartuRuang({
   onBuka: () => void
   onTutup?: () => void
   onBatal?: () => void
+  onMinuman?: () => void
+  onHapusMinuman?: (b: BarisMinuman) => void
+  minumanDibuka?: boolean
+  panel?: { produkId: string; jumlah: string }
+  produk?: Produk[]
+  onPanel?: (p: { produkId: string; jumlah: string }) => void
+  onSimpanMinuman?: (e: React.FormEvent) => void
 }) {
   const dipakai = Boolean(sesi)
 
@@ -388,6 +545,7 @@ function KartuRuang({
   const mendesak = sisaMenit <= AMBANG_MENDESAK_MENIT
   const lewatMenit = Math.floor((sekarang - mulai) / 60000)
   const lewatJam = Math.max(1, Math.ceil(lewatMenit / 60))
+  const totalMinuman = (sesi.minuman ?? []).reduce((a, b) => a + Number(b.subtotal), 0)
 
   // Warna: BERJALAN tenang, mendesak kuning, lewat merah. BOOKING beda warna
   // supaya kasir tak mengira ruang sudah terisi.
@@ -440,8 +598,77 @@ function KartuRuang({
       <p className="text-[11px] text-gray-400 mt-2">
         Sewa tercatat {rupiah(sesi.totalSewa)}
         {Number(sesi.jaminan) > 0 && ` · jaminan ${rupiah(sesi.jaminan)}`}
+        {totalMinuman > 0 && ` · minuman ${rupiah(totalMinuman)}`}
         {mendesak && berjalan && !lampau && ' · siap-siap ruang kosong'}
       </p>
+
+      {/* Minuman: hanya sesi BERJALAN yang bisa dicatat. BOOKING belum
+          didatangi pelanggannya, jadi mencatat minumannya berarti memotong
+          stok untuk penjualan yang belum tentu terjadi. */}
+      {berjalan && (
+        <div className="mt-3 border-t border-gray-200/70 pt-3">
+          {(sesi.minuman ?? []).length > 0 && (
+            <div className="space-y-1 mb-2">
+              {(sesi.minuman ?? []).map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-gray-600">
+                    {b.namaProduk} × {b.jumlah}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="tabular-nums text-gray-500">{rupiah(b.subtotal)}</span>
+                    <button
+                      type="button"
+                      className="text-coral-500 hover:text-coral-700 disabled:opacity-40"
+                      onClick={() => onHapusMinuman?.(b)}
+                      disabled={proses}
+                      aria-label={`Hapus ${b.namaProduk}`}
+                      title="Hapus (stok dikembalikan)"
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {minumanDibuka && panel && onPanel && (
+            <form onSubmit={onSimpanMinuman} className="flex gap-2 mb-2">
+              <select
+                className="input flex-1 text-xs"
+                value={panel.produkId}
+                onChange={(e) => onPanel({ ...panel, produkId: e.target.value })}
+                required
+              >
+                <option value="">Pilih minuman…</option>
+                {(produk ?? []).map((p) => (
+                  <option key={p.id} value={p.id} disabled={p.stok <= 0}>
+                    {p.nama} — {rupiah(p.hargaJual)} (stok {p.stok})
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-16 text-xs text-center"
+                type="number"
+                min={1}
+                max={999}
+                value={panel.jumlah}
+                onChange={(e) => onPanel({ ...panel, jumlah: e.target.value })}
+                aria-label="Jumlah"
+              />
+              <button type="submit" className="btn btn-primary text-xs" disabled={proses || !panel.produkId}>
+                Tambah
+              </button>
+            </form>
+          )}
+
+          {(produk ?? []).length === 0 && minumanDibuka && (
+            <p className="text-[11px] text-gray-400 mb-2">
+              Belum ada produk aktif. Tambahkan di menu Produk.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2 mt-3">
         {berjalan ? (
@@ -451,6 +678,11 @@ function KartuRuang({
         ) : (
           <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
             <ClockHistory aria-hidden="true" /> Pelanggan datang
+          </button>
+        )}
+        {onMinuman && (
+          <button className="btn btn-ghost text-xs" onClick={onMinuman} disabled={proses}>
+            <CupStraw aria-hidden="true" /> Minuman
           </button>
         )}
         <button className="btn btn-ghost text-xs text-coral-600" onClick={onBatal} disabled={proses}>

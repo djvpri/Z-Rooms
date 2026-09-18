@@ -6,7 +6,14 @@
 //
 // Dijalankan lewat `npm run check` (scripts/check-all.mjs memanggilnya).
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import * as Mod from '../lib/karaoke.ts'
+
+// Untuk pemeriksaan statis (bagian 18): berkas uji ini harus bisa membaca
+// sumber route-nya sendiri tanpa membutuhkan DB.
+const akarRepo = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const K = Mod.default ?? Mod
 
@@ -145,7 +152,7 @@ const jam = (h, m = 0) => new Date(`2026-09-18T${String(h).padStart(2, '0')}:${S
 {
   const ada = [{ status: 'BERJALAN', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: null }]
   assert.equal(
-    K.bentrok(ada, jam(21), jam(23), null).bentrok,
+    K.bentrok(ada, jam(21), jam(23), jam(18, 30)).bentrok,
     true,
     'BERJALAN memegang ruang sampai tak terbatas — mulai 21:00 harus BENTROK',
   )
@@ -154,25 +161,27 @@ const jam = (h, m = 0) => new Date(`2026-09-18T${String(h).padStart(2, '0')}:${S
 // Berurutan tepat setelah sesi SELESAI → boleh.
 {
   const ada = [{ status: 'SELESAI', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: jam(21) }]
-  assert.equal(K.bentrok(ada, jam(21), jam(23), null).bentrok, false, 'sesi SELESAI tak memegang ruang')
+  assert.equal(K.bentrok(ada, jam(21), jam(23), jam(18, 30)).bentrok, false, 'sesi SELESAI tak memegang ruang')
 }
 
 // BOOKING beririsan dengan BOOKING baru → bentrok.
+// `sekarang` WAJIB diisi: `bentrok` memakai jam nyata kalau diberi null, dan uji
+// ini jadi lulus/gagal menurut jam berapa ia dijalankan.
 {
   const ada = [{ status: 'BOOKING', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: null }]
-  assert.equal(K.bentrok(ada, jam(20), jam(22), null).bentrok, true, 'BOOKING beririsan harus bentrok')
+  assert.equal(K.bentrok(ada, jam(20), jam(22), jam(18, 30)).bentrok, true, 'BOOKING beririsan harus bentrok')
 }
 
 // BOOKING berurutan (habis 21:00, mulai baru 21:00) → boleh.
 {
   const ada = [{ status: 'BOOKING', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: null }]
-  assert.equal(K.bentrok(ada, jam(21), jam(23), null).bentrok, false, 'berurutan tepat harus boleh')
+  assert.equal(K.bentrok(ada, jam(21), jam(23), jam(18, 30)).bentrok, false, 'berurutan tepat harus boleh')
 }
 
 // BATAL tak memegang ruang.
 {
   const ada = [{ status: 'BATAL', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: null }]
-  assert.equal(K.bentrok(ada, jam(19), jam(21), null).bentrok, false, 'BATAL tak memegang ruang')
+  assert.equal(K.bentrok(ada, jam(19), jam(21), jam(18, 30)).bentrok, false, 'BATAL tak memegang ruang')
 }
 
 // BOOKING yang sudah lewat 15 menit dari jadwal → dianggap LEPAS.
@@ -195,7 +204,7 @@ const jam = (h, m = 0) => new Date(`2026-09-18T${String(h).padStart(2, '0')}:${S
 // ─── 10. Pesan bentrok menyebut penghalangnya (dipakai UI) ────────────────
 {
   const ada = [{ status: 'BERJALAN', mulaiPada: jam(19), rencanaSelesai: jam(21), selesaiAktual: null }]
-  const r = K.bentrok(ada, jam(20), jam(22), null)
+  const r = K.bentrok(ada, jam(20), jam(22), jam(19, 30))
   assert.equal(r.bentrok, true)
   assert.ok(r.penghalang, 'harus mengembalikan penghalang untuk pesan')
   assert.equal(r.penghalang.status, 'BERJALAN')
@@ -222,5 +231,116 @@ assert.equal(K.formatDurasi(90), '1 jam 30 menit')
 assert.equal(K.formatDurasi(60), '1 jam')
 assert.equal(K.formatDurasi(45), '45 menit')
 assert.equal(K.formatDurasi(0), '0 menit')
+
+// ─── 13. Booking: `pada` menentukan status, dan jam yang lewat ditolak ────
+// `waktuMulaiDari` adalah SATU-SATUNYA penentu BOOKING vs BERJALAN. Kalau ia
+// salah, kasir bisa membuat "booking" yang mulai kemarin.
+{
+  const sekarang = new Date('2026-09-18T10:00:00+07:00')
+
+  // Kosong → mulai sekarang, BERJALAN.
+  const kosong = K.waktuMulaiDari(undefined, sekarang)
+  assert.equal(kosong.ok, true, 'tanpa `pada` harus lolos')
+  assert.equal(kosong.ok && kosong.booking, false, 'tanpa `pada` = BERJALAN')
+  assert.equal(kosong.ok && kosong.mulai.getTime(), sekarang.getTime(), 'mulai = sekarang')
+
+  const nullJuga = K.waktuMulaiDari(null, sekarang)
+  assert.equal(nullJuga.ok && nullJuga.booking, false, 'null sama dengan kosong')
+
+  // Jam ke depan → BOOKING.
+  const nanti = K.waktuMulaiDari('2026-09-18T19:00:00+07:00', sekarang)
+  assert.equal(nanti.ok, true, 'jam ke depan harus lolos')
+  assert.equal(nanti.ok && nanti.booking, true, 'jam ke depan = BOOKING')
+  // Dibaca lewat helper, bukan `getHours()`: uji harus lulus di zona mesin mana
+  // pun, termasuk container produksi yang UTC.
+  assert.equal(nanti.ok && K.menitSejakTengahMalam(nanti.mulai), 19 * 60, 'jam mulai 19:00 WIB')
+
+  // Jam yang sudah lewat → DITOLAK. Diam-diam memakai jam sekarang berarti kasir
+  // mengira booking besok tersimpan, padahal sesinya jalan hari ini.
+  const lewat = K.waktuMulaiDari('2026-09-18T08:00:00+07:00', sekarang)
+  assert.equal(lewat.ok, false, 'jam yang sudah lewat harus DITOLAK')
+  assert.match(lewat.ok === false ? lewat.pesan : '', /lewat/i, 'pesan menyebut sudah lewat')
+
+  // Beberapa detik lewat masih lolos (toleransi 1 menit) — "sekarang" yang
+  // diketik tangan dibulatkan ke menit, dan tak boleh ditolak.
+  const detikLalu = K.waktuMulaiDari('2026-09-18T09:59:30+07:00', sekarang)
+  assert.equal(detikLalu.ok, true, 'kurang dari 1 menit lewat masih lolos')
+
+  // Sampah → ditolak, bukan diam-diam jadi sekarang.
+  const sampah = K.waktuMulaiDari('bukan-tanggal', sekarang)
+  assert.equal(sampah.ok, false, 'tanggal sampah harus ditolak')
+}
+
+// ─── 14. Batas lepas booking = mulai + 15 menit ───────────────────────────
+{
+  const mulai = new Date('2026-09-18T19:00:00+07:00')
+  const batas = K.batasLepasBooking(mulai)
+  assert.equal(batas.getTime(), mulai.getTime() + 15 * 60000, 'batas = mulai + 15 menit')
+
+  // Batas ini dipakai menyapu booking basi: tepat di batas BELUM lepas (kasir
+  // masih boleh memulai), satu milidetik setelahnya sudah lepas.
+  const tepat = new Date(batas.getTime())
+  const lepas = new Date(batas.getTime() + 1)
+  assert.equal(tepat.getTime() <= batas.getTime(), true, 'tepat di batas belum lepas')
+  assert.equal(lepas.getTime() > batas.getTime(), true, 'satu ms setelah batas sudah lepas')
+
+  // String ISO juga diterima — nilai dari DB datang sebagai Date, dari klien
+  // sebagai string, dan keduanya harus menghasilkan batas yang sama.
+  assert.equal(K.batasLepasBooking(mulai.toISOString()).getTime(), batas.getTime(), 'string ISO diterima')
+}
+
+// ─── 15. Subtotal minuman: harga dikali jumlah ────────────────────────────
+assert.equal(K.subtotalMinuman(15000, 1), 15000)
+assert.equal(K.subtotalMinuman(15000, 3), 45000)
+assert.equal(K.subtotalMinuman(0, 5), 0, 'produk gratis tetap 0, bukan NaN')
+
+// ─── 16. Schema: `pada` wajib berzona waktu, jumlah minuman dibatasi ──────
+{
+  const dasar = { ruangId: 'r1', durasiMenit: 60 }
+
+  // `pada` tanpa zona waktu ditolak: "2026-09-18T19:00" berarti jam berbeda di
+  // tiap mesin, dan jam mulai booking tak boleh ambigu.
+  assert.equal(K.bukaSesiSchema.safeParse({ ...dasar, pada: '2026-09-18T19:00' }).success, false, 'tanpa offset ditolak')
+  assert.equal(K.bukaSesiSchema.safeParse({ ...dasar, pada: '2026-09-18T19:00:00+07:00' }).success, true, 'dengan offset lolos')
+  assert.equal(K.bukaSesiSchema.safeParse(dasar).success, true, 'tanpa `pada` tetap lolos (mulai sekarang)')
+
+  // Jumlah minuman: 0 dan negatif ditolak, 999 dibatasi, pecahan ditolak.
+  assert.equal(K.tambahMinumanSchema.safeParse({ produkId: 'p1', jumlah: 0 }).success, false, 'jumlah 0 ditolak')
+  assert.equal(K.tambahMinumanSchema.safeParse({ produkId: 'p1', jumlah: -1 }).success, false, 'jumlah negatif ditolak')
+  assert.equal(K.tambahMinumanSchema.safeParse({ produkId: 'p1', jumlah: 1000 }).success, false, 'jumlah >999 ditolak')
+  assert.equal(K.tambahMinumanSchema.safeParse({ produkId: 'p1', jumlah: 2.5 }).success, false, 'jumlah pecahan ditolak')
+  assert.equal(K.tambahMinumanSchema.safeParse({ produkId: 'p1' }).success, true, 'jumlah default terisi')
+  assert.equal(K.tambahMinumanSchema.parse({ produkId: 'p1' }).jumlah, 1, 'default jumlah = 1')
+}
+
+// ─── 17. Stok cukup: batasnya inklusif ────────────────────────────────────
+// Sama persis dengan yang dipakai route. Stok = permintaan HARUS lolos (stok
+// jadi 0, bukan minus), kurang satu pun sudah ditolak.
+assert.equal(K.stokCukup(10, 3), true, 'stok lebih banyak → cukup')
+assert.equal(K.stokCukup(3, 3), true, 'stok tepat sama → cukup (jadi 0)')
+assert.equal(K.stokCukup(2, 3), false, 'stok kurang satu → TIDAK cukup')
+assert.equal(K.stokCukup(0, 1), false, 'stok kosong → tidak cukup')
+assert.equal(K.stokCukup(5, 0), true, 'diminta 0 → cukup (skema menolak jumlah 0)')
+
+// ─── 18. Route minuman BENAR-BENAR memakai penjaga itu ────────────────────
+// Uji di atas memeriksa helper-nya. Tapi helper yang benar tak ada gunanya
+// kalau route memakai pemeriksaan sendiri. Dulu persis itu yang bocor: route
+// punya penjagaan, tapi tak ada uji yang menutupnya, sehingga bug di jalur
+// asli lolos. Pemeriksaan ini menutup celah itu tanpa perlu DB.
+{
+  const sumber = readFileSync(join(akarRepo, 'app/api/karaoke/sesi/[id]/minuman/route.ts'), 'utf8')
+  assert.ok(
+    sumber.includes('stokCukup(produk.stok, d.jumlah)'),
+    'route minuman memanggil stokCukup sebelum memotong stok',
+  )
+  assert.ok(
+    sumber.includes('stok: { gte: d.jumlah }'),
+    'potong stok memakai syarat gte di dalam WHERE (penjaga terhadap dua kasir bersamaan)',
+  )
+  assert.ok(
+    sumber.includes("throw new StokKurangError") || sumber.includes('STOK_KURANG'),
+    'stok kurang menghasilkan 409 STOK_KURANG, bukan error 500',
+  )
+}
 
 console.log('check-karaoke: semua uji murni LULUS')

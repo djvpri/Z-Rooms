@@ -67,9 +67,36 @@ export function jumlahJamDari(menit: number): number {
   return Math.max(1, Math.ceil(menit / 60))
 }
 
-/** Menit sejak 00:00 untuk sebuah Date (jam dinding lokal). */
+/**
+ * Zona waktu usaha. Tarif karaoke ditulis dalam jam dinding (00:00–24:00), jadi
+ * tarif mana yang berlaku HARUS dihitung pada jam dinding, bukan jam server.
+ *
+ * Sebelumnya dihitung dengan `getHours()`, yang membaca jam mesin. Itu benar di
+ * laptop WIB tapi salah di container produksi yang `TZ=UTC`: sesi 19:00 WIB
+ * terbaca 12:00 dan ditagih tarif siang, bukan tarif malam.
+ */
+const ZONA_USAHA = 'Asia/Jakarta'
+
+/** Jam dan menit di zona usaha, apa pun zona mesinnya. */
+function jamDiZona(d: Date, zona = ZONA_USAHA): { jam: number; menit: number } {
+  // `formatToParts` dipakai, bukan `toLocaleString` yang hasilnya string
+  // bergantung locale — "01.30" dan "01:30" harus sama-sama terbaca 1:30.
+  const bagian = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zona,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const jam = Number(bagian.find((b) => b.type === 'hour')?.value ?? '0')
+  const menit = Number(bagian.find((b) => b.type === 'minute')?.value ?? '0')
+  // `hour12:false` bisa menghasilkan "24" untuk tengah malam di sebagian ICU.
+  return { jam: jam === 24 ? 0 : jam, menit }
+}
+
+/** Menit sejak 00:00 di ZONA USAHA untuk sebuah Date. */
 export function menitSejakTengahMalam(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes()
+  const { jam, menit } = jamDiZona(d)
+  return jam * 60 + menit
 }
 
 /**
@@ -262,6 +289,44 @@ export function sisaMenit(mulai: Date, rencanaSelesai: Date, sekarang: Date): nu
   return Math.floor((rencanaSelesai.getTime() - sekarang.getTime()) / MS_MENIT)
 }
 
+/**
+ * Batas waktu sebelum sebuah booking dianggap lepas: `mulaiPada + 15 menit`.
+ *
+ * Dipakai route untuk menandai booking lama sebagai BATAL saat ada yang
+ * menyentuh ruangnya. Tanpa ini, booking yang pelanggannya tak datang akan
+ * menggantung berstatus BOOKING selamanya — ruangnya bebas dipakai (karena
+ * `memegangRuang` sudah mengembalikan false), tapi laporannya kotor dan
+ * kasir melihat baris yang tak pernah selesai.
+ */
+export function batasLepasBooking(mulaiPada: Date | string): Date {
+  return new Date(new Date(mulaiPada).getTime() + TOLERANSI_BOOKING_MENIT * MS_MENIT)
+}
+
+/**
+ * Waktu mulai sesi dari masukan kasir, atau alasan penolakannya.
+ *
+ * `pada` kosong = mulai sekarang. Ada = jam yang diinginkan, dan kalau jam itu
+ * sudah lewat kita MENOLAK alih-alih diam-diam memakai jam sekarang: kasir yang
+ * salah ketik tanggal akan mengira booking-nya tersimpan untuk besok, padahal
+ * sesinya berjalan hari ini dan pelanggannya tak pernah datang.
+ *
+ * Toleransi 1 menit diberikan supaya "sekarang" yang diketik tangan (mis. jam
+ * dibulatkan ke menit) tak ditolak hanya karena beberapa detik sudah berlalu.
+ */
+export function waktuMulaiDari(
+  pada: string | null | undefined,
+  sekarang: Date,
+): { ok: true; mulai: Date; booking: boolean } | { ok: false; pesan: string } {
+  if (!pada) return { ok: true, mulai: sekarang, booking: false }
+
+  const mulai = new Date(pada)
+  if (Number.isNaN(mulai.getTime())) return { ok: false, pesan: 'Jam mulai tidak valid.' }
+  if (mulai.getTime() < sekarang.getTime() - MS_MENIT) {
+    return { ok: false, pesan: 'Waktu mulai sudah lewat.' }
+  }
+  return { ok: true, mulai, booking: true }
+}
+
 /** Sudah waktunya diingatkan (10 menit terakhir atau sudah lewat). */
 export function mendesak(sisa: number): boolean {
   return sisa <= AMBANG_MENDESAK_MENIT
@@ -318,6 +383,14 @@ export const bukaSesiSchema = z.object({
   durasiMenit: z.number().int('Durasi harus bilangan bulat.').min(1, 'Durasi minimal 1 menit.').max(24 * 60, 'Durasi maksimal 24 jam.'),
   jaminan: z.number().int('Jaminan harus bilangan bulat.').min(0).max(HARGA_KARAOKE_MAKS).optional(),
   catatan: z.string().trim().max(200).nullish(),
+  // Jam mulai yang DIINGINKAN, kalau sesi dijadwalkan lebih dulu. Kosong =
+  // mulai sekarang (perilaku lama).
+  //
+  // Kehadiran field ini adalah SATU-SATUNYA penentu status BOOKING vs
+  // BERJALAN. Sengaja tak ada field `status` yang bisa dikirim klien: kasir
+  // memesan jam, bukan memilih status — kalau klien bisa memilih, ia bisa
+  // membuat "booking" yang mulai kemarin, atau sesi BERJALAN berjadwal besok.
+  pada: z.string().datetime({ offset: true, message: 'Jam mulai tidak valid.' }).optional(),
 })
 
 export const tutupSesiSchema = z.object({
@@ -328,3 +401,61 @@ export const tutupSesiSchema = z.object({
   // tak ikut ditagih. Ditolak kalau sesi bukan BOOKING.
   mulaiSekarang: z.boolean().optional(),
 })
+
+// ───────────────────────────────────────────────
+// Minuman karaoke
+// ───────────────────────────────────────────────
+
+export const JUMLAH_MINUMAN_MAKS = 999
+
+export const tambahMinumanSchema = z.object({
+  produkId: z.string().min(1, 'produkId wajib diisi.'),
+  jumlah: z
+    .number()
+    .int('Jumlah harus bilangan bulat.')
+    .min(1, 'Jumlah minimal 1.')
+    .max(JUMLAH_MINUMAN_MAKS, `Jumlah maksimal ${JUMLAH_MINUMAN_MAKS}.`)
+    .default(1),
+})
+
+/**
+ * Apakah stok cukup untuk permintaan ini.
+ *
+ * Murni dan tanpa Prisma supaya bisa diuji tanpa DB — dan supaya route memakai
+ * fungsi yang SAMA dengan yang diuji. Sebelumnya penjagaan ini hanya ada di
+ * dalam route, sehingga uji DB menulis ulang syaratnya sendiri dan tak menjaga
+ * apa pun (terbukti lewat uji gigit: bug disuntik, uji tetap lulus).
+ *
+ * Ini penjagaan SEBELUM potong; syarat `stok >= jumlah` di dalam WHERE
+ * `updateMany` tetap wajib sebagai penjaga terakhir terhadap dua kasir yang
+ * menekan bersamaan.
+ */
+export function stokCukup(stokTersedia: number, diminta: number): boolean {
+  return stokTersedia >= diminta
+}
+
+/**
+ * Saringan Prisma untuk sesi yang dihitung laporan pendapatan.
+ *
+ * `status: 'SELESAI'` adalah inti laporan: uang karaoke masuk saat sesi
+ * DITUTUP. Sesi BOOKING belum didatangi, BERJALAN belum dibayar, BATAL tak
+ * pernah terjadi. Menghitung salah satunya membuat laporan menagih uang yang
+ * belum diterima.
+ *
+ * Dipakai route DAN uji, supaya uji benar-benar menjaga saringan yang dipakai
+ * produksi — bukan menulis ulang saringannya sendiri lalu lulus selamanya.
+ */
+export function saringSesiLaporan(propertiId: string, awal: Date, akhir: Date) {
+  return { propertiId, status: 'SELESAI' as const, mulaiPada: { gte: awal, lte: akhir } }
+}
+
+/**
+ * Subtotal satu baris minuman.
+ *
+ * `hargaSatuan` dikali `jumlah`, dan harga itu DISALIN dari produk saat
+ * ditambahkan — bukan dibaca ulang dari katalog. Harga produk naik besok tak
+ * boleh mengubah struk yang sudah tercetak hari ini.
+ */
+export function subtotalMinuman(hargaSatuan: number, jumlah: number): number {
+  return hargaSatuan * jumlah
+}

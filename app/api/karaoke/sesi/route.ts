@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
-import { bentrok, bukaSesiSchema, hitungSewa, nomorBerikut, periksaBlok } from '@/lib/karaoke'
+import { batasLepasBooking, bentrok, bukaSesiSchema, hitungSewa, nomorBerikut, periksaBlok, waktuMulaiDari } from '@/lib/karaoke'
 
 async function konteks() {
   const session = await auth()
@@ -74,14 +74,33 @@ export async function POST(req: NextRequest) {
   }
 
   const sekarang = new Date()
-  const jumlahJam = Math.max(1, Math.ceil(d.durasiMenit / 60))
-  const rencanaSelesai = new Date(sekarang.getTime() + jumlahJam * 60 * 60 * 1000)
 
-  const sewa = hitungSewa(
-    ruang.tarif.map((t) => ({ jamMulai: t.jamMulai, jamSelesai: t.jamSelesai, hargaPerJam: Number(t.hargaPerJam) })),
-    sekarang,
-    d.durasiMenit,
-  )
+  // Kasir boleh memesan jam mulai (booking) atau membuka sekarang. `pada` yang
+  // sudah lewat ditolak — lihat `waktuMulaiDari`.
+  const waktu = waktuMulaiDari(d.pada, sekarang)
+  if (!waktu.ok) return NextResponse.json({ error: { message: waktu.pesan } }, { status: 400 })
+
+  const mulai = waktu.mulai
+  const jumlahJam = Math.max(1, Math.ceil(d.durasiMenit / 60))
+  const rencanaSelesai = new Date(mulai.getTime() + jumlahJam * 60 * 60 * 1000)
+
+  // Sewa dihitung dari JAM MULAI yang dipilih, bukan jam sekarang: booking jam
+  // 19:00 harus dihargai tarif malam walau kasir mencatatnya pagi.
+  let sewa
+  try {
+    sewa = hitungSewa(
+      ruang.tarif.map((t) => ({ jamMulai: t.jamMulai, jamSelesai: t.jamSelesai, hargaPerJam: Number(t.hargaPerJam) })),
+      mulai,
+      d.durasiMenit,
+    )
+  } catch (e) {
+    return NextResponse.json(
+      { error: { message: `Tarif ruang "${ruang.nama}" tak menutup jam itu: ${(e as Error).message}` } },
+      { status: 409 },
+    )
+  }
+
+  const batasLepas = batasLepasBooking(sekarang) // dipakai untuk menyapu booking basi
 
   try {
     const hasil = await prisma.$transaction(async (tx) => {
@@ -89,14 +108,28 @@ export async function POST(req: NextRequest) {
       // tak ada celah antara "periksa" dan "tulis".
       const ada = await tx.sesiKaraoke.findMany({
         where: { ruangId: d.ruangId, status: { in: ['BOOKING', 'BERJALAN'] } },
-        select: { status: true, mulaiPada: true, rencanaSelesai: true, selesaiAktual: true },
+        select: { id: true, status: true, mulaiPada: true, rencanaSelesai: true, selesaiAktual: true },
       })
 
-      const cek = bentrok(ada, sekarang, rencanaSelesai, sekarang)
+      const cek = bentrok(ada, mulai, rencanaSelesai, sekarang)
       if (cek.bentrok) {
         const p = cek.penghalang!
         throw new BentrokError(p.status, p.mulaiPada as Date, p.rencanaSelesai as Date)
       }
+
+      // Booking yang pelanggannya tak datang dibiarkan menggantung BOOKING oleh
+      // `memegangRuang` (ruangnya sudah bebas), tapi barisnya harus ditutup di
+      // sini — kalau tidak ia menggantung selamanya dan mengotori laporan.
+      // Disapu hanya untuk ruang ini: menyapu seluruh properti tiap kali ada
+      // yang membuka sesi membuat transaksi yang seharusnya rapat jadi berat.
+      await tx.sesiKaraoke.updateMany({
+        where: {
+          ruangId: d.ruangId,
+          status: 'BOOKING',
+          mulaiPada: { lt: batasLepas },
+        },
+        data: { status: 'BATAL', catatan: 'BATAL OTOMATIS: pelanggan tak datang (lewat 15 menit)' },
+      })
 
       const nomorAda = await tx.sesiKaraoke.findMany({
         where: { propertiId: k.properti.id },
@@ -110,12 +143,12 @@ export async function POST(req: NextRequest) {
           nomor: nomorBerikut(nomorAda.map((s) => s.nomor)),
           namaPelanggan: d.namaPelanggan?.trim() || null,
           telepon: d.telepon?.trim() || null,
-          mulaiPada: sekarang,
+          mulaiPada: mulai,
           rencanaSelesai,
           jumlahJam: sewa.jumlahJam,
           totalSewa: sewa.total,
           jaminan: d.jaminan ?? 0,
-          status: 'BERJALAN',
+          status: waktu.booking ? 'BOOKING' : 'BERJALAN',
           catatan: d.catatan?.trim() || null,
           item: {
             create: sewa.item.map((it) => ({
