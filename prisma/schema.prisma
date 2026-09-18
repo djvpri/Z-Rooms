@@ -102,6 +102,12 @@ model Properti {
   // NULL = belum pernah diatur -> halaman memakai urutan bawaan.
   prefTabelKamar String?
 
+  // Setelan cetak nota (ukuran kertas, koneksi, printer terakhir), JSON teks.
+  // Per-PROPERTI untuk alasan yang sama dengan prefTabelKamar: satu meja kasir
+  // satu printer, dan semua staf properti itu harus mencetak dengan setelan
+  // yang sama. NULL = belum diatur -> lib/cetak.ts memakai bawaan.
+  prefCetak String?
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
