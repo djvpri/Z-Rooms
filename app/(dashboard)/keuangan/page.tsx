@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, namaPenyewa } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { piutangBarang } from '@/lib/piutang'
 import TagihanTable from './TagihanTable'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +22,7 @@ export default async function KeuanganPage() {
   const now = new Date()
   const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
 
-  const [tagihan, pengeluaran, trend6bulan] = await Promise.all([
+  const [tagihan, pengeluaran, penjualan, trend6bulan] = await Promise.all([
     prisma.tagihan.findMany({
       where: {
         jatuhTempo: bulanIni,
@@ -44,6 +45,13 @@ export default async function KeuanganPage() {
       orderBy: { tanggal: 'desc' },
     }),
 
+    // Penjualan barang yang uangnya sudah masuk bulan ini (LUNAS). BELUM_BAYAR
+    // masuk `belumLunas`, BATAL dibuang.
+    prisma.penjualan.findMany({
+      where: { propertiId: properti.id, createdAt: bulanIni, status: 'LUNAS' },
+      select: { total: true },
+    }),
+
     // Rekap 6 bulan
     Promise.all(
       Array.from({ length: 6 }, (_, i) => {
@@ -58,18 +66,29 @@ export default async function KeuanganPage() {
             where: { propertiId: properti.id, tanggal: range },
             _sum: { nominal: true },
           }),
-        ]).then(([pend, penge]) => ({
+          prisma.penjualan.aggregate({
+            where: { propertiId: properti.id, status: 'LUNAS', createdAt: range },
+            _sum: { total: true },
+          }),
+        ]).then(([pend, penge, jual]) => ({
           bulan: bulan.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
-          pendapatan: Number(pend._sum.nominal ?? 0),
+          // Pendapatan = sewa + barang. Digabung di sini karena grafiknya satu
+          // batang; porsi sewa vs barang dirinci di kartu ringkasan.
+          pendapatan: Number(pend._sum.nominal ?? 0) + Number(jual._sum.total ?? 0),
           pengeluaran: Number(penge._sum.nominal ?? 0),
         }))
       })
     ),
   ])
 
-  const totalPendapatan = tagihan.filter(t => t.status === 'LUNAS').reduce((s, t) => s + Number(t.nominal), 0)
+  const pendapatanSewa = tagihan.filter(t => t.status === 'LUNAS').reduce((s, t) => s + Number(t.nominal), 0)
+  const pendapatanBarang = penjualan.reduce((s, p) => s + Number(p.total), 0)
+  const totalPendapatan = pendapatanSewa + pendapatanBarang
   const totalPengeluaran = pengeluaran.reduce((s, p) => s + Number(p.nominal), 0)
-  const belumLunas = tagihan.filter(t => ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'].includes(t.status)).reduce((s, t) => s + Number(t.nominal), 0)
+  // Piutang barang (titipan kamar yang belum dilunasi) — tanpa ini "Belum
+  // terkumpul" terlihat lebih kecil dari yang sebenarnya harus ditagih.
+  const belumLunasSewa = tagihan.filter(t => ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'].includes(t.status)).reduce((s, t) => s + Number(t.nominal), 0)
+  const belumLunas = belumLunasSewa + await piutangBarang(properti.id)
   const maxBar = Math.max(...trend6bulan.map(t => Math.max(t.pendapatan, t.pengeluaran)), 1)
 
   return (

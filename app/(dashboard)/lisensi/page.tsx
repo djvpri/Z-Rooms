@@ -17,6 +17,7 @@ import { auth } from '@/lib/auth'
 import { propertiAktif } from '@/lib/properti'
 import { labelPlan, statusLisensi, sisaHari, kalimatStatus, hargaPlan } from '@/lib/lisensi'
 import { formatRupiah } from '@/lib/utils'
+import TabPengaturan from '@/components/pengaturan/TabPengaturan'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,10 @@ export default async function LisensiPage() {
 
   return (
     <div className="p-5 max-w-3xl mx-auto">
+      {/* Tab disamakan dengan halaman Pengaturan: Lisensi memang bagian dari
+          Pengaturan (nav HP tak cukup ruang untuk item ke-8). */}
+      <TabPengaturan aktif="/lisensi" />
+
       <div className="flex items-center gap-2 mb-5">
         <ShieldCheck className="h-5 w-5 text-teal-600" />
         <h1 className="text-xl font-bold text-gray-900">Lisensi &amp; Langganan</h1>

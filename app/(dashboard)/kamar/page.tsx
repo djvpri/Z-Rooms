@@ -9,6 +9,7 @@ import { namaTipe, fasilitasEfektif, hargaEfektif, depositEfektif } from '@/lib/
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
+import TombolJual from '@/components/kamar/TombolJual'
 import TabelKamar from '@/components/kamar/TabelKamar'
 import { PemicuJadwal } from '@/components/kamar/JadwalKamar'
 import { DoorClosedFill } from 'react-bootstrap-icons'
@@ -41,6 +42,13 @@ export default async function KamarPage() {
         where: { statusSewa: { in: ['AKTIF', 'PENDING'] } },
         include: {
           penyewa: { select: { nama: true, noHp: true } },
+          // Penjualan barang yang masih menempel di kamar ini (belum dibayar).
+          // Ditampilkan di kartu kamar supaya kasir ingat ada utang minuman/
+          // makanan yang harus ikut ditagih saat penghuni keluar.
+          penjualan: {
+            where: { status: 'BELUM_BAYAR' },
+            select: { id: true, nomor: true, total: true },
+          },
           // SEMUA tagihan sewa ini, bukan cuma yang belum bayar: badge "sudah
           // bayar atau belum" di halaman ini perlu tagihan LUNAS untuk bisa
           // mengenali kamar yang sudah lunas. `ringkasBayar` (lib/bayar.ts) yang
@@ -83,16 +91,22 @@ export default async function KamarPage() {
 
   const ringkasSewa = (k: KamarBaris, s: SewaBaris) => {
     const bayar = ringkasBayar(s.tagihan, sekarang)
+    // Utang barang ikut ditambahkan ke sisa supaya kartu kamar tak berbohong
+    // "Lunas" padahal masih ada minuman yang belum dibayar. Statusnya TIDAK
+    // diubah: `ringkasBayar` tetap sumber tunggal status sewa.
+    const utangBarang = s.penjualan.reduce((t, p) => t + Number(p.total), 0)
     return {
       id: s.id,
       kamarNomor: k.nomor,
       penyewaNama: s.penyewa?.nama ?? null,
       tanggalKeluar: s.tanggalKeluar.toISOString(),
       deposit: Number(s.deposit),
-      sisaTagihan: bayar.sisa,
+      sisaTagihan: bayar.sisa + utangBarang,
       jumlahTagihan: s.tagihan.filter(t => t.status !== 'DIBATALKAN').length,
       periodeSewa: s.periodeSewa as string,
       menitLebih: cekLewat(s.tanggalKeluar, aturan, sekarang).menitLebih,
+      utangBarang,
+      barangTitipan: s.penjualan.map(p => p.nomor),
     }
   }
   // Kandidat kamar tujuan pindah: kamar TERSEDIA selain kamar asal.
@@ -251,6 +265,7 @@ export default async function KamarPage() {
                   kamarTersedia={kamarTersediaUntuk(k.id)}
                 />
               )}
+              {sewaAktif && <TombolJual sewaId={sewaAktif.id} />}
             </div>
           )
         })}
@@ -292,6 +307,7 @@ export default async function KamarPage() {
                           sewa={ringkasSewa(k, sewaAktif)}
                           kamarTersedia={kamarTersediaUntuk(k.id)}
                         />
+                        <TombolJual sewaId={sewaAktif.id} />
                       </div>
                     )}
                   </div>
@@ -407,6 +423,7 @@ export default async function KamarPage() {
                         sewa={ringkasSewa(k, sewaAktif)}
                         kamarTersedia={kamarTersediaUntuk(k.id)}
                       />
+                      <TombolJual sewaId={sewaAktif.id} />
                     </div>
                   )}
                 </div>

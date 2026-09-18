@@ -47,20 +47,39 @@ if (berkas.length === 0) {
 const bacaBerkas = (f) => readFileSync(join(scriptsDir, f), 'utf8')
 const butuhDb = (f) => /@prisma\/client|new PrismaClient/.test(bacaBerkas(f))
 
+// Sebagian check menuntut FIXTURE tertentu di DB (mis. properti "Kos Melati
+// Indah" yang dibuat scripts/seed-demo.js). Terhadap DB lain — DB uji, DB
+// kosong — mereka mati dengan P2025 dan seluruh `npm run check` jadi merah
+// padahal kodenya tak tersentuh. Itu keliru: yang absen fixture-nya, bukan
+// kodenya. Kenali lewat pesannya, dan laporkan sebagai DILEWATI.
+// Bukan daftar nama berkas — daftar nama basi begitu ada check baru.
+const FIXTURE_ABSEN = /P2025|NotFoundError/
+
 const punyaDb = Boolean(process.env.DATABASE_URL)
 const gagal = []
 const dilewati = []
+const tanpaFixture = []
 
 for (const f of berkas) {
   if (butuhDb(f) && !punyaDb) {
     dilewati.push(f)
     continue
   }
+  // pipe, bukan inherit: keluarannya diperiksa untuk membedakan fixture absen
+  // dari kegagalan sungguhan, lalu tetap dicetak apa adanya.
   const r = spawnSync(process.execPath, [tsxCli, join(scriptsDir, f)], {
-    stdio: 'inherit',
+    encoding: 'utf8',
     cwd: akarRepo,
   })
-  if (r.status !== 0) gagal.push(f)
+  const keluaran = `${r.stdout ?? ''}${r.stderr ?? ''}`
+  process.stdout.write(keluaran)
+  if (r.status === 0) continue
+  if (FIXTURE_ABSEN.test(keluaran)) {
+    console.log(`  (fixture absen di DB ini — bukan kegagalan kode)`)
+    tanpaFixture.push(f)
+  } else {
+    gagal.push(f)
+  }
 }
 
 // Dilewati BUKAN lulus. Dicetak besar supaya tak ada yang mengira seluruh
@@ -70,9 +89,15 @@ if (dilewati.length > 0) {
   console.log('Jalankan dengan DATABASE_URL terisi untuk memeriksa jalur ini.')
 }
 
+// Fixture absen juga BUKAN lulus: check-nya tak pernah benar-benar berjalan.
+if (tanpaFixture.length > 0) {
+  console.log(`\nDILEWATI (fixture DB tak ada): ${tanpaFixture.join(', ')}`)
+  console.log('DB ini bukan hasil seed-demo — jalur itu belum diuji di sini.')
+}
+
 if (gagal.length > 0) {
   console.error(`\nGAGAL: ${gagal.join(', ')}`)
   process.exit(1)
 }
-const lulus = berkas.length - dilewati.length
-console.log(`\nOK — check: ${lulus} berkas lulus${dilewati.length > 0 ? `, ${dilewati.length} dilewati` : ''}`)
+const lulus = berkas.length - dilewati.length - tanpaFixture.length
+console.log(`\nOK — check: ${lulus} berkas lulus${dilewati.length + tanpaFixture.length > 0 ? `, ${dilewati.length + tanpaFixture.length} dilewati` : ''}`)

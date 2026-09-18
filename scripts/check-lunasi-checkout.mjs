@@ -28,6 +28,9 @@
 //       bukan baris Pembayaran — kalau ini lewat, uang tak muncul di laporan)
 //   I5. lunasi=false -> tak ada Pembayaran atas tagihan sewa
 //   I6. lunasi diabaikan kalau tak ada tagihan (tak ada pembayaran hantu 0)
+//   I7. lunasi=true  -> penjualan titipan juga jadi LUNAS (jalur uang sendiri,
+//       bukan lewat Tagihan — kalau ini lewat, barang tak pernah terbayar)
+//   I8. lunasi=false -> penjualan titipan tetap BELUM_BAYAR
 import assert from 'node:assert/strict'
 
 /** Salinan keputusan guard di route. */
@@ -35,10 +38,11 @@ function perluPaksa({ sisaTagihan, paksa, lunasi }) {
   return sisaTagihan > 0 && !paksa && !lunasi
 }
 
-/** Salinan blok transaksi lunasi di route. */
-function jalankanLunasi({ tagihan, lunasi, metodeBayar, keluarAktual }) {
+/** Salinan blok transaksi lunasi di route. `penjualan` = titipan barang,
+ *  jalur uang SENDIRI (model Penjualan, bukan Tagihan) tapi ikut dilunasi. */
+function jalankanLunasi({ tagihan, penjualan = [], lunasi, metodeBayar, keluarAktual }) {
   const pembayaran = []
-  const status = new Map(tagihan.map(t => [t.id, t.status]))
+  const status = new Map([...tagihan, ...penjualan].map(t => [t.id, t.status]))
   const dilunasi = []
   if (lunasi && tagihan.length > 0) {
     for (const t of tagihan) {
@@ -52,6 +56,7 @@ function jalankanLunasi({ tagihan, lunasi, metodeBayar, keluarAktual }) {
       dilunasi.push(t.id)
     }
   }
+  if (lunasi) for (const p of penjualan) status.set(p.id, 'LUNAS')
   return { pembayaran, status, dilunasi }
 }
 
@@ -110,4 +115,22 @@ assert.equal(perluPaksa({ sisaTagihan: 0, paksa: false, lunasi: false }), false)
   assert.equal(dilunasi.length, 0)
 }
 
-console.log('OK — 6 blok assertion lulus (lunasi saat check-out)')
+// I7, I8 — penjualan titipan ikut dilunasi, dan hanya kalau lunasi=true
+{
+  const PENJUALAN = [
+    { id: 'p1', total: 7000, status: 'BELUM_BAYAR' },
+    { id: 'p2', total: 5000, status: 'BELUM_BAYAR' },
+  ]
+  const { status } = jalankanLunasi({
+    tagihan: [], penjualan: PENJUALAN, lunasi: true, metodeBayar: 'TUNAI', keluarAktual: KELUAR,
+  })
+  assert.equal(status.get('p1'), 'LUNAS')
+  assert.equal(status.get('p2'), 'LUNAS')
+  const s2 = jalankanLunasi({
+    tagihan: [], penjualan: PENJUALAN, lunasi: false, metodeBayar: 'TUNAI', keluarAktual: KELUAR,
+  }).status
+  assert.equal(s2.get('p1'), 'BELUM_BAYAR')
+  assert.equal(s2.get('p2'), 'BELUM_BAYAR')
+}
+
+console.log('OK — 8 blok assertion lulus (lunasi saat check-out)')

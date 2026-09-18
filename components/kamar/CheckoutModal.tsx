@@ -31,6 +31,10 @@ export interface SewaAktif {
   periodeSewa: string
   /** Menit lewat batas check-out. 0 = belum lewat. Dipakai badge peringatan. */
   menitLebih?: number
+  /** Utang barang titipan (minuman/makanan) yang belum dibayar. Termasuk di sisaTagihan. */
+  utangBarang?: number
+  /** Nomor struk barang titipan, mis. ['PJ-0003','PJ-0005']. */
+  barangTitipan?: string[]
 }
 
 export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif; kamarTersedia: KamarTersedia[] }) {
@@ -234,13 +238,30 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                   </div>
                 )}
 
+                {/* Rincian barang titipan: sisa di atas menggabung sewa + barang,
+                    jadi kasir perlu tahu bagian mana yang barang. */}
+                {(sewa.utangBarang ?? 0) > 0 && (
+                  <div className="rounded-xl bg-gray-50 px-3 py-2.5 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">
+                        Barang titipan{sewa.barangTitipan?.length ? ` (${sewa.barangTitipan.join(', ')})` : ''}
+                      </span>
+                      <span className="text-gray-800 font-medium">{formatRupiah(sewa.utangBarang ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Tagihan sewa</span>
+                      <span className="text-gray-800">{formatRupiah(Math.max(sewa.sisaTagihan - (sewa.utangBarang ?? 0), 0))}</span>
+                    </div>
+                  </div>
+                )}
+
                 {mode === 'KELUAR' && sewa.sisaTagihan > 0 && (
                   <div className="space-y-2">
                     <label className="flex items-start gap-2 cursor-pointer">
                       <input type="checkbox" className="mt-0.5" checked={lunasi}
                         onChange={e => { setLunasi(e.target.checked); setPeringatan('') }} />
                       <span className="text-xs text-gray-700">
-                        Lunasi tagihan {formatRupiah(sewa.sisaTagihan)} sekarang
+                        Lunasi {(sewa.utangBarang ?? 0) > 0 ? 'tagihan & barang' : 'tagihan'} {formatRupiah(sewa.sisaTagihan)} sekarang
                         <span className="text-gray-400"> — tercatat sebagai pemasukan</span>
                       </span>
                     </label>

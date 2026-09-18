@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { piutangBarang } from '@/lib/piutang'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
 export async function GET(req: NextRequest) {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   const targetBulan = subMonths(new Date(), bulan)
   const range = { gte: startOfMonth(targetBulan), lte: endOfMonth(targetBulan) }
 
-  const [tagihan, pengeluaran, pendapatanPerBulan] = await Promise.all([
+  const [tagihan, pengeluaran, penjualan, pendapatanPerBulan] = await Promise.all([
     // Semua tagihan bulan ini
     prisma.tagihan.findMany({
       where: {
@@ -44,6 +45,16 @@ export async function GET(req: NextRequest) {
       orderBy: { tanggal: 'desc' },
     }),
 
+    // Penjualan barang (minuman/makanan) bulan ini yang uangnya SUDAH masuk:
+    // LUNAS — baik jual lepas maupun titipan kamar yang dilunasi saat check-out.
+    // BELUM_BAYAR sengaja tidak masuk sini; ia masuk `belumTerkumpul` seperti
+    // tagihan yang belum lunas. BATAL dibuang.
+    prisma.penjualan.findMany({
+      where: { propertiId: properti.id, createdAt: range, status: 'LUNAS' },
+      include: { item: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+
     // Trend 6 bulan terakhir
     prisma.$queryRaw<{ bulan: string; pendapatan: number }[]>`
       SELECT
@@ -60,26 +71,52 @@ export async function GET(req: NextRequest) {
     `,
   ])
 
-  const totalPendapatan = tagihan
+  const pendapatanSewa = tagihan
     .filter(t => t.status === 'LUNAS')
     .reduce((sum, t) => sum + Number(t.nominal), 0)
+
+  const pendapatanBarang = penjualan
+    .reduce((sum, p) => sum + Number(p.total), 0)
+
+  // Laba barang = harga jual − modal, bukan seluruh omzetnya. Baris tanpa modal
+  // dihitung modal 0 (pemilik memang belum mengisi HPP-nya).
+  const labaBarang = penjualan
+    .reduce((s, p) => s + p.item.reduce((t, it) => {
+      const beli = it.hargaBeli === null ? 0 : Number(it.hargaBeli)
+      return t + (Number(it.hargaSatuan) - beli) * it.jumlah
+    }, 0), 0)
+
+  const totalPendapatan = pendapatanSewa + pendapatanBarang
 
   const totalPengeluaran = pengeluaran
     .reduce((sum, p) => sum + Number(p.nominal), 0)
 
-  const belumTerkumpul = tagihan
+  const belumTerkumpulSewa = tagihan
     .filter(t => ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'].includes(t.status))
     .reduce((sum, t) => sum + Number(t.nominal), 0)
+
+  // Titipan barang ke kamar yang belum dilunasi ikut dihitung sebagai piutang —
+  // kalau tidak, nilai ini terlihat lebih kecil dari uang yang sebenarnya
+  // masih harus ditagih.
+  const belumTerkumpulBarang = await piutangBarang(properti.id)
 
   return NextResponse.json({
     tagihan,
     pengeluaran,
+    penjualan,
     pendapatanPerBulan,
     ringkasan: {
       totalPendapatan,
+      // Dipisah supaya pemilik tetap bisa melihat porsi sewa vs barang; totalnya
+      // adalah jumlah keduanya.
+      pendapatanSewa,
+      pendapatanBarang,
+      labaBarang,
       totalPengeluaran,
       labaBersih: totalPendapatan - totalPengeluaran,
-      belumTerkumpul,
+      belumTerkumpul: belumTerkumpulSewa + belumTerkumpulBarang,
+      belumTerkumpulSewa,
+      belumTerkumpulBarang,
     },
   })
 }

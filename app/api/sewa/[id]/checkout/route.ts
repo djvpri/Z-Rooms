@@ -52,6 +52,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       kamar: { select: { id: true, nomor: true, propertiId: true } },
       penyewa: { select: { nama: true } },
       tagihan: { where: { status: { in: ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'] } } },
+      // Penjualan barang yang dititipkan ke kamar ini. Ikut dihitung sebagai
+      // sisa tagihan: tanpa ini check-out bisa lolos tanpa kasir sadar masih
+      // ada utang barang, dan uangnya tak pernah tertagih.
+      penjualan: { where: { status: 'BELUM_BAYAR' }, include: { item: true } },
     },
   })
   if (!sewa) return NextResponse.json({ error: 'Sewa tidak ditemukan' }, { status: 404 })
@@ -60,18 +64,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const deposit = Number(sewa.deposit)
-  const sisaTagihan = sewa.tagihan.reduce((s, t) => s + Number(t.nominal), 0)
+  const totalPenjualan = sewa.penjualan.reduce((s, p) => s + Number(p.total), 0)
+  const sisaTagihan = sewa.tagihan.reduce((s, t) => s + Number(t.nominal), 0) + totalPenjualan
+  const jumlahSisa = sewa.tagihan.length + sewa.penjualan.length
 
   // Tagihan belum lunas tidak memblokir (keputusan produk), tapi harus disengaja.
   // Kalau user memilih "bayar saat checkout", tagihan ini justru dilunasi —
   // jadi tak perlu konfirmasi paksa.
   if (sisaTagihan > 0 && !d.paksa && !d.lunasi) {
+    const rincian = [
+      sewa.tagihan.length > 0 ? `${sewa.tagihan.length} tagihan sewa` : '',
+      sewa.penjualan.length > 0 ? `${sewa.penjualan.length} penjualan barang` : '',
+    ].filter(Boolean).join(' + ')
     return NextResponse.json(
       {
         error: 'MASIH_ADA_TAGIHAN',
-        pesan: `Masih ada ${sewa.tagihan.length} tagihan belum lunas (Rp ${sisaTagihan.toLocaleString('id-ID')}).`,
+        pesan: `Masih ada ${rincian} belum lunas (Rp ${sisaTagihan.toLocaleString('id-ID')}).`,
         sisaTagihan,
-        jumlahTagihan: sewa.tagihan.length,
+        jumlahTagihan: jumlahSisa,
+        sisaSewa: sewa.tagihan.reduce((s, t) => s + Number(t.nominal), 0),
+        sisaBarang: totalPenjualan,
       },
       { status: 409 },
     )
@@ -127,6 +139,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
 
+      // Penjualan barang titipan ikut dilunasi di sini. Beda dari tagihan sewa:
+      // penjualan punya jalur uangnya sendiri (model Penjualan, bukan Tagihan),
+      // jadi tak ada baris Pembayaran yang dibuat — cukup statusnya jadi LUNAS
+      // + dibayarPada, dan laporan barang membaca status itu.
+      const jualDilunasi: string[] = []
+      if (d.lunasi && sewa.penjualan.length > 0) {
+        for (const p of sewa.penjualan) {
+          await tx.penjualan.update({
+            where: { id: p.id },
+            data: { status: 'LUNAS', dibayarPada: keluarAktual, metodeBayar: d.metodeBayar },
+          })
+          jualDilunasi.push(p.id)
+        }
+      }
+
       // Deposit dikembalikan -> uang keluar, catat di Pengeluaran (bukan
       // potong pendapatan) supaya laporan laba tetap bersih.
       if (kembali > 0) {
@@ -178,11 +205,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             `Deposit ${labelDeposit(deposit)}: kembali ${labelDeposit(kembali)}` +
             `${hangus > 0 ? `, hangus ${labelDeposit(hangus)}` : ''}.` +
             `${tagihanDilunasi.length > 0 ? ` ${tagihanDilunasi.length} tagihan dilunasi saat check-out.` : ''}` +
-            `${sisaTagihan > 0 && tagihanDilunasi.length === 0 ? ` Tagihan belum lunas ${labelDeposit(sisaTagihan)}.` : ''}`,
+            `${jualDilunasi.length > 0 ? ` ${jualDilunasi.length} penjualan barang (${labelDeposit(totalPenjualan)}) ikut dilunasi.` : ''}` +
+            `${sisaTagihan > 0 && tagihanDilunasi.length === 0 && jualDilunasi.length === 0 ? ` Tagihan belum lunas ${labelDeposit(sisaTagihan)}.` : ''}`,
         },
       })
 
-      return { deposit, kembali, hangus, sisaTagihan, dilunasi: tagihanDilunasi.length }
+      return {
+        deposit, kembali, hangus, sisaTagihan,
+        dilunasi: tagihanDilunasi.length,
+        penjualanDilunasi: jualDilunasi.length,
+        totalPenjualan,
+      }
     })
 
     return NextResponse.json({ ok: true, ...result })

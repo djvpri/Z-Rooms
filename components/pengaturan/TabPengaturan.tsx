@@ -8,7 +8,12 @@ const TAB = [
   { href: '/pengaturan/properti', label: 'Properti' },
   { href: '/pengaturan/tipe-kamar', label: 'Tipe kamar' },
   { href: '/pengaturan/fasilitas', label: 'Fasilitas' },
+  { href: '/pengaturan/produk', label: 'Produk' },
+  { href: '/lisensi', label: 'Lisensi' },
 ] as const
+
+/** Dipakai halaman yang bukan di bawah /pengaturan tapi punya tab yang sama. */
+export const TAB_PENGATURAN = TAB
 
 export default function TabPengaturan({ aktif }: { aktif: (typeof TAB)[number]['href'] }) {
   return (

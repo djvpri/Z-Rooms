@@ -6,7 +6,7 @@ import { cn, inisial } from '@/lib/utils'
 import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
-  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear, ShieldCheck,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear, Bag,
 } from 'react-bootstrap-icons'
 import type { ComponentType } from 'react'
 
@@ -15,14 +15,29 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   { href: '/kamar',        label: 'Kamar',       Icon: DoorOpen },
   { href: '/penyewa',      label: 'Penyewa',     Icon: People },
   { href: '/booking',      label: 'Booking Baru',Icon: CalendarPlus },
+  // Jalur uang kedua, di samping Keuangan (sewa). Ditaruh berdampingan supaya
+  // terbaca sebagai pasangan: sewa | barang.
+  { href: '/penjualan-barang', label: 'Penjualan', Icon: Bag },
   { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
   { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
-  { href: '/lisensi',      label: 'Lisensi',     Icon: ShieldCheck },
-  // Kelola properti ada di dalam sini sebagai tab, bukan menu terpisah —
-  // satu pintu masuk, dan `/pengaturan/properti` tetap menyalakan menu ini
-  // lewat path.startsWith.
+  // Lisensi & Kelola properti keduanya di dalam Pengaturan sebagai tab, bukan
+  // menu terpisah: nav HP sudah 7 item dan menambah ke-8 membuat labelnya
+  // terpotong. `/lisensi` tetap menyalakan menu ini lewat daftar `padanan`.
   { href: '/pengaturan',   label: 'Pengaturan',  Icon: Gear },
 ]
+
+/**
+ * Path yang menyalakan sebuah menu walau bukan awalan href-nya. Dipakai untuk
+ * halaman yang dipindah ke dalam Pengaturan tapi URL-nya dipertahankan
+ * (`/lisensi`) — kalau tidak, membuka Lisensi tak menyorot menu apa pun dan
+ * pengguna merasa tersesat.
+ */
+const padanan: Record<string, string> = { '/lisensi': '/pengaturan' }
+
+/** Menu menyala kalau path diawali href-nya, atau path itu punya padanan ke href ini. */
+function aktifItem(href: string, path: string): boolean {
+  return path.startsWith(href) || padanan[path] === href
+}
 
 export default function Sidebar({
   user, properti = [], propertiAktifId,
@@ -64,7 +79,7 @@ export default function Sidebar({
             href={item.href}
             className={cn(
               'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm transition-colors',
-              path.startsWith(item.href)
+              aktifItem(item.href, path)
                 ? 'bg-teal-50 text-teal-700 font-medium'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             )}
@@ -113,7 +128,7 @@ export default function Sidebar({
             href={item.href}
             className={cn(
               'flex flex-col items-center py-1.5 px-2 rounded-lg transition-colors min-w-0',
-              path.startsWith(item.href)
+              aktifItem(item.href, path)
                 ? 'text-teal-600'
                 : 'text-gray-400 hover:text-gray-600'
             )}
