@@ -6,7 +6,7 @@ import { cn, inisial } from '@/lib/utils'
 import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
-  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Bell, Gear, Bag,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Gear, Bag, MusicNoteBeamed,
 } from 'react-bootstrap-icons'
 import type { ComponentType } from 'react'
 
@@ -15,11 +15,19 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   { href: '/kamar',        label: 'Kamar',       Icon: DoorOpen },
   { href: '/penyewa',      label: 'Penyewa',     Icon: People },
   { href: '/booking',      label: 'Booking Baru',Icon: CalendarPlus },
+  // Jalur uang ketiga: sewa bulanan (Keuangan) | barang (Penjualan) | per jam
+  // (Karaoke). Sejajar, bukan tab di dalam Pengaturan — karaoke dipakai
+  // bergantian sepanjang malam, Pengaturan dibuka sebulan sekali.
+  { href: '/karaoke',      label: 'Karaoke',     Icon: MusicNoteBeamed },
   // Jalur uang kedua, di samping Keuangan (sewa). Ditaruh berdampingan supaya
   // terbaca sebagai pasangan: sewa | barang.
   { href: '/penjualan-barang', label: 'Penjualan', Icon: Bag },
   { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
-  { href: '/notifikasi',   label: 'Notifikasi',  Icon: Bell },
+  // Notifikasi BUKAN menu: dipindah ke lonceng di judul tiap halaman
+  // (`components/layout/NotifikasiLonceng.tsx`). Alasan: slot nav terbatas dan
+  // notifikasi justru harus terlihat TANPA dicari — di dalam menu, ia praktis
+  // mati. `/notifikasi` tetap hidup sebagai halaman daftarnya.
+  //
   // Lisensi & Kelola properti keduanya di dalam Pengaturan sebagai tab, bukan
   // menu terpisah: nav HP sudah 7 item dan menambah ke-8 membuat labelnya
   // terpotong. `/lisensi` tetap menyalakan menu ini lewat daftar `padanan`.

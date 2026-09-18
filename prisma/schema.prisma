@@ -113,6 +113,8 @@ model Properti {
   fasilitasMaster Fasilitas[]
   produk      Produk[]
   penjualan   Penjualan[]
+  ruangKaraoke RuangKaraoke[]
+  sesiKaraoke  SesiKaraoke[]
 }
 
 enum TipeProperti {
@@ -460,9 +462,133 @@ model Produk {
 
   properti    Properti       @relation(fields: [propertiId], references: [id])
   item        ItemPenjualan[]
+  itemMinumanKaraoke ItemMinumanKaraoke[]
 
   @@unique([propertiId, nama])
   @@index([propertiId, aktif, urutan])
+}
+
+// ───────────────────────────────────────────────
+// KARAOKE — sewa ruang per jam (fasilitas hotel)
+// ───────────────────────────────────────────────
+// Jalur uang KETIGA, terpisah dari Sewa (per bulan) dan Penjualan (tanpa
+// durasi). Ruang karaoke SENGAJA bukan `Kamar`: kamar hotel dihuni satu orang
+// untuk rentang hari, ruang karaoke berganti orang tiap 1-2 jam. Menyatukan
+// keduanya merusak papan jadwal hotel (`lib/jadwalKamar.ts` menganggap satu
+// kamar satu penghuni pada satu rentang) dan membuat tamu yang sedang nyanyi
+// terbaca sebagai tamu menginap.
+model RuangKaraoke {
+  id         String   @id @default(cuid())
+  propertiId String
+  nama       String            // "Reguler 1", "VIP 2"
+  kapasitas  Int?
+  aktif      Boolean  @default(true)
+  urutan     Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  properti   Properti       @relation(fields: [propertiId], references: [id])
+  tarif      TarifKaraoke[]
+  sesi       SesiKaraoke[]
+
+  @@unique([propertiId, nama])
+  @@index([propertiId])
+}
+
+// Tarif per BLOK JAM. Satu ruang punya beberapa baris; misal 10:00-17:00,
+// 17:00-24:00, 24:00-10:00. Wajib menutup 24 jam tanpa lubang & tanpa
+// tumpang tindih — divalidasi di `lib/karaoke.ts` saat Pengaturan menyimpan.
+//
+// jamMulai/jamSelesai = MENIT SEJAK TENGAH MALAM (bukan DateTime): blok tarif
+// berulang tiap hari dan tak punya tanggal. Menyimpannya sebagai DateTime
+// memaksa memilih tanggal dummy yang harus diabaikan di setiap query — sumber
+// bug klasik. `jamSelesai` boleh 1440 (= tengah malam) supaya blok terakhir
+// tetap terwakili dan bisa menutup sampai 24:00.
+model TarifKaraoke {
+  id         String   @id @default(cuid())
+  ruangId    String
+  jamMulai   Int              // menit sejak 00:00, 0-1439
+  jamSelesai Int              // menit sejak 00:00, 1-1440
+  hargaPerJam Decimal @db.Decimal(12, 0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ruang      RuangKaraoke @relation(fields: [ruangId], references: [id], onDelete: Cascade)
+
+  @@index([ruangId, jamMulai])
+}
+
+model SesiKaraoke {
+  id             String        @id @default(cuid())
+  propertiId     String
+  ruangId        String
+  nomor          String                  // "KR-0001" per properti
+  namaPelanggan  String?                 // teks bebas — pelanggan umum sering tanpa KTP
+  telepon        String?
+  mulaiPada      DateTime
+  rencanaSelesai DateTime
+  selesaiAktual  DateTime?               // diisi saat sesi ditutup
+  jumlahJam      Int                     // hasil pembulatan ke atas, DISALIN
+  totalSewa      Decimal       @db.Decimal(12, 0)  // DISALIN, tak dihitung ulang
+  jaminan        Decimal       @db.Decimal(12, 0) @default(0)
+  status         StatusKaraoke @default(BERJALAN)
+  catatan        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  properti       Properti            @relation(fields: [propertiId], references: [id])
+  ruang          RuangKaraoke        @relation(fields: [ruangId], references: [id])
+  item           ItemSesiKaraoke[]
+  minuman        ItemMinumanKaraoke[]
+
+  @@unique([propertiId, nomor])
+  @@index([ruangId, status])
+  @@index([propertiId, status])
+}
+
+// Rincian satu jam sesi: tarif mana yang dipakai jam itu. Baris-baris inilah
+// yang membuat tagihan bisa dipertanggungjawabkan saat pelanggan bertanya
+// "kok mahal?" — kasir bisa menunjuk "jam 20:00 tarifnya beda", dan struk
+// mencetaknya. Sekaligus membuat aturan "dipatok jam mulai jam itu" bisa
+// diaudit pelanggan, bukan cuma dipercaya.
+model ItemSesiKaraoke {
+  id          String   @id @default(cuid())
+  sesiId      String
+  jamKe       Int                 // 1, 2, 3, ...
+  mulai       DateTime
+  selesai     DateTime
+  hargaPerJam Decimal  @db.Decimal(12, 0)  // DISALIN dari tarif saat itu
+  subtotal    Decimal  @db.Decimal(12, 0)
+
+  sesi        SesiKaraoke @relation(fields: [sesiId], references: [id], onDelete: Cascade)
+
+  @@unique([sesiId, jamKe])
+}
+
+// Minuman/makanan yang ditebus ke sesi. SENGAJA bukan model `Penjualan`:
+// Penjualan adalah jalur uangnya sendiri (bisa ditarik ke kamar hotel). Minuman
+// karaoke menempel ke sesi supaya pelanggan umum tak bisa kabur setelah pesan.
+// Harga & nama DISALIN — struk lama tak berubah kalau harga produk naik.
+model ItemMinumanKaraoke {
+  id          String   @id @default(cuid())
+  sesiId      String
+  produkId    String
+  namaProduk  String
+  hargaSatuan Decimal  @db.Decimal(12, 0)
+  jumlah      Int
+  subtotal    Decimal  @db.Decimal(12, 0)
+
+  sesi        SesiKaraoke @relation(fields: [sesiId], references: [id], onDelete: Cascade)
+  produk      Produk      @relation(fields: [produkId], references: [id])
+
+  @@index([sesiId])
+}
+
+enum StatusKaraoke {
+  BOOKING
+  BERJALAN
+  SELESAI
+  BATAL
 }
 
 model Penjualan {

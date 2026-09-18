@@ -9,6 +9,7 @@ const TAB = [
   { href: '/pengaturan/tipe-kamar', label: 'Tipe kamar' },
   { href: '/pengaturan/fasilitas', label: 'Fasilitas' },
   { href: '/pengaturan/produk', label: 'Produk' },
+  { href: '/pengaturan/karaoke', label: 'Karaoke' },
   { href: '/lisensi', label: 'Lisensi' },
 ] as const
 

@@ -32,3 +32,6 @@ yarn-error.log*
 .railway
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Rencana kerja agen — bukan bagian produk
+.hermes/
