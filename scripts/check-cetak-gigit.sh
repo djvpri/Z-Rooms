@@ -167,6 +167,44 @@ PY
 cek_gigit "pratinjau menulis ulang tata letak (tak memakai lib/cetak)"
 kembalikan
 
+# ── 9. Tombol tes cetak hilang dari halaman ──────────────────────────────
+python3 - <<'PY2' || MATI "tak bisa menyuntik bug tombol"
+p = 'app/(dashboard)/pengaturan/cetak/page.tsx'
+s = open(p, encoding='utf8').read()
+lama = "                onClick={tesCetak}"
+assert lama in s, 'penanda tombol tes tidak ketemu'
+open(p, 'w', encoding='utf8').write(s.replace(lama, "                onClick={() => {}}"))
+PY2
+cek_gigit "tombol Tes cetak tak lagi memanggil apa pun"
+kembalikan
+
+# ── 10. Jembatan dicek tanpa memastikan kemampuan cetak ───────────────────
+# APK lama punya ZXR_APK tanpa `cetak`. Menganggapnya "ada" membuat tombol
+# menyala lalu diam — terbaca kasir sebagai kerusakan.
+python3 - <<'PY2' || MATI "tak bisa menyuntik bug jembatan"
+p = 'lib/cetak.ts'
+s = open(p, encoding='utf8').read()
+lama = "  if (typeof kandidat.cetak !== 'function') return null"
+assert lama in s, 'penanda jembatan tidak ketemu'
+open(p, 'w', encoding='utf8').write(s.replace(lama, "  // kemampuan cetak tak diperiksa"))
+PY2
+cek_gigit "jembatan dianggap ada tanpa memeriksa kemampuan cetak"
+kembalikan
+
+# ── 11. Naskah dikirim tanpa perintah ESC/POS ─────────────────────────────
+python3 - <<'PY2' || MATI "tak bisa menyuntik bug naskah"
+p = 'lib/cetak.ts'
+s = open(p, encoding='utf8').read()
+lama = """  const naskah: PerintahEscPos[] = [
+    { jenis: 'mentah', byte: [...ESC.INISIALISASI] },
+    { jenis: 'mentah', byte: [...ESC.RATA_KIRI] },
+  ]"""
+assert lama in s, 'penanda naskah tidak ketemu'
+open(p, 'w', encoding='utf8').write(s.replace(lama, "  const naskah: PerintahEscPos[] = []"))
+PY2
+cek_gigit "naskah tanpa inisialisasi printer"
+kembalikan
+
 echo
 if [ "$gagal" -ne 0 ]; then
   echo "uji gigit cetak: $lulus menggigit, $gagal TIDAK menggigit"

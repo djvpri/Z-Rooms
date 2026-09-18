@@ -177,3 +177,137 @@ export function labelPrinter(printer: string): string {
   const p = printer.trim()
   return p === '' ? 'Belum dipilih' : p
 }
+
+// ───────────────────────────────────────────────
+// Naskah ESC/POS
+// ───────────────────────────────────────────────
+//
+// Perintah ESC/POS dikirim sebagai BYTE, bukan teks tampil. Karena itu naskah
+// ditulis di sini sebagai angka, bukan sebagai string biasa — kalau ditulis
+// sebagai teks, karakter kontrol akan terlihat di nota sebagai simbol aneh.
+//
+// Yang dikirim hanyalah perintah yang benar-benar ada di hampir semua printer
+// thermal (ESC @, ESC a, GS V). Perintah yang tak dukung sebagian printer
+// dihindari — printer yang tak paham perintah akan mencetaknya sebagai teks
+// sampah, dan itu lebih buruk daripada tak ada efeknya.
+
+/** Perintah ESC/POS yang dipakai. Angkanya adalah standar, bukan pilihan. */
+export const ESC = {
+  /** ESC @ — mulai ulang printer ke keadaan awal. Wajib, tiap kali cetak. */
+  INISIALISASI: [0x1b, 0x40],
+  /** ESC a n — rata teks: 0 kiri, 1 tengah, 2 kanan. */
+  RATA_TENGAH: [0x1b, 0x61, 0x01],
+  RATA_KIRI: [0x1b, 0x61, 0x00],
+  /** ESC E n / GS ! n — tebal dan ukuran huruf ganda. */
+  TEBAL_ON: [0x1b, 0x45, 0x01],
+  TEBAL_OFF: [0x1b, 0x45, 0x00],
+  BESAR_ON: [0x1d, 0x21, 0x11],
+  BESAR_OFF: [0x1d, 0x21, 0x00],
+  /** GS V m — potong kertas. 66 = potong penuh dengan maju sedikit. */
+  POTONG: [0x1d, 0x56, 0x42, 0x00],
+  /** ESC d n — maju n baris, supaya potongan tak memotong teks terakhir. */
+  MAJU: [0x1b, 0x64, 0x03],
+} as const
+
+/** Muatan satu perintah di naskah. Dipisah supaya bisa diuji tanpa printer. */
+export type PerintahEscPos =
+  | { jenis: 'mentah'; byte: number[] }
+  | { jenis: 'baris'; teks: string }
+
+/**
+ * Hasilkan naskah nota siap kirim ke printer.
+ *
+ * `baris` adalah daftar teks yang sudah rapi (dari `barisDuaKolom` dll) —
+ * fungsi ini hanya menambahkan perintah, tak mengatur tata letak. Pemisahan
+ * itu disengaja: tata letak bisa diuji di layar, perintah tidak.
+ */
+export function naskahNota(baris: string[], opsi: { potong?: boolean } = {}): PerintahEscPos[] {
+  const naskah: PerintahEscPos[] = [
+    { jenis: 'mentah', byte: [...ESC.INISIALISASI] },
+    { jenis: 'mentah', byte: [...ESC.RATA_KIRI] },
+  ]
+  for (const b of baris) naskah.push({ jenis: 'baris', teks: b })
+  if (opsi.potong !== false) {
+    naskah.push({ jenis: 'mentah', byte: [...ESC.MAJU] })
+    naskah.push({ jenis: 'mentah', byte: [...ESC.POTONG] })
+  }
+  return naskah
+}
+
+/**
+ * Ubah naskah jadi satu string untuk dikirim lewat jembatan APK.
+ *
+ * Bentuknya sengaja sederhana (`teks` + perintah sebagai penanda dalam kurung
+ * siku) karena jembatan `JembatanApk` hanya menerima String — `addJavascriptInterface`
+ * tak bisa mengirim byte. Penguraiannya ada di sisi Kotlin, dan harus SAMA.
+ *
+ * Baris dipisah "\n". Pencetak yang tak mendukung potong tetap dapat teksnya.
+ */
+export function naskahKeTeks(naskah: PerintahEscPos[]): string {
+  return naskah
+    .map((p) => (p.jenis === 'baris' ? p.teks : `<${p.byte.join(',')}>`))
+    .join('\n')
+}
+
+/**
+ * Teks nota contoh untuk tombol "Tes cetak".
+ *
+ * Sengaja memuat SEMUA fitur kertas yang bisa salah: baris penuh selebar
+ * kertas (untuk melihat apakah berlipat), baris dua kolom (untuk melihat apakah
+ * kolom angka jatuh di tempatnya), dan teks pada batas lebar.
+ */
+export function notaUji(kertas: string | null | undefined): string[] {
+  return [
+    barisTengah('TES CETAK', kertas),
+    garisKertas(kertas, '='),
+    barisDuaKolom('Kertas', `${kolomKertas(kertas)} kolom`, kertas),
+    barisDuaKolom('Tanggal', new Date().toLocaleString('id-ID'), kertas),
+    garisKertas(kertas),
+    potongKolom('X'.repeat(kolomKertas(kertas)), kertas),
+    garisKertas(kertas, '='),
+    barisTengah('Printer terhubung', kertas),
+  ]
+}
+
+// ───────────────────────────────────────────────
+// Jembatan ke aplikasi Android
+// ───────────────────────────────────────────────
+//
+// Halaman web TIDAK bisa membuka Bluetooth sendiri — itu hanya bisa dilakukan
+// aplikasi Android. Jadi cetak langsung bekerja lewat jembatan `ZXR_APK` yang
+// dipasang MainActivity untuk host ZXRoom.
+//
+// Di browser biasa jembatan ini TIDAK ADA. Karena itu setiap pemanggil harus
+// memeriksa dulu (`adaJembatanCetak`) dan menyiapkan jalan lain — kalau tidak,
+// tombolnya diam tanpa penjelasan, yang terbaca kasir sebagai "aplikasi rusak".
+
+/** Nama jembatan yang dipasang APK. Satu tempat, dipakai web dan diuji. */
+export const NAMA_JEMBATAN = 'ZXR_APK'
+
+/** Bentuk jembatan yang diharapkan ada di `window`. */
+export type JembatanCetak = {
+  cetak?: (naskah: string) => void
+  /** Daftar printer Bluetooth yang sudah dipasangkan ke perangkat. */
+  daftarPrinter?: () => string
+  /** Alamat printer terakhir yang dipakai, "" kalau belum ada. */
+  printerTersimpan?: () => string
+  /** Kode versi APK, untuk memastikan APK-nya cukup baru. */
+  versi?: () => string
+}
+
+/** Ambil jembatan dari `window`, atau null kalau halaman dibuka di browser. */
+export function ambilJembatan(w: unknown): JembatanCetak | null {
+  if (!w || typeof w !== 'object') return null
+  const j = (w as Record<string, unknown>)[NAMA_JEMBATAN]
+  if (!j || typeof j !== 'object') return null
+  const kandidat = j as JembatanCetak
+  // Dianggap ada hanya kalau punya `cetak` — APK versi lama punya jembatan ini
+  // tanpa kemampuan cetak, dan menganggapnya ada akan membuat tombol diam.
+  if (typeof kandidat.cetak !== 'function') return null
+  return kandidat
+}
+
+/** Apakah halaman sedang berjalan di dalam aplikasi Android yang bisa cetak. */
+export function adaJembatanCetak(w: unknown): boolean {
+  return ambilJembatan(w) !== null
+}

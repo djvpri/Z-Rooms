@@ -17,12 +17,17 @@ import {
   NAMA_PRINTER_MAKS,
   PREF_CETAK_BAWAAN,
   UKURAN_KERTAS,
+  adaJembatanCetak,
+  ambilJembatan,
   barisDuaKolom,
   barisKiriKanan,
   barisTengah,
   garisKertas,
   kolomKertas,
   labelPrinter,
+  naskahKeTeks,
+  naskahNota,
+  notaUji,
   type PrefCetak,
 } from '@/lib/cetak'
 
@@ -32,6 +37,16 @@ export default function PengaturanCetakPage() {
   const [simpan, setSimpan] = useState(false)
   const [pesan, setPesan] = useState('')
   const [error, setError] = useState('')
+  // Hasil tes cetak DIPISAH dari pesan simpan: tes cetak bicara soal printer,
+  // bukan soal setelan yang tersimpan. Menggabungkannya membuat pesan
+  // "tersimpan" hilang begitu kasir menekan Tes cetak.
+  const [hasilTes, setHasilTes] = useState<{ ok: boolean; teks: string } | null>(null)
+  // Diperiksa setelah halaman tampil: `window` belum ada saat render server,
+  // dan membacanya di render pertama membuat HTML server berbeda dari klien.
+  const [bisaCetak, setBisaCetak] = useState(false)
+  // Menunggu jawaban APK. Menyambung printer bisa beberapa detik, dan tombol
+  // yang tetap bisa ditekan akan mengirim nota berkali-kali.
+  const [menunggu, setMenunggu] = useState(false)
 
   const muat = async () => {
     setLoading(true)
@@ -51,6 +66,55 @@ export default function PengaturanCetakPage() {
   useEffect(() => {
     void muat()
   }, [])
+
+  // Jembatan cetak hanya ada di dalam aplikasi Android. Diperiksa sekali
+  // setelah halaman tampil; `window` tak ada saat render server.
+  useEffect(() => {
+    setBisaCetak(adaJembatanCetak(window))
+  }, [])
+
+  /**
+   * Kirim satu naskah ke printer lewat aplikasi Android.
+   *
+   * Tak ada nilai balik yang bisa dipercaya dari jembatan: APK menerima
+   * naskah lalu mengembalikan segera, sementara printer masih bekerja di
+   * latar. Jadi hasil di sini berarti "sudah DIKIRIM ke aplikasi", bukan
+   * "sudah tercetak" — dan pesannya harus berbunyi begitu, supaya kasir tak
+   * menyimpulkan printer rusak hanya karena kertas belum keluar.
+   */
+  function kirimKePrinter(baris: string[], label: string) {
+    const j = ambilJembatan(window)
+    if (!j) {
+      setHasilTes({
+        ok: false,
+        teks: 'Cetak langsung butuh aplikasi Z-Rooms versi Android. Buka halaman ini dari aplikasi, bukan dari peramban.',
+      })
+      return
+    }
+    // APK menjawab BELAKANGAN lewat `ZXR_CETAK_HASIL` karena menyambung printer
+    // makan waktu. Kalau callback ini belum dipasang, kegagalan cetak tak akan
+    // pernah terlihat — kasir menekan tombol, dan halaman diam saja.
+    setMenunggu(true)
+    ;(window as unknown as Record<string, unknown>).ZXR_CETAK_HASIL = (ok: boolean, pesan: string) => {
+      setMenunggu(false)
+      setHasilTes({ ok, teks: pesan })
+    }
+    try {
+      j.cetak!(naskahKeTeks(naskahNota(baris)))
+    } catch (e) {
+      // Jembatan bisa melempar kalau APK-nya sudah lama/tak cocok.
+      setMenunggu(false)
+      setHasilTes({ ok: false, teks: `Gagal mengirim ke printer: ${(e as Error).message}` })
+      return
+    }
+    setHasilTes({ ok: true, teks: `${label} sedang dicetak…` })
+  }
+
+  function tesCetak() {
+    setError('')
+    setPesan('')
+    kirimKePrinter(notaUji(pref.kertas), 'Nota uji')
+  }
 
   async function kirim(e: React.FormEvent) {
     e.preventDefault()
@@ -208,6 +272,47 @@ export default function PengaturanCetakPage() {
               <button type="button" className="btn btn-ghost" onClick={kembaliBawaan}>
                 <ArrowCounterclockwise aria-hidden="true" /> Bawaan
               </button>
+            </div>
+
+            {/* ── Tes cetak ── */}
+            <div className="rounded-lg border border-gray-200 p-3">
+              <span className="block text-xs text-gray-500 mb-1">Tes cetak</span>
+              <p className="text-[11px] text-gray-400 mb-2">
+                Mengirim nota contoh ke printer, supaya ketahuan tersambung atau tidak.
+                Pakai ukuran kertas di atas — jadi sekaligus terlihat apakah barisnya berlipat.
+              </p>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={tesCetak}
+                disabled={!bisaCetak || menunggu}
+                title={bisaCetak ? undefined : 'Buka halaman ini dari aplikasi Z-Rooms di Android'}
+              >
+                <Printer aria-hidden="true" /> {menunggu ? 'Mencetak…' : 'Tes cetak'}
+              </button>
+
+              {!bisaCetak && (
+                <p className="text-[11px] text-amber-600 mt-2 flex items-start gap-1">
+                  <ExclamationTriangleFill aria-hidden="true" className="mt-0.5 shrink-0" />
+                  Halaman ini sedang dibuka di peramban. Cetak langsung butuh aplikasi Z-Rooms
+                  versi Android — di peramban tak ada jalur ke printer Bluetooth.
+                </p>
+              )}
+
+              {hasilTes && (
+                <p
+                  className={`text-[11px] mt-2 flex items-start gap-1 ${
+                    hasilTes.ok ? 'text-teal-700' : 'text-coral-600'
+                  }`}
+                >
+                  {hasilTes.ok ? (
+                    <Check2 aria-hidden="true" className="mt-0.5 shrink-0" />
+                  ) : (
+                    <ExclamationTriangleFill aria-hidden="true" className="mt-0.5 shrink-0" />
+                  )}
+                  {hasilTes.teks}
+                </p>
+              )}
             </div>
           </div>
 
