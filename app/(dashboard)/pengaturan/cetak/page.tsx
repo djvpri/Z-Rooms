@@ -9,7 +9,7 @@
 // memakai fungsi yang SAMA dengan yang akan mencetak (`lib/cetak.ts`), jadi
 // yang dilihat admin di layar persis bentuk yang keluar dari printer —
 // termasuk jumlah kolomnya.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Printer, Check2, ArrowCounterclockwise, ExclamationTriangleFill, CupHot } from 'react-bootstrap-icons'
 import TabPengaturan from '@/components/pengaturan/TabPengaturan'
 import {
@@ -48,15 +48,25 @@ export default function PengaturanCetakPage() {
   // yang tetap bisa ditekan akan mengirim nota berkali-kali.
   const [menunggu, setMenunggu] = useState(false)
 
-  const muat = async () => {
+  // Penanda "pengguna sudah menyentuh form". Dipakai sebagai ref, bukan state:
+  // nilainya dibaca di dalam respons fetch yang sudah berjalan, dan state akan
+  // tertangkap basi di closure itu.
+  const sudahDisentuh = useRef(false)
+
+  async function muat() {
     setLoading(true)
     try {
       const res = await fetch('/api/properti/pref-cetak', { cache: 'no-store' })
       const d = await res.json().catch(() => null)
       if (!res.ok) throw new Error(d?.error?.message ?? d?.error ?? 'Gagal memuat setelan.')
+      // DIKUNCI saat memuat: respons yang datang setelah pengguna mulai mengetik
+      // akan menimpa ketikan itu, dan kolom kembali tampak kosong seperti
+      // "pilihan saya tak tersimpan".
+      if (sudahDisentuh.current) return
       setPref(d.pref)
       setError('')
     } catch (e) {
+      if (sudahDisentuh.current) return
       setError((e as Error).message)
     } finally {
       setLoading(false)
@@ -230,7 +240,7 @@ export default function PengaturanCetakPage() {
                 value={pref.printer}
                 maxLength={NAMA_PRINTER_MAKS}
                 placeholder={pref.koneksi === 'bluetooth' ? 'Alamat MAC, mis. 66:1E:0C:2A:9F:31' : 'Alamat / IP printer'}
-                onChange={(e) => setPref({ ...pref, printer: e.target.value })}
+                onChange={(e) => { sudahDisentuh.current = true; setPref({ ...pref, printer: e.target.value }) }}
               />
               <span className="block text-[11px] text-gray-400 mt-1">
                 Diisi otomatis saat kasir pertama kali mencetak. Boleh dikosongkan.
@@ -340,7 +350,24 @@ export default function PengaturanCetakPage() {
             )}
 
             <p className="text-[11px] text-gray-400 mt-2">
-              Printer terakhir: <span className="text-gray-600">{labelPrinter(pref.printer)}</span>
+              Printer terakhir:{' '}
+              {pref.printer ? (
+                <span className="text-gray-600 inline-flex items-center gap-1">
+                  {labelPrinter(pref.printer)}
+                  {/* Bisa dihapus dari sini: kalau printer diganti, alamat lama
+                      yang tertinggal membuat cetakan berikutnya menuju alat
+                      yang sudah tak ada. */}
+                  <button
+                    type="button"
+                    className="text-coral-600 hover:underline"
+                    onClick={() => { sudahDisentuh.current = true; setPref({ ...pref, printer: '' }) }}
+                  >
+                    kosongkan
+                  </button>
+                </span>
+              ) : (
+                <span className="text-gray-600">{labelPrinter(pref.printer)}</span>
+              )}
             </p>
           </div>
         </form>
