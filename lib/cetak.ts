@@ -311,3 +311,18 @@ export function ambilJembatan(w: unknown): JembatanCetak | null {
 export function adaJembatanCetak(w: unknown): boolean {
   return ambilJembatan(w) !== null
 }
+
+/**
+ * Ada objek `ZXR_APK` di `window`, tapi tanpa `cetak` — APK lama.
+ *
+ * Berguna untuk membedakan dua sebab tombol cetak mati: halaman dibuka di
+ * peramban (tak ada `ZXR_APK` sama sekali) vs APK terlalu lama (ada, tapi
+ * belum punya kemampuan cetak). Tanpa pembedaan ini, pesannya menyuruh
+ * "buka dari aplikasi" kepada kasir yang memang sudah di aplikasi — jalan
+ * keluarnya memperbarui APK, bukan pindah peramban.
+ */
+export function adaJembatanLama(w: unknown): boolean {
+  if (!w || typeof w !== 'object') return false
+  const j = (w as Record<string, unknown>)[NAMA_JEMBATAN]
+  return !!j && typeof j === 'object'
+}

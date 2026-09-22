@@ -18,6 +18,7 @@ import {
   PREF_CETAK_BAWAAN,
   UKURAN_KERTAS,
   adaJembatanCetak,
+  adaJembatanLama,
   ambilJembatan,
   barisDuaKolom,
   barisKiriKanan,
@@ -47,6 +48,9 @@ export default function PengaturanCetakPage() {
   // Menunggu jawaban APK. Menyambung printer bisa beberapa detik, dan tombol
   // yang tetap bisa ditekan akan mengirim nota berkali-kali.
   const [menunggu, setMenunggu] = useState(false)
+  // Penjelasan kenapa tombol cetak mati. Dipisah jadi state karena sebabnya
+  // dua (di peramban vs APK lama) dan harus diketahui SETELAH mount.
+  const [pesanCetak, setPesanCetak] = useState('')
 
   // Penanda "pengguna sudah menyentuh form". Dipakai sebagai ref, bukan state:
   // nilainya dibaca di dalam respons fetch yang sudah berjalan, dan state akan
@@ -81,6 +85,17 @@ export default function PengaturanCetakPage() {
   // setelah halaman tampil; `window` tak ada saat render server.
   useEffect(() => {
     setBisaCetak(adaJembatanCetak(window))
+    // Pesan penjelas dipilih berdasarkan JENIS kegagalannya — "buka dari
+    // aplikasi" tak menolong kalau pengguna memang SUDAH di aplikasi dan
+    // yang bermasalah versinya: itu terjadi saat APK lama punya ZXR_APK
+    // tanpa `cetak`, dan satu-satunya jalan keluarnya memperbarui APK.
+    setPesanCetak(
+      adaJembatanCetak(window)
+        ? ''
+        : adaJembatanLama(window)
+          ? 'Aplikasi Android ini terlalu lama — cetak butuh Z-Rooms 1.0.9 ke atas. Perbarui aplikasinya (cek notifikasi pembaruan, atau unduh dari github.com/djvpri/Z-Rooms-android/releases), lalu buka ulang halaman ini.'
+          : 'Halaman ini sedang dibuka di peramban. Cetak langsung butuh aplikasi Z-Rooms versi Android — di peramban tak ada jalur ke printer Bluetooth.',
+    )
   }, [])
 
   /**
@@ -301,11 +316,10 @@ export default function PengaturanCetakPage() {
                 <Printer aria-hidden="true" /> {menunggu ? 'Mencetak…' : 'Tes cetak'}
               </button>
 
-              {!bisaCetak && (
+              {!bisaCetak && pesanCetak && (
                 <p className="text-[11px] text-amber-600 mt-2 flex items-start gap-1">
                   <ExclamationTriangleFill aria-hidden="true" className="mt-0.5 shrink-0" />
-                  Halaman ini sedang dibuka di peramban. Cetak langsung butuh aplikasi Z-Rooms
-                  versi Android — di peramban tak ada jalur ke printer Bluetooth.
+                  {pesanCetak}
                 </p>
               )}
 
