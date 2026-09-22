@@ -153,6 +153,13 @@ export function kosongkan() {
   baris.length = 0
 }
 
-export function jumlahBaris() {
+export function jumlahBaris(): number {
   return baris.length
+}
+
+/** N baris log terakhir sebagai teks siap tempel. */
+export function barisTerakhir(n = 5): string {
+  return baris.slice(-n).map((b) =>
+    `[${b.ts}] ${b.jenis}${b.tempat ? ` (${b.tempat})` : ''}: ${b.pesan}`,
+  ).join('\n')
 }

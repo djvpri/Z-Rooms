@@ -10,14 +10,15 @@
 // menggabungkannya akan membuat satu `useActionState` menanggung dua hal
 // berbeda.
 import { useEffect, useState } from 'react'
-import { BugFill, CheckCircleFill, ExclamationTriangleFill } from 'react-bootstrap-icons'
-import { isiLog, jumlahBaris, kosongkan, pasangPenangkap, perangkatId } from '@/lib/logError'
+import { BugFill, CheckCircleFill, ClipboardCheck, ExclamationTriangleFill } from 'react-bootstrap-icons'
+import { barisTerakhir, isiLog, jumlahBaris, kosongkan, pasangPenangkap, perangkatId } from '@/lib/logError'
 
 type Keadaan = { ok: boolean; pesan: string } | null
 
 export default function KirimLogError({ versi }: { versi?: string }) {
   const [keadaan, setKeadaan] = useState<Keadaan>(null)
   const [sedang, setSedang] = useState(false)
+  const [tersalin, setTersalin] = useState(false)
   const [nama, setNama] = useState('')
   const [n, setN] = useState(0)
 
@@ -69,6 +70,21 @@ export default function KirimLogError({ versi }: { versi?: string }) {
     }
   }
 
+  // Salin 5 kejadian terakhir, bukan seluruh isi log: yang dibutuhkan kasir
+  // saat menempel ke chat/email cukup yang paling baru. `navigator.clipboard`
+  // butuh HTTPS dan bisa ditolak kebijakan peramban — gagalnya ditampilkan,
+  // bukan didiamkan, supaya kasir tahu ia harus menyalin manual.
+  async function salin() {
+    const teks = barisTerakhir(5)
+    try {
+      await navigator.clipboard.writeText(teks)
+      setTersalin(true)
+      setTimeout(() => setTersalin(false), 2500)
+    } catch {
+      setKeadaan({ ok: false, pesan: 'Peramban menolak menyalin. Salin manual dari layar.' })
+    }
+  }
+
   return (
     <div className="card p-4">
       <h2 className="text-sm font-medium text-gray-900 mb-1">Laporan masalah</h2>
@@ -108,15 +124,26 @@ export default function KirimLogError({ versi }: { versi?: string }) {
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={kirim}
-        disabled={sedang}
-        className="btn btn-primary disabled:opacity-60 inline-flex items-center gap-2"
-      >
-        <BugFill size={14} aria-hidden="true" />
-        {sedang ? 'Mengirim...' : 'Kirim log error'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={kirim}
+          disabled={sedang}
+          className="btn btn-primary disabled:opacity-60 inline-flex items-center gap-2"
+        >
+          <BugFill size={14} aria-hidden="true" />
+          {sedang ? 'Mengirim...' : 'Kirim log error'}
+        </button>
+        <button
+          type="button"
+          onClick={salin}
+          className="btn btn-ghost inline-flex items-center gap-2"
+          title="Salin 5 kejadian terakhir"
+        >
+          <ClipboardCheck size={14} aria-hidden="true" />
+          {tersalin ? 'Tersalin!' : 'Salin log'}
+        </button>
+      </div>
 
       <p className="text-xs text-gray-400 mt-2">
         {n > 0
