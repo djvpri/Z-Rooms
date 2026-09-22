@@ -149,6 +149,17 @@ function diagnosaCetak(): string {
   return `siap (versi APK ${v})`
 }
 
+/** Versi APK dari User-Agent (`... ZRoomsAndroid/1.0.11`). Sumber kedua yang
+ *  bekerja bahkan di APK lama tanpa method versi() — asal agen memuat
+ *  penanda versi. `ZRoomsAndroid/1.0` tanpa angka minor berarti APK lama
+ *  yang menandai agennya secara tetap. */
+function versiDariAgen(): string {
+  if (typeof navigator === 'undefined') return '-'
+  const c = navigator.userAgent.match(/ZRoomsAndroid\/(\S+)/)
+  if (!c) return 'bukan APK (peramban biasa)'
+  return c[1] === '1.0' ? '1.0 (tetap — APK lama, pra-versi-agen)' : c[1]
+}
+
 /** Ambil versi APK tanpa lempar walau jembatan error. */
 function safeVersi(f: () => string): string {
   try { return f() } catch { return '(gagal baca)' }
@@ -171,6 +182,10 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
     // "tombol cetak tak bisa diklik". Tanpa baris ini, log tak menjawab
     // pertanyaan dasar pengembang: APK mana dan kenapa tombol mati?
     `apk      : ${diagnosaCetak()}`,
+    // Versi APK dari User-Agent: satu-satunya sumber yang tersisa saat APK
+    // terlalu lama untuk punya method versi(). Tanpa ini, log hanya bisa
+    // bilang "APK lama (versi ?)" dan asal-usulnya tak pernah ketahuan.
+    `apk-agen : ${versiDariAgen()}`,
     '',
     `--- ${baris.length} kejadian ---`,
   ]
