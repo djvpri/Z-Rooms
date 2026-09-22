@@ -2,11 +2,16 @@
 //
 // Penangkap error sisi peramban untuk fitur "Kirim Log Error" di tab Pengaturan.
 //
-// Kenapa disimpan di memori, bukan langsung dikirim: kasir tak boleh diganggu
-// popup saat aplikasi sedang dipakai. Error dikumpulkan diam-diam, dan baru
-// dikirim saat kasir menekan tombol — biasanya karena ada yang aneh dan ia
-// mau melapor. Log yang terkirim otomatis tanpa diminta juga tak pernah dibaca
-// siapa pun.
+// Kenapa dikumpulkan diam-diam, bukan langsung dikirim: kasir tak boleh diganggu
+// popup saat aplikasi sedang dipakai. Error dikumpulkan, dan baru dikirim saat
+// kasir menekan tombol — biasanya karena ada yang aneh dan ia mau melapor.
+// Log yang terkirim otomatis tanpa diminta juga tak pernah dibaca siapa pun.
+//
+// Kenapa ikut disimpan di localStorage: sebelumnya murni di memori, jadi setiap
+// kali halaman dimuat ulang (atau app dibuka-tutup) log ikut hilang dan laporan
+// yang dikirim selalu "0 kejadian" — padahal error terjadi sebelum itu. Dengan
+// penyimpanan lokal, error yang terjadi di halaman lain tetap terbawa saat
+// kasir membuka Pengaturan untuk melapor.
 //
 // Sengaja TIDAK menangkap console.log biasa: itu bukan error, dan menampungnya
 // membuat log penuh sampah sehingga yang penting justru tenggelam.
@@ -20,7 +25,34 @@ const MAKS_BARIS = 200
 /** Batas panjang satu baris. Pesan error bisa memuat seluruh isi DOM. */
 const MAKS_PESAN = 2_000
 
-const baris: BarisLog[] = []
+const KUNCI_SIMPAN = 'zxroom.logerror'
+
+/** Baca log dari kunjungan sebelumnya. Gagal baca (data rusak, localStorage
+ *  diblokir) tak boleh mematikan penangkap — log hari ini tetap lebih penting
+ *  daripada log kemarin yang tak bisa dibuka. */
+function muatTersimpan(): BarisLog[] {
+  if (typeof localStorage === 'undefined') return []
+  try {
+    const mentah = localStorage.getItem(KUNCI_SIMPAN)
+    if (!mentah) return []
+    const p = JSON.parse(mentah)
+    return Array.isArray(p) ? p.filter(
+      (b): b is BarisLog => !!b && typeof b.ts === 'string' && typeof b.pesan === 'string',
+    ).slice(-MAKS_BARIS) : []
+  } catch {
+    return []
+  }
+}
+
+/** Simpan ke localStorage. QuotaExceededError wajar dan sengaja ditelan:
+ *  log yang tak tersimpan lebih baik daripada error gara-gara gagal simpan. */
+function simpan() {
+  try {
+    localStorage.setItem(KUNCI_SIMPAN, JSON.stringify(baris.slice(-MAKS_BARIS)))
+  } catch { /* abaikan */ }
+}
+
+const baris: BarisLog[] = muatTersimpan()
 let terpasang = false
 
 /** Penanda perangkat per peramban. Bukan identitas pengguna — ZXRoom berbasis
@@ -71,6 +103,7 @@ export function catat(jenis: string, pesan: unknown, tempat?: string) {
     tempat,
   })
   if (baris.length > MAKS_BARIS) baris.splice(0, baris.length - MAKS_BARIS)
+  simpan()
 }
 
 /** Pasang penangkap. Aman dipanggil berkali-kali — React memasang ulang saat
@@ -143,7 +176,7 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
   ]
   const isi = baris.map((b) =>
     `[${b.ts}] ${b.jenis}${b.tempat ? ` (${b.tempat})` : ''}: ${b.pesan}`)
-  if (isi.length === 0) isi.push('(tak ada error tercatat sejak halaman dibuka)')
+  if (isi.length === 0) isi.push('(tak ada error tercatat)')
   return [...kepala, ...isi].join('\n')
 }
 
@@ -151,6 +184,7 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
  *  (server juga dedup 30 menit, tapi ini menghemat kuota kasir). */
 export function kosongkan() {
   baris.length = 0
+  simpan()
 }
 
 export function jumlahBaris(): number {
