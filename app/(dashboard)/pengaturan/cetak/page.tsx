@@ -51,6 +51,12 @@ export default function PengaturanCetakPage() {
   // Penjelasan kenapa tombol cetak mati. Dipisah jadi state karena sebabnya
   // dua (di peramban vs APK lama) dan harus diketahui SETELAH mount.
   const [pesanCetak, setPesanCetak] = useState('')
+  // Nama printer tersimpan (dari APK, bukan dari form). Dipakai menampilkan
+  // label yang dibaca kasir — alamat MAC tak memberi tahu apa pun.
+  const [namaPrinterApk, setNamaPrinterApk] = useState('')
+  // Apakah socket printer sedang hidup. Berubah otomatis dari APK lewat
+  // `ZXR_PRINTER_STATUS` — bukan hanya saat tes cetak.
+  const [printerTersambung, setPrinterTersambung] = useState(false)
 
   // Penanda "pengguna sudah menyentuh form". Dipakai sebagai ref, bukan state:
   // nilainya dibaca di dalam respons fetch yang sudah berjalan, dan state akan
@@ -84,18 +90,33 @@ export default function PengaturanCetakPage() {
   // Jembatan cetak hanya ada di dalam aplikasi Android. Diperiksa sekali
   // setelah halaman tampil; `window` tak ada saat render server.
   useEffect(() => {
-    setBisaCetak(adaJembatanCetak(window))
+    const j = ambilJembatan(window)
+    setBisaCetak(j !== null)
     // Pesan penjelas dipilih berdasarkan JENIS kegagalannya — "buka dari
     // aplikasi" tak menolong kalau pengguna memang SUDAH di aplikasi dan
     // yang bermasalah versinya: itu terjadi saat APK lama punya ZXR_APK
     // tanpa `cetak`, dan satu-satunya jalan keluarnya memperbarui APK.
     setPesanCetak(
-      adaJembatanCetak(window)
+      j
         ? ''
         : adaJembatanLama(window)
           ? 'Aplikasi Android ini terlalu lama — cetak butuh Z-Rooms 1.0.9 ke atas. Perbarui aplikasinya (cek notifikasi pembaruan, atau unduh dari github.com/djvpri/Z-Rooms-android/releases), lalu buka ulang halaman ini.'
           : 'Halaman ini sedang dibuka di peramban. Cetak langsung butuh aplikasi Z-Rooms versi Android — di peramban tak ada jalur ke printer Bluetooth.',
     )
+    if (!j) return
+
+    // Baca nama printer tersimpan + status awal.
+    setNamaPrinterApk(j.namaPrinterTersimpan?.() ?? '')
+    setPrinterTersambung(j.statusPrinter?.() ?? false)
+
+    // Callback: APK memanggil balik saat kasir memilih printer di dialog native.
+    ;(window as unknown as Record<string, unknown>).ZXR_PRINTER_DIPILIH = (nama: string | null, _alamat: string | null) => {
+      setNamaPrinterApk(nama ?? '')
+    }
+    // Callback: APK memberi tahu saat sambungan hidup/putus (auto-connect).
+    ;(window as unknown as Record<string, unknown>).ZXR_PRINTER_STATUS = (ok: boolean) => {
+      setPrinterTersambung(ok)
+    }
   }, [])
 
   /**
@@ -301,20 +322,39 @@ export default function PengaturanCetakPage() {
 
             {/* ── Tes cetak ── */}
             <div className="rounded-lg border border-gray-200 p-3">
-              <span className="block text-xs text-gray-500 mb-1">Tes cetak</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="block text-xs text-gray-500">Tes cetak</span>
+                {bisaCetak && (
+                  <span className={`text-[11px] flex items-center gap-1 ${printerTersambung ? 'text-teal-700' : 'text-gray-400'}`}>
+                    {printerTersambung ? '● Printer tersambung' : '○ Belum tersambung'}
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-gray-400 mb-2">
                 Mengirim nota contoh ke printer, supaya ketahuan tersambung atau tidak.
                 Pakai ukuran kertas di atas — jadi sekaligus terlihat apakah barisnya berlipat.
               </p>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={tesCetak}
-                disabled={!bisaCetak || menunggu}
-                title={bisaCetak ? undefined : 'Buka halaman ini dari aplikasi Z-Rooms di Android'}
-              >
-                <Printer aria-hidden="true" /> {menunggu ? 'Mencetak…' : 'Tes cetak'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={tesCetak}
+                  disabled={!bisaCetak || menunggu}
+                  title={bisaCetak ? undefined : 'Buka halaman ini dari aplikasi Z-Rooms di Android'}
+                >
+                  <Printer aria-hidden="true" /> {menunggu ? 'Mencetak…' : 'Tes cetak'}
+                </button>
+                {bisaCetak && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => ambilJembatan(window)?.pilihPrinter?.()}
+                    title="Pilih atau pindai printer Bluetooth"
+                  >
+                    {namaPrinterApk ? `Ganti (${namaPrinterApk})` : 'Pilih printer'}
+                  </button>
+                )}
+              </div>
 
               {!bisaCetak && pesanCetak && (
                 <p className="text-[11px] text-amber-600 mt-2 flex items-start gap-1">

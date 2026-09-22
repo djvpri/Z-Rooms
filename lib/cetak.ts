@@ -291,6 +291,12 @@ export type JembatanCetak = {
   daftarPrinter?: () => string
   /** Alamat printer terakhir yang dipakai, "" kalau belum ada. */
   printerTersimpan?: () => string
+  /** Nama printer tersimpan (bukan MAC), "" kalau belum ada. */
+  namaPrinterTersimpan?: () => string
+  /** Apakah socket printer sedang hidup. */
+  statusPrinter?: () => boolean
+  /** Buka dialog native pemilih printer. */
+  pilihPrinter?: () => void
   /** Kode versi APK, untuk memastikan APK-nya cukup baru. */
   versi?: () => string
 }
