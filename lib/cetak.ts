@@ -305,7 +305,10 @@ export type JembatanCetak = {
 export function ambilJembatan(w: unknown): JembatanCetak | null {
   if (!w || typeof w !== 'object') return null
   const j = (w as Record<string, unknown>)[NAMA_JEMBATAN]
-  if (!j || typeof j !== 'object') return null
+  // Di WebView Android, objek hasil addJavascriptInterface punya typeof
+  // 'function', bukan 'object' — cek dua-duanya (lihat cetak/page.tsx 2026-09-22:
+  // jembatan ada, versi APK 1.0.13, tapi tombol cetak mati "tak ada jembatan").
+  if (!j || (typeof j !== 'object' && typeof j !== 'function')) return null
   const kandidat = j as JembatanCetak
   // Dianggap ada hanya kalau punya `cetak` — APK versi lama punya jembatan ini
   // tanpa kemampuan cetak, dan menganggapnya ada akan membuat tombol diam.
@@ -330,5 +333,6 @@ export function adaJembatanCetak(w: unknown): boolean {
 export function adaJembatanLama(w: unknown): boolean {
   if (!w || typeof w !== 'object') return false
   const j = (w as Record<string, unknown>)[NAMA_JEMBATAN]
-  return !!j && typeof j === 'object'
+  // typeof 'function' juga sah di WebView Android — lihat catatan ambilJembatan.
+  return !!j && (typeof j === 'object' || typeof j === 'function')
 }

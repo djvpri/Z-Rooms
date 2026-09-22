@@ -113,4 +113,31 @@ assert.ok(rute.includes("interval '12 hours'"), 'retensi 12 jam seperti zpos')
 assert.ok(/slice\(-MAX_BARIS\)/.test(rute), 'potong dari BELAKANG (baris terbaru yang penting)')
 assert.ok(rute.includes('if (!perangkat || !konten)'), 'perangkat & isi wajib diisi')
 
-console.log('\nOK — check-log-error: 9 blok lulus')
+// ── Gema [APK] tak boleh jadi error: LogWeb.sambungkan menerjemahkan tiap
+//    pesan APK jadi console.error('[APK] …'), dan interceptor mencatatnya
+//    sebagai "console". Tanpa penjaga, info startup APK ("versi 1.0.13",
+//    "pembaruan: sudah terbaru") membanjiri laporan — lihat LogKasir 2026-09-22.
+//    Dilewat sebelum `catat`, tapi console asli TETAP dipanggil agar tak ada
+//    yang hilang dari DevTools kasir. ─────────────────────────────────────────
+const sumberLog = readFileSync(new URL('../lib/logError.ts', import.meta.url), 'utf8')
+assert.ok(sumberLog.includes("teks.startsWith('[APK] ')"),
+  'interceptor harus melewat gema [APK]')
+assert.ok(/if \(teks\.startsWith\('\[APK\] '\)\) return/.test(sumberLog),
+  'gema [APK] dilewat SEBELUM catat, bukan sesudahnya')
+assert.ok(sumberLog.includes('asli.apply(console, a)'),
+  'console asli tetap dipanggil walau gema dilewat')
+
+// ── Jembatan WebView: typeof bisa 'function', bukan 'object'. ───────────────
+// Objek hasil addJavascriptInterface punya typeof 'function' di WebView Android.
+// Cek yang hanya menerima 'object' melaporkan "peramban (tak ada jembatan APK)"
+// padahal APK berjalan — terbukti LogKasir 2026-09-22: apk-agen 1.0.13, tapi
+// diagnosa "tak ada jembatan", dan tombol cetak ikut mati. ──────────────────
+const sumberCetak = readFileSync(new URL('../lib/cetak.ts', import.meta.url), 'utf8')
+assert.ok(sumberCetak.includes("typeof j !== 'object' && typeof j !== 'function'"),
+  "ambilJembatan menerima typeof 'function' (bukan cuma 'object')")
+assert.ok(sumberCetak.includes("typeof j === 'object' || typeof j === 'function'"),
+  "adaJembatanLama menerima typeof 'function' (bukan cuma 'object')")
+assert.ok(sumberLog.includes("typeof j !== 'object' && typeof j !== 'function'"),
+  "diagnosaCetak menerima typeof 'function' (bukan cuma 'object')")
+
+console.log('\nOK — check-log-error: 12 blok lulus')

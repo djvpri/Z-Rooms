@@ -125,7 +125,13 @@ export function pasangPenangkap() {
 
   const asli = console.error
   console.error = (...a: unknown[]) => {
-    catat('console', a.map((x) => rapikan(x, 500)).join(' '))
+    const teks = a.map((x) => rapikan(x, 500)).join(' ')
+    // Gema [APK] dilewat: pesan dari sisi APK dikirim lewat event zxr-apk-log
+    // yang diterjemahkan jadi console.error('[APK] …') oleh LogWeb.sambungkan.
+    // Tanpa penjaga ini, info startup APK ("versi 1.0.13", "pembaruan: sudah
+    // terbaru") ikut tercatat sebagai error — lihat LogKasir produksi 2026-09-22.
+    if (teks.startsWith('[APK] ')) return
+    catat('console', teks)
     asli.apply(console, a)
   }
 }
@@ -139,7 +145,7 @@ import { NAMA_JEMBATAN } from './cetak'
 function diagnosaCetak(): string {
   if (typeof window === 'undefined') return '-'
   const j = (window as unknown as Record<string, unknown>)[NAMA_JEMBATAN]
-  if (!j || typeof j !== 'object') return 'peramban (tak ada jembatan APK)'
+  if (!j || (typeof j !== 'object' && typeof j !== 'function')) return 'peramban (tak ada jembatan APK)'
   // ZXR_APK ada — cek apakah punya `cetak` (APK cukup baru) atau tidak.
   const v = typeof (j as { versi?: () => string }).versi === 'function'
     ? safeVersi((j as { versi: () => string }).versi)
