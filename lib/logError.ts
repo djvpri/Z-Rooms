@@ -97,6 +97,30 @@ export function pasangPenangkap() {
   }
 }
 
+// `cetak.ts` diimpor hanya untuk `NAMA_JEMBATAN` — diagnosa tombol cetak
+// dibaca langsung dari `window` supaya tak bergantung pada bentuk penuh
+// jembatan (APK lama bisa punya objek tanpa `cetak`/`versi`).
+import { NAMA_JEMBATAN } from './cetak'
+
+/** Diagnosa kenapa tombol cetak bisa/tidak diklik. Ringkas, satu baris. */
+function diagnosaCetak(): string {
+  if (typeof window === 'undefined') return '-'
+  const j = (window as unknown as Record<string, unknown>)[NAMA_JEMBATAN]
+  if (!j || typeof j !== 'object') return 'peramban (tak ada jembatan APK)'
+  // ZXR_APK ada — cek apakah punya `cetak` (APK cukup baru) atau tidak.
+  const v = typeof (j as { versi?: () => string }).versi === 'function'
+    ? safeVersi((j as { versi: () => string }).versi)
+    : '?'
+  if (typeof (j as { cetak?: unknown }).cetak !== 'function')
+    return `APK lama (versi ${v}, tanpa cetak)`
+  return `siap (versi APK ${v})`
+}
+
+/** Ambil versi APK tanpa lempar walau jembatan error. */
+function safeVersi(f: () => string): string {
+  try { return f() } catch { return '(gagal baca)' }
+}
+
 /** Isi log siap kirim. `info` dulu: tanpa itu, log "kamar X salah" tak bisa
  *  ditelusuri — kasir biasanya tidak menyebut halaman mana yang dibuka. */
 export function isiLog(info: { versi?: string; halaman?: string } = {}): string {
@@ -110,6 +134,10 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
     `layar    : ${typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}x` : '-'}`,
     `agen     : ${typeof navigator !== 'undefined' ? navigator.userAgent : '-'}`,
     `zona     : ${Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+    // Versi APK + status tombol cetak: paling sering jadi alasan laporan
+    // "tombol cetak tak bisa diklik". Tanpa baris ini, log tak menjawab
+    // pertanyaan dasar pengembang: APK mana dan kenapa tombol mati?
+    `apk      : ${diagnosaCetak()}`,
     '',
     `--- ${baris.length} kejadian ---`,
   ]
