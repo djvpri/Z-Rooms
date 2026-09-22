@@ -141,6 +141,27 @@ export function pasangPenangkap() {
 // jembatan (APK lama bisa punya objek tanpa `cetak`/`versi`).
 import { NAMA_JEMBATAN } from './cetak'
 
+/** Cek `window.ZXR_APK` tanpa menerima 'function' sebagai bentuk sah. */
+function ambilJembatanRaw(w: Window): unknown {
+  return (w as unknown as Record<string, unknown>)[NAMA_JEMBATAN]
+}
+
+/** Alasan kenapa tombol Tes cetak tidak bisa diklik — satu string, atau null
+ *  kalau tombolnya justru hidup. Dipakai halaman cetak untuk mencatat
+ *  kejadian saat halaman dibuka, supaya laporan kasir memuat alasan persis
+ *  (bisaCetak=false) dan bukan cuma kesimpulan penangkap yang generik. */
+export function alasanTombolMati(): string | null {
+  if (typeof window === 'undefined') return null
+  const j = ambilJembatanRaw(window)
+  if (!j) return 'tak ada ZXR_APK sama sekali — halaman di peramban biasa, bukan di APK'
+  const t = typeof j
+  if (t !== 'object' && t !== 'function')
+    return `ZXR_APK ada tapi typeof '${t}' (bukan object/function)`
+  if (typeof (j as { cetak?: unknown }).cetak !== 'function')
+    return `ZXR_APK ada tanpa cetak — APK lama (typeof '${t}')`
+  return null
+}
+
 /** Diagnosa kenapa tombol cetak bisa/tidak diklik. Ringkas, satu baris. */
 function diagnosaCetak(): string {
   if (typeof window === 'undefined') return '-'

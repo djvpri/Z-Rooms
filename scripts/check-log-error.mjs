@@ -140,4 +140,17 @@ assert.ok(sumberCetak.includes("typeof j === 'object' || typeof j === 'function'
 assert.ok(sumberLog.includes("typeof j !== 'object' && typeof j !== 'function'"),
   "diagnosaCetak menerima typeof 'function' (bukan cuma 'object')")
 
-console.log('\nOK — check-log-error: 12 blok lulus')
+// ── Halaman cetak mencatat alasan tombol mati sebagai kejadian ──────────────
+// Pesan di layar (pesanCetak) tak ikut laporan; tanpa catat() di sini,
+// laporan hanya bisa menebak kenapa tombolnya tak bisa diklik.
+const halCetak = readFileSync(
+  new URL('../app/(dashboard)/pengaturan/cetak/page.tsx', import.meta.url), 'utf8')
+assert.ok(halCetak.includes('alasanTombolMati'),
+  'halaman cetak memakai alasanTombolMati() untuk mengisi catatan')
+for (const titik of ['tombol cetak mati', 'tes cetak gagal', 'hasil cetak GAGAL', 'kirim ke printer melempar']) {
+  assert.ok(halCetak.includes(titik), `titik catat "${titik}" harus ada di halaman cetak`)
+}
+assert.ok(sumberLog.includes('export function alasanTombolMati'),
+  'lib/logError mengekspor alasanTombolMati')
+
+console.log('\nOK — check-log-error: 13 blok lulus')

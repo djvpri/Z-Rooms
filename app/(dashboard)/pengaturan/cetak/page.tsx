@@ -31,6 +31,10 @@ import {
   notaUji,
   type PrefCetak,
 } from '@/lib/cetak'
+// Alasan tombol mati dicatat sebagai kejadian: pesan di layar hilang begitu
+// kasir pindah halaman, sedangkan laporan dikirim dari halaman Pengaturan —
+// tanpa dicatat, laporan hanya bisa menebak kenapa tombolnya tak bisa diklik.
+import { alasanTombolMati, catat } from '@/lib/logError'
 
 export default function PengaturanCetakPage() {
   const [pref, setPref] = useState<PrefCetak>(PREF_CETAK_BAWAAN)
@@ -103,7 +107,12 @@ export default function PengaturanCetakPage() {
           ? 'Aplikasi Android ini terlalu lama — cetak butuh Z-Rooms 1.0.9 ke atas. Perbarui aplikasinya (cek notifikasi pembaruan, atau unduh dari github.com/djvpri/Z-Rooms-android/releases), lalu buka ulang halaman ini.'
           : 'Halaman ini sedang dibuka di peramban. Cetak langsung butuh aplikasi Z-Rooms versi Android — di peramban tak ada jalur ke printer Bluetooth.',
     )
-    if (!j) return
+    if (!j) {
+      // Sebabnya dicatat persis: pesan layar tak ikut ke laporan, dan
+      // "tombol mati" tanpa sebab hanya bisa ditebak dari versi APK saja.
+      catat('cetak', `tombol cetak mati — ${alasanTombolMati() ?? 'sebab tak dikenal'}`)
+      return
+    }
 
     // Baca nama printer tersimpan + status awal.
     setNamaPrinterApk(j.namaPrinterTersimpan?.() ?? '')
@@ -131,6 +140,8 @@ export default function PengaturanCetakPage() {
   function kirimKePrinter(baris: string[], label: string) {
     const j = ambilJembatan(window)
     if (!j) {
+      const alasan = alasanTombolMati() ?? 'sebab tak dikenal'
+      catat('cetak', `tes cetak gagal — ${alasan}`)
       setHasilTes({
         ok: false,
         teks: 'Cetak langsung butuh aplikasi Z-Rooms versi Android. Buka halaman ini dari aplikasi, bukan dari peramban.',
@@ -144,13 +155,19 @@ export default function PengaturanCetakPage() {
     ;(window as unknown as Record<string, unknown>).ZXR_CETAK_HASIL = (ok: boolean, pesan: string) => {
       setMenunggu(false)
       setHasilTes({ ok, teks: pesan })
+      // Hasil dari APK dicatat: kalau cetak gagal karena printer mati/kertas
+      // habis, pesannya ada di sini dan laporan kasir memuatnya — kalau tidak,
+      // laporan hanya bilang "tombol hidup" padahal cetaknya tak pernah keluar.
+      if (!ok) catat('cetak', `hasil cetak GAGAL — ${pesan}`)
     }
     try {
       j.cetak!(naskahKeTeks(naskahNota(baris)))
     } catch (e) {
       // Jembatan bisa melempar kalau APK-nya sudah lama/tak cocok.
+      const teks = (e as Error).message
+      catat('cetak', `kirim ke printer melempar — ${teks}`)
       setMenunggu(false)
-      setHasilTes({ ok: false, teks: `Gagal mengirim ke printer: ${(e as Error).message}` })
+      setHasilTes({ ok: false, teks: `Gagal mengirim ke printer: ${teks}` })
       return
     }
     setHasilTes({ ok: true, teks: `${label} sedang dicetak…` })
