@@ -35,6 +35,7 @@ import {
 // kasir pindah halaman, sedangkan laporan dikirim dari halaman Pengaturan —
 // tanpa dicatat, laporan hanya bisa menebak kenapa tombolnya tak bisa diklik.
 import { alasanTombolMati, catat } from '@/lib/logError'
+import KirimLogError from '@/components/pengaturan/KirimLogError'
 
 export default function PengaturanCetakPage() {
   const [pref, setPref] = useState<PrefCetak>(PREF_CETAK_BAWAAN)
@@ -443,6 +444,14 @@ export default function PengaturanCetakPage() {
           </div>
         </form>
       )}
+
+      {/* Tombol kirim log di halaman cetak sendiri: diagnosa tombol cetak
+          mati tercatat di halaman INI — kalau kasir harus pindah ke tab
+          Pengaturan dulu, peristiwa "tombol mati" sudah lewat dan laporan
+          kehilangan konteksnya. */}
+      <div className="mt-4">
+        <KirimLogError />
+      </div>
     </div>
   )
 }

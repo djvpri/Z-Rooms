@@ -152,6 +152,9 @@ function ambilJembatanRaw(w: Window): unknown {
  *  (bisaCetak=false) dan bukan cuma kesimpulan penangkap yang generik. */
 export function alasanTombolMati(): string | null {
   if (typeof window === 'undefined') return null
+  const dg = (window as unknown as Record<string, string>).__zxrDiagnosaJembatan
+  if (typeof dg === 'string' && dg.includes('typeof=undefined'))
+    return 'tak ada ZXR_APK sama sekali — ' + dg
   const j = ambilJembatanRaw(window)
   if (!j) return 'tak ada ZXR_APK sama sekali — halaman di peramban biasa, bukan di APK'
   const t = typeof j
@@ -162,9 +165,14 @@ export function alasanTombolMati(): string | null {
   return null
 }
 
-/** Diagnosa kenapa tombol cetak bisa/tidak diklik. Ringkas, satu baris. */
+/** Diagnosa kenapa tombol cetak bisa/tidak diklik. Ringkas, satu baris.
+ *  Jika APK menulis `window.__zxrDiagnosaJembatan` (v1.0.15+), pakai itu —
+ *  jawaban paling akurat karena dibaca saat `onPageFinished`, persis setelah
+ *  `addJavascriptInterface`. */
 function diagnosaCetak(): string {
   if (typeof window === 'undefined') return '-'
+  const dg = (window as unknown as Record<string, unknown>).__zxrDiagnosaJembatan
+  if (typeof dg === 'string') return dg
   const j = (window as unknown as Record<string, unknown>)[NAMA_JEMBATAN]
   if (!j || (typeof j !== 'object' && typeof j !== 'function')) return 'peramban (tak ada jembatan APK)'
   // ZXR_APK ada — cek apakah punya `cetak` (APK cukup baru) atau tidak.
