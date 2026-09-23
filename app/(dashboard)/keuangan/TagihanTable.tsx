@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { Printer, CheckLg } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
+import {
+  barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
+  garisKertas, kertasPrefAktif,
+} from '@/lib/cetak'
 
 export type TagihanRow = {
   id: string
@@ -33,6 +37,50 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
   properti?: PropertiNota
 }) {
   const [printTagihan, setPrintTagihan] = useState<TagihanRow | null>(null)
+  const [pesanCetak, setPesanCetak] = useState('')
+  const [mengirim, setMengirim] = useState(false)
+
+  /**
+   * Cetak nota tagihan ke printer Bluetooth lewat aplikasi Android.
+   *
+   * DULU tombol ini memanggil `window.print()`. Di WebView APK tak ada printer
+   * sistem — nota tak pernah keluar dan modal hanya diam, terbaca kasir sebagai
+   * "cetak rusak".
+   */
+  async function cetak(t: TagihanRow) {
+    setMengirim(true)
+    setPesanCetak('')
+    try {
+      const kertas = await kertasPrefAktif()
+      const baris: string[] = [
+        barisTengah(properti?.nama || 'ZXRoom', kertas),
+        barisTengah('NOTA TAGIHAN SEWA', kertas),
+        // Alamat '-' di DB mencetak "-, -" di nota (sama seperti bug booking),
+        // jadi anggap '-' kosong.
+        ...(properti?.alamat && properti.alamat !== '-' || properti?.kota && properti.kota !== '-'
+          ? [barisTengah([properti?.alamat, properti?.kota].filter(v => v && v !== '-').join(', '), kertas)]
+          : []),
+        ...(properti?.noHp ? [barisTengah(`HP ${properti.noHp}`, kertas)] : []),
+        garisKertas(kertas),
+        barisDuaKolom('Kamar', t.sewa.kamar.nomor, kertas),
+        barisDuaKolom('Penyewa', namaPenyewa(t.sewa.penyewa.nama), kertas),
+        barisDuaKolom('Jatuh Tempo', formatTanggal(t.jatuhTempo, { day: 'numeric', month: 'long', year: 'numeric' }), kertas),
+        barisDuaKolom('Metode', t.pembayaran[0]?.metodeBayar?.replace('_', ' ') ?? '-', kertas),
+        barisDuaKolom('Status', statusTagihanLabel(t.status), kertas),
+        garisKertas(kertas),
+        barisKiriKanan('TOTAL', formatRupiah(t.nominal), kertas),
+        ...(t.status === 'LUNAS' ? [barisTengah('LUNAS', kertas)] : []),
+        garisKertas(kertas),
+        barisTengah(properti?.teksNota || 'Terima kasih atas kepercayaan Anda.', kertas),
+      ]
+      await cetakNotaKasir(baris)
+      setPesanCetak('Nota terkirim ke printer.')
+    } catch (e) {
+      setPesanCetak(`Cetak gagal: ${(e as Error).message}`)
+    } finally {
+      setMengirim(false)
+    }
+  }
 
   return (
     <>
@@ -190,10 +238,11 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
 
             <div className="flex gap-3 px-6 pb-5">
               <button
-                onClick={() => window.print()}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                onClick={() => cetak(printTagihan)}
+                disabled={mengirim}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <Printer size={14} /> Cetak
+                <Printer size={14} /> {mengirim ? 'Mengirim…' : 'Cetak'}
               </button>
               <button
                 onClick={() => setPrintTagihan(null)}
@@ -202,6 +251,11 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
                 Tutup
               </button>
             </div>
+            {pesanCetak && (
+              <p className={`px-6 pb-5 pt-0 text-xs ${pesanCetak.startsWith('Nota') ? 'text-gray-500' : 'text-red-600'}`}>
+                {pesanCetak}
+              </p>
+            )}
           </div>
         </div>
       )}

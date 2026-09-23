@@ -11,9 +11,13 @@
 import { useMemo, useState } from 'react'
 import {
   Bag, CartPlus, CheckCircleFill, Dash, ExclamationTriangleFill,
-  Plus, Trash3, InfoCircle, CashCoin, DoorOpen,
+  Plus, Trash3, InfoCircle, CashCoin, DoorOpen, Printer,
 } from 'react-bootstrap-icons'
 import { JUMLAH_MAKS } from '@/lib/produk'
+import {
+  barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
+  garisKertas, kertasPrefAktif,
+} from '@/lib/cetak'
 
 type Produk = {
   id: string
@@ -66,6 +70,12 @@ export default function KasirJual({
   const [error, setError] = useState('')
   const [pesan, setPesan] = useState('')
   const [kurang, setKurang] = useState<{ nama: string; diminta: number; tersedia: number }[]>([])
+  // Nota penjualan sukses — kasir klik Cetak di banner, baru reload.
+  const [notaSukses, setNotaSukses] = useState<{
+    nomor: string; total: number; metodeBayar: string; kamar: string | null; item: RiwayatItem[]
+  } | null>(null)
+  const [mengirimNota, setMengirimNota] = useState(false)
+  const [pesanCetakNota, setPesanCetakNota] = useState('')
 
   const petaProduk = useMemo(() => new Map(produk.map(p => [p.id, p])), [produk])
 
@@ -161,14 +171,65 @@ export default function KasirJual({
           : `${data.nomor} — ${rupiah(data.total)} terjual.`,
       )
       bersihkan()
-      // Muat ulang supaya stok & riwayat ikut berubah. Stok di layar harus
-      // mencerminkan DB, bukan sisa state lama.
-      window.location.reload()
+      // Simpan nota utk tombol cetak. Reload DITUNDA: kalau langsung reload,
+      // banner sukses (dan tombol Cetak Nota) lenyap sebelum sempat dibaca.
+      setNotaSukses({
+        nomor: data.nomor,
+        total: data.total,
+        metodeBayar: METODE.find(m => m.nilai === metodeBayar)?.label ?? metodeBayar,
+        kamar: kamarTerpilih?.nomor ?? null,
+        item: data.item as RiwayatItem[],
+      })
     } catch {
       setError('Gagal menyimpan penjualan.')
     } finally {
       setSimpan(false)
     }
+  }
+
+  /**
+   * Cetak nota penjualan terakhir ke printer Bluetooth lewat aplikasi Android
+   * (pola sama dengan nota booking & struk karaoke — `window.print()` tak
+   * pernah jalan di WebView APK).
+   */
+  async function cetakNota() {
+    if (!notaSukses) return
+    setMengirimNota(true)
+    setPesanCetakNota('')
+    try {
+      const kertas = await kertasPrefAktif()
+      const baris: string[] = [
+        barisTengah('ZXRoom', kertas),
+        barisTengah('NOTA PENJUALAN', kertas),
+        garisKertas(kertas),
+        barisDuaKolom('No.', notaSukses.nomor, kertas),
+        ...(notaSukses.kamar
+          ? [barisDuaKolom('Kamar', notaSukses.kamar, kertas)]
+          : []),
+        barisDuaKolom('Tanggal', new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }), kertas),
+        garisKertas(kertas),
+        ...notaSukses.item.map((it) =>
+          // subtotal = jumlah x hargaSatuan (RiwayatItem tak menyimpannya)
+          barisKiriKanan(`${it.jumlah}x ${it.nama}`, (it.jumlah * it.hargaSatuan).toLocaleString('id-ID'), kertas),
+        ),
+        garisKertas(kertas),
+        barisKiriKanan('TOTAL', rupiah(notaSukses.total), kertas),
+        barisDuaKolom('Bayar', notaSukses.metodeBayar, kertas),
+        garisKertas(kertas),
+        barisTengah('Terima kasih.', kertas),
+      ]
+      await cetakNotaKasir(baris)
+      setPesanCetakNota('Nota terkirim ke printer.')
+    } catch (e) {
+      setPesanCetakNota(`Cetak gagal: ${(e as Error).message}`)
+    } finally {
+      setMengirimNota(false)
+    }
+  }
+
+  /** Selesai dengan nota: muat ulang supaya stok & riwayat di layar = DB. */
+  function selesaiNota() {
+    window.location.reload()
   }
 
   const kamarTerpilih = kamar.find(k => k.sewaId === tujuan)
@@ -178,8 +239,34 @@ export default function KasirJual({
       {/* ── Kolom kiri: pilih produk ─────────────────────────────── */}
       <div className="lg:col-span-2">
         {pesan && (
-          <div className="mb-4 text-sm text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-            <CheckCircleFill size={14} aria-hidden="true" /> {pesan}
+          <div className="mb-4 text-sm text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+            <div className="inline-flex items-center gap-2">
+              <CheckCircleFill size={14} aria-hidden="true" /> {pesan}
+            </div>
+            {/* Nota dicetak dari sini: reload ditunda sampai kasir selesai,
+                kalau tidak banner (dan tombol ini) lenyap sebelum dibaca. */}
+            {notaSukses && (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={() => cetakNota()}
+                  disabled={mengirimNota}
+                  className="inline-flex items-center gap-2 bg-teal-600 text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                >
+                  <Printer aria-hidden="true" size={12} /> {mengirimNota ? 'Mengirim…' : 'Cetak Nota'}
+                </button>
+                <button
+                  onClick={selesaiNota}
+                  className="inline-flex items-center gap-2 bg-white border border-teal-200 text-teal-700 rounded-lg px-3 py-1.5 text-xs font-medium"
+                >
+                  Selesai
+                </button>
+              </div>
+            )}
+            {pesanCetakNota && (
+              <p className={`mt-2 text-xs ${pesanCetakNota.startsWith('Nota') ? 'text-gray-500' : 'text-red-600'}`}>
+                {pesanCetakNota}
+              </p>
+            )}
           </div>
         )}
         {error && (

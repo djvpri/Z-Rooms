@@ -342,3 +342,47 @@ export function adaJembatanLama(w: unknown): boolean {
   // typeof 'function' juga sah di WebView Android — lihat catatan ambilJembatan.
   return !!j && (typeof j === 'object' || typeof j === 'function')
 }
+
+/**
+ * Ambil ukuran kertas preferensi cetak properti aktif. Halaman nota memakai ini
+ * supaya struk mengikuti setelan printer meja kasir (58 vs 80 mm) tanpa harus
+ * mengambil seluruh objek preferensi.
+ */
+export async function kertasPrefAktif(): Promise<KunciKertas> {
+  try {
+    const r = await fetch('/api/properti/pref-cetak', { cache: 'no-store' })
+    const j = await r.json()
+    const k = j?.pref?.kertas
+    return (typeof k === 'string' && k in UKURAN_KERTAS ? k : KERTAS_BAWAAN) as KunciKertas
+  } catch {
+    return KERTAS_BAWAAN
+  }
+}
+
+/**
+ * Cetak sekumpulan baris nota ke printer lewat aplikasi Android.
+ *
+ * Resolusi saat sukses/gagal: APK menjawab BELAKANGAN lewat `ZXR_CETAK_HASIL`
+ * (menyambung printer makan waktu). Tanpa callback itu, kegagalan tak akan
+ * pernah terlihat — kasir menekan tombol, halaman diam saja.
+ *
+ * Dulu tiap halaman memanggil `window.print()` sendiri-sendiri; di WebView APK
+ * itu tak pernah jalan. Sekarang semua tombol Cetak kasir memakai fungsi ini.
+ */
+export async function cetakNotaKasir(baris: string[]): Promise<void> {
+  const j = ambilJembatan(typeof window !== 'undefined' ? window : null)
+  if (!j) {
+    throw new Error(
+      'Cetak langsung butuh aplikasi Z-Rooms versi Android. Buka halaman ini dari aplikasi, bukan dari peramban.',
+    )
+  }
+  return new Promise<void>((selesai, gagal) => {
+    ;(window as unknown as Record<string, unknown>).ZXR_CETAK_HASIL = (ok: boolean, pesan: string) =>
+      ok ? selesai() : gagal(new Error(pesan))
+    try {
+      j.cetak!(naskahKeTeks(naskahNota(baris)))
+    } catch (e) {
+      gagal(e as Error)
+    }
+  })
+}

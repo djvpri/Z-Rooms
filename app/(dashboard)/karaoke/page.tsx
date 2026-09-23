@@ -24,6 +24,10 @@ import {
   ClockHistory, Printer, CupStraw, BarChartLine,
 } from 'react-bootstrap-icons'
 import { AMBANG_MENDESAK_MENIT, TOLERANSI_BOOKING_MENIT, formatDurasi } from '@/lib/karaoke'
+import {
+  barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
+  garisKertas, kertasPrefAktif,
+} from '@/lib/cetak'
 
 type Ruang = { id: string; nama: string; kapasitas: number | null; aktif: boolean }
 type Produk = { id: string; nama: string; hargaJual: string | number; stok: number }
@@ -714,6 +718,62 @@ function StrukKaraoke({
   const jam = (d: string | null) =>
     d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
 
+  const [pesan, setPesan] = useState('')
+  const [mengirim, setMengirim] = useState(false)
+
+  /**
+   * Cetak struk ke printer Bluetooth lewat aplikasi Android. DULU tombol ini
+   * memanggil `window.print()` — di WebView APK itu tak punya printer sistem,
+   * struk tak pernah keluar dan modal hanya diam, terbaca kasir "cetak rusak".
+   */
+  async function cetak() {
+    setMengirim(true)
+    setPesan('')
+    try {
+      const kertas = await kertasPrefAktif()
+      const baris: string[] = [
+        barisTengah('ZXRoom', kertas),
+        barisTengah('Struk Karaoke', kertas),
+        garisKertas(kertas),
+        barisKiriKanan(sesi.nomor, jam(sesi.mulaiPada), kertas),
+        barisDuaKolom('Ruang', sesi.ruang?.nama ?? '-', kertas),
+        barisDuaKolom('Pelanggan', sesi.namaPelanggan || 'Umum', kertas),
+        barisDuaKolom('Mulai', jam(sesi.mulaiPada), kertas),
+        barisDuaKolom('Selesai', jam(sesi.selesaiAktual), kertas),
+        barisDuaKolom('Durasi ditagih', `${sesi.jumlahJam} jam`, kertas),
+        garisKertas(kertas),
+        // Rincian per jam — jawaban untuk "kok mahal?" (aturan aturan blok
+        // per jam harus bisa diperiksa pelanggan dari struk, bukan dipercaya).
+        ...item.map((it) =>
+          barisKiriKanan(`Jam ${it.jamKe} (${jam(it.mulai)}-${jam(it.selesai)})`, Number(it.hargaPerJam).toLocaleString('id-ID'), kertas),
+        ),
+        ...(item.length === 0
+          ? [barisKiriKanan(`Sewa ${sesi.jumlahJam} jam`, Number(ringkas.sewa).toLocaleString('id-ID'), kertas)]
+          : []),
+        garisKertas(kertas),
+        barisKiriKanan('Sewa ruang', rupiah(ringkas.sewa), kertas),
+        ...(ringkas.minuman > 0 ? [barisKiriKanan('Minuman', rupiah(ringkas.minuman), kertas)] : []),
+        barisKiriKanan('TOTAL', rupiah(ringkas.total), kertas),
+        ...(ringkas.jaminan > 0
+          ? [
+              barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas),
+              barisKiriKanan('DIBAYAR SEKARANG', rupiah(ringkas.dibayar), kertas),
+            ]
+          : []),
+        garisKertas(kertas),
+        barisTengah('Tarif per jam ditentukan', kertas),
+        barisTengah('jam mulai tiap jam.', kertas),
+        barisTengah('Terima kasih.', kertas),
+      ]
+      await cetakNotaKasir(baris)
+      setPesan('Struk terkirim ke printer.')
+    } catch (e) {
+      setPesan(`Cetak gagal: ${(e as Error).message}`)
+    } finally {
+      setMengirim(false)
+    }
+  }
+
   return (
     <>
       <style>{`
@@ -819,13 +879,18 @@ function StrukKaraoke({
           </div>
 
           <div className="flex gap-2 p-4 border-t border-gray-100">
-            <button className="btn btn-primary flex-1" onClick={() => window.print()}>
-              <Printer aria-hidden="true" /> Cetak
+            <button className="btn btn-primary flex-1" onClick={() => cetak()} disabled={mengirim}>
+              <Printer aria-hidden="true" /> {mengirim ? 'Mengirim…' : 'Cetak'}
             </button>
             <button className="btn btn-ghost" onClick={onTutup}>
               Tutup
             </button>
           </div>
+          {pesan && (
+            <p className={`px-4 pb-4 text-xs ${pesan.startsWith('Struk') ? 'text-gray-500' : 'text-red-600'}`}>
+              {pesan}
+            </p>
+          )}
         </div>
       </div>
     </>
