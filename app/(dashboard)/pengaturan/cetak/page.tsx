@@ -118,6 +118,16 @@ export default function PengaturanCetakPage() {
     // Baca nama printer tersimpan + status awal.
     setNamaPrinterApk(j.namaPrinterTersimpan?.() ?? '')
     setPrinterTersambung(j.statusPrinter?.() ?? false)
+    // Daftar printer terpasang diminta TANPA menunggu hasilnya dipakai:
+    // APK mencatat status pairing saat ini dikerjakan, dan tanpa baris itu
+    // laporan kasir hanya bilang "cetak gagal" tanpa sebab. Kalau nanti
+    // daftarnya perlu ditampilkan, nilainya sudah ada di sini.
+    try {
+      const terpasang = j.daftarPrinter?.() ?? ''
+      catat('cetak', `printer terpasang: ${terpasang ? terpasang.split('\n').join(', ') : 'TIDAK ADA'}`)
+    } catch {
+      catat('cetak', 'daftar printer tak bisa dibaca')
+    }
 
     // Callback: APK memanggil balik saat kasir memilih printer di dialog native.
     ;(window as unknown as Record<string, unknown>).ZXR_PRINTER_DIPILIH = (nama: string | null, _alamat: string | null) => {
