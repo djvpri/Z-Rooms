@@ -123,6 +123,16 @@ export function pasangPenangkap() {
     catat('promise', e.reason)
   })
 
+  // Log sisi APK (Bluetooth, jembatan, pembaruan) datang sebagai event
+  // 'zxr-apk-log', bukan console.error: APK mengirimnya lewat evaluateJavascript
+  // supaya pesan dengan kutip/baris baru tak merusak skrip. Tanpa pendengar
+  // ini, semua kegagalan Bluetooth hilang — log selalu "0 kejadian" walau
+  // pemindaian gagal berkali-kali.
+  window.addEventListener('zxr-apk-log', (e) => {
+    const d = (e as CustomEvent<string>).detail
+    if (d) catat('apk', d)
+  })
+
   const asli = console.error
   console.error = (...a: unknown[]) => {
     const teks = a.map((x) => rapikan(x, 500)).join(' ')
