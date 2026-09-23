@@ -7,6 +7,16 @@ import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tg
 import { batasCheckout } from '@/lib/checkout'
 import { celahKosong, bolehDipesan } from '@/lib/jadwalKamar'
 import { tanggalKeluar, type PeriodeDikenal } from '@/lib/sewa'
+import {
+  ambilJembatan,
+  barisDuaKolom,
+  barisKiriKanan,
+  barisTengah,
+  garisKertas,
+  naskahKeTeks,
+  naskahNota,
+  potongKolom,
+} from '@/lib/cetak'
 import JadwalKamar from '@/components/kamar/JadwalKamar'
 import PilihWaktu, { JAM_MASUK, daftarTanggal } from './PilihWaktu'
 
@@ -68,6 +78,9 @@ export default function BookingPage() {
   const router = useRouter()
   const [kamarList, setKamarList] = useState<Kamar[]>([])
   const [loading, setLoading] = useState(false)
+  const [pesanCetakNota, setPesanCetakNota] = useState('')
+  const [menungguCetak, setMenungguCetak] = useState(false)
+  const [prefCetakNota, setPrefCetakNota] = useState<string>('58')
   const [nota, setNota] = useState<NotaBooking | null>(null)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'INDIVIDU' | 'PERUSAHAAN'>('INDIVIDU')
@@ -146,6 +159,16 @@ export default function BookingPage() {
     fetch('/api/kamar')
       .then(r => r.json())
       .then(setKamarList)
+  }, [])
+
+  // Ukuran kertas untuk nota cetak. Diambil dari preferensi yang sama dengan
+  // halaman Pengaturan → Cetak, supaya nota booking tak melebihi lebar kertas
+  // yang dipasang di printer (58 mm vs 80 mm beda potongan).
+  useEffect(() => {
+    fetch('/api/properti/pref-cetak', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(j => setPrefCetakNota(j?.pref?.kertas ?? '58'))
+      .catch(() => setPrefCetakNota('58'))
   }, [])
 
   // Cari penyewa lama. Dibatasi >=2 huruf supaya tak menarik seluruh tabel,
@@ -396,6 +419,64 @@ export default function BookingPage() {
   }
 
   const PERIODE_LABEL: Record<string, string> = { HARIAN: 'Harian', BULANAN: 'Bulanan', TAHUNAN: 'Tahunan' }
+
+  /**
+   * Cetak nota booking ke printer Bluetooth lewat aplikasi Android.
+   *
+   * DULU tombol ini memanggil `window.print()`. Di WebView APK itu tak punya
+   * printer — nota tak pernah keluar dan modal hanya diam, terbaca kasir
+   * sebagai "cetak rusak". Jadi cetak harus lewat jembatan `ZXR_APK.cetak()`,
+   * sama seperti halaman Pengaturan → Cetak.
+   *
+   * APK menjawab BELAKANGAN lewat `ZXR_CETAK_HASIL` karena menyambung printer
+   * makan waktu — tanpa callback itu kegagalan tak pernah terlihat.
+   */
+  function cetakNotaBooking() {
+    if (!nota) return
+    const j = ambilJembatan(window)
+    if (!j) {
+      setPesanCetakNota('Cetak langsung butuh aplikasi Z-Rooms versi Android. Buka halaman ini dari aplikasi, bukan dari peramban.')
+      return
+    }
+    const kertas = prefCetakNota
+    const baris: string[] = [
+      barisTengah(propertiNota?.nama || 'ZXRoom', kertas),
+      barisTengah(propertiNota ? `${propertiNota.alamat}, ${propertiNota.kota}` : 'Sistem Manajemen Kos & Apartemen', kertas),
+      ...(propertiNota?.noHp ? [barisTengah(`HP ${propertiNota.noHp}`, kertas)] : []),
+      garisKertas(kertas),
+      barisTengah('NOTA BOOKING SEWA', kertas),
+      garisKertas(kertas),
+      barisDuaKolom('Tanggal', new Date(nota.tanggalCetak).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), kertas),
+      garisKertas(kertas),
+      barisDuaKolom('Penyewa', namaPenyewa(nota.nama), kertas),
+      barisDuaKolom('No. HP', nota.noHp || '-', kertas),
+      barisDuaKolom('Kamar', `${nota.kamarNomor} (${nota.kamarTipe.toLowerCase()})`, kertas),
+      barisDuaKolom('Periode', PERIODE_LABEL[nota.periodeSewa] ?? nota.periodeSewa, kertas),
+      barisDuaKolom('Masuk', tglJam(nota.tanggalMasuk), kertas),
+      barisDuaKolom('Keluar', nota.tanggalKeluar ? tglJam(nota.tanggalKeluar) : '-', kertas),
+      barisDuaKolom('Durasi', `${nota.durasi} ${nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}`, kertas),
+      garisKertas(kertas),
+      barisKiriKanan('Harga', formatRupiah(nota.harga), kertas),
+      ...(nota.deposit > 0 ? [barisKiriKanan('Deposit', formatRupiah(nota.deposit), kertas)] : []),
+      barisKiriKanan('Total', formatRupiah(nota.harga + nota.deposit), kertas),
+      barisDuaKolom('Bayar', nota.bayarSekarang ? metodeBayarLabel(nota.metodeBayar) : 'Bayar saat check-out', kertas),
+      ...(nota.catatan ? [garisKertas(kertas), barisDuaKolom('Catatan', nota.catatan, kertas)] : []),
+      garisKertas(kertas),
+      barisTengah(propertiNota?.teksNota || 'Powered by ZXRoom', kertas),
+    ]
+    setMenungguCetak(true)
+    setPesanCetakNota('')
+    ;(window as unknown as Record<string, unknown>).ZXR_CETAK_HASIL = (ok: boolean, pesan: string) => {
+      setMenungguCetak(false)
+      setPesanCetakNota(pesan)
+    }
+    try {
+      j.cetak!(naskahKeTeks(naskahNota(baris)))
+    } catch (e) {
+      setMenungguCetak(false)
+      setPesanCetakNota(`Cetak gagal: ${(e as Error).message}`)
+    }
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -1004,10 +1085,11 @@ export default function BookingPage() {
 
             <div className="flex gap-3 px-6 pb-5">
               <button
-                onClick={() => window.print()}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                onClick={() => cetakNotaBooking()}
+                disabled={menungguCetak}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                <Printer size={14} /> Cetak
+                <Printer size={14} /> {menungguCetak ? 'Mengirim…' : 'Cetak'}
               </button>
               <button
                 onClick={() => router.push('/dashboard')}
@@ -1016,6 +1098,11 @@ export default function BookingPage() {
                 Selesai
               </button>
             </div>
+            {pesanCetakNota && (
+              <p className={`px-6 pb-5 pt-0 text-xs ${pesanCetakNota.startsWith('Nota terkirim') || !pesanCetakNota.includes('gagal') ? 'text-gray-500' : 'text-red-600'}`}>
+                {pesanCetakNota}
+              </p>
+            )}
           </div>
         </div>
       )}
