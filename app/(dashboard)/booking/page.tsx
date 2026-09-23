@@ -439,14 +439,32 @@ export default function BookingPage() {
       return
     }
     const kertas = prefCetakNota
+
+    // Format singkat dd/mm/yyyy HH:MM — "23 September 2026 pukul 13.00" (29
+    // dari 32 kolom) memaksa label terpotong jadi "Ma." di kertas 58mm.
+    const fmtCetak = (iso: string) =>
+      new Date(iso).toLocaleString('id-ID', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
+      })
+    // Jam keluar pakai batasCheckout (jam checkout properti), BUKAN tanggal
+    // mentah — kalau tidak, jam keluar ikut jam masuk (mis. 13:00) alih-alih
+    // jam checkout (mis. 14:00), beda dengan yang ditampilkan di modal.
+    const keluarFmt = nota.tanggalKeluar
+      ? fmtCetak(batasCheckout(new Date(nota.tanggalKeluar), {
+          jamCheckout: propertiNota?.jamCheckout ?? '12:00',
+          toleransiCheckout: propertiNota?.toleransiCheckout ?? 0,
+        }).toISOString())
+      : '-'
+
     const baris: string[] = [
       barisTengah(propertiNota?.nama || 'ZXRoom', kertas),
       // Alamat kosong = baris kosong. JANGAN fallback — pemilik yang belum
       // mengisi alamat tak ingin nota berbohong "Sistem Manajemen Kos &
       // Apartemen", kosong saja (baris dilewati, bukan spasi kosong).
-      ...(propertiNota?.alamat || propertiNota?.kota
+      ...(propertiNota?.alamat && propertiNota?.alamat !== '-' || propertiNota?.kota && propertiNota?.kota !== '-'
         ? [barisTengah(
-            [propertiNota?.alamat, propertiNota?.kota].filter(Boolean).join(', '),
+            [propertiNota?.alamat, propertiNota?.kota].filter(v => v && v !== '-').join(', '),
             kertas,
           )]
         : []),
@@ -460,8 +478,8 @@ export default function BookingPage() {
       barisDuaKolom('No. HP', nota.noHp || '-', kertas),
       barisDuaKolom('Kamar', `${nota.kamarNomor} (${nota.kamarTipe.toLowerCase()})`, kertas),
       barisDuaKolom('Periode', PERIODE_LABEL[nota.periodeSewa] ?? nota.periodeSewa, kertas),
-      barisDuaKolom('Masuk', tglJam(nota.tanggalMasuk), kertas),
-      barisDuaKolom('Keluar', nota.tanggalKeluar ? tglJam(nota.tanggalKeluar) : '-', kertas),
+      barisDuaKolom('Masuk', fmtCetak(nota.tanggalMasuk), kertas),
+      barisDuaKolom('Keluar', keluarFmt, kertas),
       barisDuaKolom('Durasi', `${nota.durasi} ${nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}`, kertas),
       garisKertas(kertas),
       barisKiriKanan('Harga', formatRupiah(nota.harga), kertas),
