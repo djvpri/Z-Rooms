@@ -406,6 +406,10 @@ export default function BookingPage() {
           #nota-booking {
             position: fixed !important; top: 0 !important; left: 0 !important;
             width: 100% !important; padding: 24px !important; background: white !important;
+            /* Batas layar & gulir layar (untuk tombol tetap terlihat) harus
+               dibuka saat mencetak — kalau tidak, bagian nota yang tergulir
+               keluar layar ikut terpotong di hasil cetak. */
+            max-height: none !important; overflow: visible !important;
           }
         }
       `}</style>
@@ -885,9 +889,13 @@ export default function BookingPage() {
 
       {/* Modal Nota Booking */}
       {nota && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-            <div id="nota-booking" className="p-6 font-mono text-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          {/* Modal dibatasi tinggi layar: nota panjang (catatan, teks kaki
+              properti) pernah membuat modal lebih tinggi dari layar tablet,
+              sehingga baris tombol Cetak/Selesai berada DI LUAR layar dan tak
+              bisa ditekan. Sekarang badan nota yang digulir, tombol tetap. */}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] flex flex-col overflow-hidden">
+            <div id="nota-booking" className="p-6 font-mono text-sm overflow-y-auto">
               <div className="text-center mb-4">
                 <div className="text-lg font-bold flex items-center justify-center gap-2">
                   <i className="bi bi-house-door-fill text-teal-600" /> {propertiNota?.nama ?? 'ZXRoom'}
