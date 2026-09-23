@@ -247,6 +247,12 @@ export function naskahKeTeks(naskah: PerintahEscPos[]): string {
   return naskah
     .map((p) => (p.jenis === 'baris' ? p.teks : `<${p.byte.join(',')}>`))
     .join('\n')
+    // \xa0 (non-breaking space dari Intl NumberFormat "Rp 150.000") tercetak
+    // sebagai 'a'/'á' di printer thermal — kodepage Latin-1 memetakan 0xA0 ke
+    // karakter aksen. Di layar tak pernah kelihatan; di kertas selalu kelihatan.
+    // Dibersihkan di sini (satu tempat) supaya SEMUA pemanggil nota aman,
+    // bukan hanya yang kebetulan memakai helper tertentu.
+    .replace(/\xa0/g, ' ')
 }
 
 /**
