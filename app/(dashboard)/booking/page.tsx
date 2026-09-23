@@ -441,7 +441,15 @@ export default function BookingPage() {
     const kertas = prefCetakNota
     const baris: string[] = [
       barisTengah(propertiNota?.nama || 'ZXRoom', kertas),
-      barisTengah(propertiNota ? `${propertiNota.alamat}, ${propertiNota.kota}` : 'Sistem Manajemen Kos & Apartemen', kertas),
+      // Alamat kosong = baris kosong. JANGAN fallback — pemilik yang belum
+      // mengisi alamat tak ingin nota berbohong "Sistem Manajemen Kos &
+      // Apartemen", kosong saja (baris dilewati, bukan spasi kosong).
+      ...(propertiNota?.alamat || propertiNota?.kota
+        ? [barisTengah(
+            [propertiNota?.alamat, propertiNota?.kota].filter(Boolean).join(', '),
+            kertas,
+          )]
+        : []),
       ...(propertiNota?.noHp ? [barisTengah(`HP ${propertiNota.noHp}`, kertas)] : []),
       garisKertas(kertas),
       barisTengah('NOTA BOOKING SEWA', kertas),
