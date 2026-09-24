@@ -135,6 +135,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ruang: { select: { id: true, nama: true } },
         item: { orderBy: { jamKe: 'asc' } },
         minuman: true,
+        // Ikut dikirim supaya kepala struk memakai nama tenant, bukan 'ZXRoom'.
+        properti: { select: { nama: true, alamat: true, kota: true, noHp: true, teksNota: true } },
       },
     })
   })
