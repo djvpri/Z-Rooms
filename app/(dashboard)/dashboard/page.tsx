@@ -6,6 +6,7 @@ import {
   formatRupiah, formatTanggal, statusKamarLabel,
   hunianWarna, hunianBarWarna, waktuRelatif, namaPenyewa,
 } from '@/lib/utils'
+import { batasCheckout } from '@/lib/checkout'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
 import DemoBanner from '@/components/demo/DemoBanner'
@@ -53,7 +54,7 @@ export default async function DashboardPage() {
   const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
 
   const [totalKamar, kamarByStatus, pendapatanBulanIni, pengeluaranBulanIni,
-    tagihanBelumBayar, aktivitas, notifCount] = await Promise.all([
+    tagihanBelumBayar, aktivitas, notifCount, sesiKaraoke, sewaBerakhir] = await Promise.all([
     prisma.kamar.count({ where: { propertiId: properti.id } }),
     prisma.kamar.groupBy({ by: ['status'], where: { propertiId: properti.id }, _count: true }),
     prisma.tagihan.aggregate({
@@ -77,6 +78,33 @@ export default async function DashboardPage() {
       },
     }),
     prisma.notifikasi.count({ where: { propertiId: properti.id, dibaca: false } }),
+    // ── Panel "Segera berakhir" ──
+    // Karaoke: sesi BERJALAN yang rencana selesainya ≤ 15 menit dari sekarang
+    // (termasuk yang sudah lewat — kartu merah di papan karaoke datang dari
+    // sini juga).
+    prisma.sesiKaraoke.findMany({
+      where: {
+        propertiId: properti.id,
+        status: 'BERJALAN',
+        rencanaSelesai: { lte: new Date(now.getTime() + 15 * 60000) },
+      },
+      include: { ruang: { select: { nama: true } } },
+      orderBy: { rencanaSelesai: 'asc' },
+      take: 5,
+    }),
+    // Kamar: sewa AKTIF yang batas checkout-nya ≤ 15 menit dari sekarang.
+    // `tanggalKeluar` disimpan dengan jam masuk, jadi rentangnya lebar
+    // (24 jam lalu → 24 jam lagi) lalu disaring pakai `batasCheckout` —
+    // satu-satunya angka checkout yang dipakai nota & layar kamar.
+    prisma.sewa.findMany({
+      where: {
+        statusSewa: 'AKTIF',
+        kamar: { propertiId: properti.id },
+        tanggalKeluar: { gte: new Date(now.getTime() - 24 * 3600000), lte: new Date(now.getTime() + 24 * 3600000) },
+      },
+      include: { kamar: { select: { nomor: true } }, penyewa: { select: { nama: true } } },
+      take: 50,
+    }),
   ])
 
   const statusMap = kamarByStatus.reduce((acc, s) => { acc[s.status] = s._count; return acc }, {} as Record<string, number>)
@@ -84,6 +112,51 @@ export default async function DashboardPage() {
   const pengeluaran = Number(pengeluaranBulanIni._sum.nominal ?? 0)
   const laba = pendapatan - pengeluaran
   const hunian = totalKamar ? Math.round((statusMap['TERISI'] ?? 0) / totalKamar * 100) : 0
+
+  // ── Satu panel, dua sumber waktu ──
+  // Karaoke memang habis dengan sendirinya (nomor berhenti dipakai). Kamar
+  // habis karena jam check-out properti, yang baru ketahuan setelah
+  // `batasCheckout` dihitung — itulah sebabnya dua-duanya bisa disandingkan
+  // dalam satu daftar berskala menit.
+  const AMBANG_MENIT = 15
+  const aturan = { jamCheckout: properti.jamCheckout, toleransiCheckout: properti.toleransiCheckout }
+
+  const mendesak: {
+    jenis: 'karaoke' | 'kamar'
+    judul: string
+    sub: string
+    batasMs: number
+    menit: number
+    lewat: boolean
+    href: string
+  }[] = [
+    ...sesiKaraoke.map((s) => {
+      const ms = new Date(s.rencanaSelesai).getTime()
+      const menit = Math.round((ms - now.getTime()) / 60000)
+      return {
+        jenis: 'karaoke' as const,
+        judul: s.ruang?.nama ?? 'Ruang',
+        sub: `${s.nomor}${s.namaPelanggan ? ` · ${s.namaPelanggan}` : ''}`,
+        batasMs: ms,
+        menit,
+        lewat: menit <= 0,
+        href: '/karaoke',
+      }
+    }),
+    ...sewaBerakhir.map((s) => {
+      const ms = batasCheckout(new Date(s.tanggalKeluar), aturan).getTime()
+      const menit = Math.round((ms - now.getTime()) / 60000)
+      return {
+        jenis: 'kamar' as const,
+        judul: `Kamar ${s.kamar.nomor}`,
+        sub: namaPenyewa(s.penyewa?.nama),
+        batasMs: ms,
+        menit,
+        lewat: menit <= 0,
+        href: '/kamar',
+      }
+    }).filter((x) => x.menit <= AMBANG_MENIT),
+  ].sort((a, b) => a.batasMs - b.batasMs)
 
   const kpi: { label: string; nilai: string; sub: React.ReactNode; aksen: string; Icon: BiIcon }[] = [
     {
@@ -112,9 +185,52 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
-      {properti.isDemo && <DemoBanner />}
+          {properti.isDemo && <DemoBanner />}
 
-      {/* Header */}
+          {/* ── Segera berakhir: karaoke (rencana selesai) & kamar (jam checkout).
+              Panel HILANG saat sepi — dashboard yang sepi harus tetap bersih.
+              Alarm bunyi tetap di halaman karaoke/kamar, bukan di sini: halaman ini
+              tempat melihat sepintas, bukan pos jaga. ── */}
+          {mendesak.length > 0 && (
+            <div className="card mb-4 md:mb-6 border-l-4 border-amber-400">
+              <h2 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <ClockFill className="text-amber-500" aria-hidden="true" />
+                Segera berakhir
+                <span className="badge bg-amber-50 text-amber-700">{mendesak.length}</span>
+              </h2>
+              <div className="space-y-2">
+                {mendesak.map((m) => (
+                  <Link
+                    key={`${m.jenis}-${m.judul}-${m.batasMs}`}
+                    href={m.href}
+                    className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50 ${
+                      m.lewat ? 'bg-coral-50' : 'bg-amber-50/60'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {m.judul}
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-400">{m.jenis}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{m.sub}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-semibold tabular-nums ${m.lewat ? 'text-coral-600' : 'text-amber-600'}`}>
+                        {m.lewat ? `lewat ${Math.abs(m.menit)} mnt` : `${m.menit} mnt lagi`}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {m.lewat
+                          ? 'sudah habis'
+                          : new Date(m.batasMs).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Header */}
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">{properti.nama}</h1>
         <p className="text-sm text-gray-400">
