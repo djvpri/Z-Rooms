@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Printer, CheckLg } from 'react-bootstrap-icons'
+import { Printer, CheckLg, CashCoin } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, formatTanggal, statusTagihanColor, statusTagihanLabel } from '@/lib/utils'
 import {
   barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
@@ -37,6 +37,41 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
   properti?: PropertiNota
 }) {
   const [printTagihan, setPrintTagihan] = useState<TagihanRow | null>(null)
+  const [bayarTagihan, setBayarTagihan] = useState<TagihanRow | null>(null)
+  const [metodePilih, setMetodePilih] = useState<'TUNAI' | 'TRANSFER' | 'QRIS' | 'LAINNYA'>('TUNAI')
+  const [pesanBayar, setPesanBayar] = useState('')
+  const [mengirimBayar, setMengirimBayar] = useState(false)
+
+  /**
+   * Catat pembayaran satu tagihan: status LUNAS + baris Pembayaran.
+   * Ini satu-satunya jalan keluar untuk tagihan BELUM_BAYAR pada sewa yang
+   * sudah SELESAI — checkout hanya menawarkan "lunasi semua" SEBELUM tutup.
+   */
+  async function konfirmasiBayar() {
+    if (!bayarTagihan || mengirimBayar) return
+    setMengirimBayar(true)
+    setPesanBayar('')
+    try {
+      const res = await fetch(`/api/tagihan/${bayarTagihan.id}/bayar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metodeBayar: metodePilih }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setPesanBayar(data?.error?.message ?? data?.error ?? 'Gagal mencatat pembayaran.')
+        return
+      }
+      setBayarTagihan(null)
+      setPesanBayar('')
+      // Muat ulang data: baris tagihan & laporan pemasukan harus ikut berubah.
+      window.location.reload()
+    } catch {
+      setPesanBayar('Gagal menghubungi server.')
+    } finally {
+      setMengirimBayar(false)
+    }
+  }
   const [pesanCetak, setPesanCetak] = useState('')
   const [mengirim, setMengirim] = useState(false)
 
@@ -120,13 +155,24 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
                   </td>
                   <td className="py-2.5 text-gray-400 text-xs">{t.pembayaran[0]?.metodeBayar?.replace('_', ' ') ?? '-'}</td>
                   <td className="py-2.5">
-                    <button
-                      onClick={() => setPrintTagihan(t)}
-                      className="text-gray-400 hover:text-teal-600 transition-colors"
-                      title="Cetak nota"
-                    >
-                      <Printer size={15} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {t.status !== 'LUNAS' && t.status !== 'DIBATALKAN' && (
+                        <button
+                          onClick={() => { setBayarTagihan(t); setPesanBayar('') }}
+                          className="text-gray-400 hover:text-teal-600 transition-colors"
+                          title="Catat pembayaran"
+                        >
+                          <CashCoin size={15} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setPrintTagihan(t)}
+                        className="text-gray-400 hover:text-teal-600 transition-colors"
+                        title="Cetak nota"
+                      >
+                        <Printer size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -147,6 +193,15 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
                   <span className="text-gray-600 text-sm ml-2">{namaPenyewa(t.sewa.penyewa.nama)}</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {t.status !== 'LUNAS' && t.status !== 'DIBATALKAN' && (
+                    <button
+                      onClick={() => { setBayarTagihan(t); setPesanBayar('') }}
+                      className="text-gray-400 hover:text-teal-600"
+                      title="Catat pembayaran"
+                    >
+                      <CashCoin size={14} />
+                    </button>
+                  )}
                   <button onClick={() => setPrintTagihan(t)} className="text-gray-400 hover:text-teal-600">
                     <Printer size={14} />
                   </button>
@@ -256,6 +311,57 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
                 {pesanCetak}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal catat pembayaran */}
+      {bayarTagihan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">Catat pembayaran</h2>
+              <p className="text-sm text-gray-400 mb-4">
+                Kamar {bayarTagihan.sewa.kamar.nomor} · {namaPenyewa(bayarTagihan.sewa.penyewa.nama)}
+              </p>
+
+              <div className="flex justify-between font-bold text-sm mb-4">
+                <span className="text-gray-500 font-medium">Jumlah</span>
+                <span>{formatRupiah(bayarTagihan.nominal)}</span>
+              </div>
+
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Metode bayar</label>
+              <select
+                value={metodePilih}
+                onChange={(e) => setMetodePilih(e.target.value as typeof metodePilih)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="TUNAI">Tunai</option>
+                <option value="TRANSFER">Transfer</option>
+                <option value="QRIS">QRIS</option>
+                <option value="LAINNYA">Lainnya</option>
+              </select>
+
+              {pesanBayar && (
+                <p className="text-xs text-red-600 mb-3">{pesanBayar}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 px-6 pb-5">
+              <button
+                onClick={() => konfirmasiBayar()}
+                disabled={mengirimBayar}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-60"
+              >
+                {mengirimBayar ? 'Menyimpan…' : 'Sudah dibayar'}
+              </button>
+              <button
+                onClick={() => { setBayarTagihan(null); setPesanBayar('') }}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+              >
+                Batal
+              </button>
+            </div>
           </div>
         </div>
       )}
