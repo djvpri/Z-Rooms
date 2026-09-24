@@ -87,9 +87,16 @@ export function penghalangUntuk(
   baru: RentangSewa,
   sewa: SewaNonSelesai[],
   aturan: AturanCheckout,
+  sekarang: Date = new Date(),
 ): Penghalang[] {
   const halangan: Penghalang[] = []
   for (const s of sewa) {
+    // Booking PENDING yang tanggal masuknya sudah lewat tamu tak datang —
+    // kamarnya efektif kosong. Tanpa pengecualian ini kamar terkunci
+    // selamanya: validasi menolak semua booking baru sementara sewa hantunya
+    // tak pernah berakhir sendiri. Kasir tetap bisa check-in/batalkan lewat
+    // panel booking; pengecualian hanya melaporkan kamar sebagai bebas.
+    if (s.statusSewa === 'PENDING' && new Date(s.tanggalMasuk).getTime() < sekarang.getTime()) continue
     const r = rentangSewa(s, aturan)
     const selesaiSebelum = baru.selesai.getTime() <= r.mulai.getTime()
     const mulaiSetelahLepas = baru.mulai.getTime() >= r.selesai.getTime()
@@ -154,10 +161,11 @@ export function bolehDipesan(
   baru: RentangSewa,
   sewa: SewaNonSelesai[] | SewaJadwal,
   aturan: AturanCheckout,
+  sekarang: Date = new Date(),
 ): { boleh: true; pesan: null; halangan: [] } | { boleh: false; pesan: string; halangan: Penghalang[] } {
   // Pemanggil lama boleh mengirim satu sewa (atau null) — dinormalkan di sini.
   const daftar: SewaNonSelesai[] = Array.isArray(sewa) ? sewa : sewa ? [sewa] : []
-  const halangan = penghalangUntuk(baru, daftar, aturan)
+  const halangan = penghalangUntuk(baru, daftar, aturan, sekarang)
   if (halangan.length === 0) return { boleh: true, pesan: null, halangan: [] }
 
   const pertama = halangan[0]

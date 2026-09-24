@@ -54,7 +54,7 @@ export default async function DashboardPage() {
   const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
 
   const [totalKamar, kamarByStatus, pendapatanBulanIni, pengeluaranBulanIni,
-    tagihanBelumBayar, aktivitas, notifCount, sesiKaraoke, sewaBerakhir] = await Promise.all([
+      tagihanBelumBayar, aktivitas, notifCount, sesiKaraoke, sewaMendesak, bookingLewat] = await Promise.all([
     prisma.kamar.count({ where: { propertiId: properti.id } }),
     prisma.kamar.groupBy({ by: ['status'], where: { propertiId: properti.id }, _count: true }),
     prisma.tagihan.aggregate({
@@ -91,6 +91,18 @@ export default async function DashboardPage() {
       include: { ruang: { select: { nama: true } } },
       orderBy: { rencanaSelesai: 'asc' },
       take: 5,
+    }),
+    // Kamar yang LEWAT jadwal check-in tanpa pernah di-check-in: booking hantu.
+    // Kamarnya terkunci TERISI dan tak bisa dipesan orang lain — panel ini
+    // yang mengingatkan operator untuk check-in atau membatalkannya.
+    prisma.sewa.findMany({
+      where: {
+        statusSewa: 'PENDING',
+        kamar: { propertiId: properti.id },
+        tanggalMasuk: { lt: now },
+      },
+      include: { kamar: { select: { nomor: true } }, penyewa: { select: { nama: true } } },
+      take: 20,
     }),
     // Kamar: sewa AKTIF yang batas checkout-nya ≤ 15 menit dari sekarang.
     // `tanggalKeluar` disimpan dengan jam masuk, jadi rentangnya lebar
@@ -143,7 +155,7 @@ export default async function DashboardPage() {
         href: '/karaoke',
       }
     }),
-    ...sewaBerakhir.map((s) => {
+    ...sewaMendesak.map((s) => {
       const ms = batasCheckout(new Date(s.tanggalKeluar), aturan).getTime()
       const menit = Math.round((ms - now.getTime()) / 60000)
       return {
@@ -156,7 +168,19 @@ export default async function DashboardPage() {
         href: '/kamar',
       }
     }).filter((x) => x.menit <= AMBANG_MENIT),
-  ].sort((a, b) => a.batasMs - b.batasMs)
+    ...bookingLewat.map((s) => {
+          const menit = Math.round((now.getTime() - new Date(s.tanggalMasuk).getTime()) / 60000)
+          return {
+            jenis: 'kamar' as const,
+            judul: `Kamar ${s.kamar.nomor}`,
+            sub: `${namaPenyewa(s.penyewa?.nama)} · tak check-in`,
+            batasMs: new Date(s.tanggalMasuk).getTime(),
+            menit,
+            lewat: true,
+            href: '/booking',
+          }
+        }),
+      ].sort((a, b) => a.batasMs - b.batasMs)
 
   const kpi: { label: string; nilai: string; sub: React.ReactNode; aksen: string; Icon: BiIcon }[] = [
     {
@@ -216,13 +240,17 @@ export default async function DashboardPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`text-sm font-semibold tabular-nums ${m.lewat ? 'text-coral-600' : 'text-amber-600'}`}>
-                        {m.lewat ? `lewat ${Math.abs(m.menit)} mnt` : `${m.menit} mnt lagi`}
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        {m.lewat
-                          ? 'sudah habis'
-                          : new Date(m.batasMs).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                                          {m.lewat
+                                            ? Math.abs(m.menit) >= 1440
+                                              ? `lewat ${Math.floor(Math.abs(m.menit) / 1440)} hari`
+                                              : `lewat ${Math.abs(m.menit)} mnt`
+                                            : `${m.menit} mnt lagi`}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">
+                                          {m.href === '/booking' ? 'perlu check-in / batal' : m.lewat
+                                            ? 'sudah habis'
+                                            : new Date(m.batasMs).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
                     </div>
                   </Link>
                 ))}

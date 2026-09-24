@@ -40,11 +40,12 @@ type Kamar = {
   // (PENDING). Kamar terisi tetap bisa dibooking setelah jam check-out, jadi
   // kasir perlu tahu terisi sampai kapan — bukan sekadar kamarnya disembunyikan.
   sewa?: {
-    statusSewa: string
-    tanggalMasuk: string
-    tanggalKeluar: string
-    penyewa?: { nama: string | null; noHp: string | null } | null
-  }[]
+      id: string
+      statusSewa: string
+      tanggalMasuk: string
+      tanggalKeluar: string
+      penyewa?: { nama: string | null; noHp: string | null } | null
+    }[]
 }
 
 type PenyewaHasil = {
@@ -91,8 +92,28 @@ export default function BookingPage() {
   // Pencarian penyewa lama. `penyewaId` kosong = penyewa baru.
   const [cari, setCari] = useState('')
   const [hasil, setHasil] = useState<PenyewaHasil[]>([])
-  const [penyewaId, setPenyewaId] = useState('')
-  const [penyewaNama, setPenyewaNama] = useState('')
+    const [penyewaId, setPenyewaId] = useState('')
+    const [penyewaNama, setPenyewaNama] = useState('')
+    // Aksi booking lewat: check-in / batalkan. null = tak ada yang berjalan.
+    const [prosesBooking, setProsesBooking] = useState<string | null>(null)
+
+    async function aksiBooking(id: string, jenis: 'checkin' | 'batal') {
+      setProsesBooking(id)
+      setError('')
+      try {
+        const res = await fetch(`/api/booking/${id}/${jenis}`, { method: 'POST' })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(data?.error ?? 'Gagal.')
+        setPesanCetakNota(data?.pesan ?? 'Selesai.')
+        // Daftar kamar + sewanya harus dibaca ulang — status kamar berubah
+        // (TERISI ↔ TERSEDIA) dan pesanan menunggu bisa hilang dari daftar.
+        fetch('/api/kamar').then(r => r.json()).then(setKamarList)
+      } catch (e) {
+        setError((e as Error).message)
+      } finally {
+        setProsesBooking(null)
+      }
+    }
 
   const [form, setForm] = useState({
     nama: '', nik: '', noHp: '', alamatAsal: '',
@@ -832,13 +853,46 @@ export default function BookingPage() {
                     : <>Kamar ini kosong, tetapi sudah dipesan untuk tanggal{' '}</>}
                 <strong>{tglJamSingkat(batasCheckout(new Date((sewaAktif ?? pesananMenunggu[0]).tanggalKeluar), aturanJadwal), awalJendela)}</strong>.
                 {pesananMenunggu.length > 0 && (
-                  <> Berikutnya sudah dipesan: {pesananMenunggu.map((p, i) => (
-                    <span key={i}>
-                      {i > 0 && ', '}
-                      <strong>{tglJamSingkat(new Date(p.tanggalMasuk), awalJendela)}</strong>
-                    </span>
-                  ))}.</>
-                )}
+                                  <> Berikutnya sudah dipesan: {pesananMenunggu.map((p, i) => (
+                                    <span key={i}>
+                                      {i > 0 && ', '}
+                                      <strong>{tglJamSingkat(new Date(p.tanggalMasuk), awalJendela)}</strong>
+                                    </span>
+                                  ))}.</>
+                                )}
+                                {/* Pesanan yang tanggal masuknya sudah lewat — tamu tak kunjung
+                                    datang. Kasir bisa check-in (naik AKTIF, tanggal di-reset ke
+                                    sekarang) atau batalkan (kamar kembali TERSEDIA, tagihan
+                                    ikut BATAL). Kamar yang lewat tanpa aksi terkunci untuk
+                                    pemesan lain selamanya — inilah jalan kelarnya. */}
+                                {pesananMenunggu.filter(p => new Date(p.tanggalMasuk) <= awalJendela).map(p => {
+                                  const hariLewat = Math.floor((awalJendela.getTime() - new Date(p.tanggalMasuk).getTime()) / 86400000)
+                                  return (
+                                    <div key={p.id} className="mt-2 flex items-center justify-between gap-2 rounded border border-coral-200 bg-coral-50 px-2 py-1.5">
+                                      <span className="text-coral-700">
+                                        ⚠ {p.penyewa?.nama ?? 'tanpa nama'} — lewat {hariLewat} hari
+                                      </span>
+                                      <span className="flex gap-1">
+                                        <button
+                                          type="button"
+                                          className="btn btn-primary text-[10px] py-1 px-2"
+                                          disabled={prosesBooking === p.id}
+                                          onClick={() => void aksiBooking(p.id, 'checkin')}
+                                        >
+                                          {prosesBooking === p.id ? '…' : 'Check-in'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btn btn-ghost text-[10px] py-1 px-2"
+                                          disabled={prosesBooking === p.id}
+                                          onClick={() => void aksiBooking(p.id, 'batal')}
+                                        >
+                                          {prosesBooking === p.id ? '…' : 'Batalkan'}
+                                        </button>
+                                      </span>
+                                    </div>
+                                  )
+                                })}
                 {celah.length > 0
                   ? <> Kamar kosong: {celah.map((c, i) => (
                       <span key={i}>
