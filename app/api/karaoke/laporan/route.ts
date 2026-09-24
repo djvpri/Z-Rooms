@@ -129,6 +129,7 @@ export async function GET(req: NextRequest) {
       totalSewa: Number(s.totalSewa),
       totalMinuman: s.minuman.reduce((a, m) => a + Number(m.subtotal), 0),
       jaminan: Number(s.jaminan),
+      lunas: s.lunas,
     })),
   })
 }

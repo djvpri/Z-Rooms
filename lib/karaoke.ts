@@ -400,6 +400,9 @@ export const tutupSesiSchema = z.object({
   // BOOKING → BERJALAN. Waktu mulai di-reset ke sekarang supaya waktu tunggu
   // tak ikut ditagih. Ditolak kalau sesi bukan BOOKING.
   mulaiSekarang: z.boolean().optional(),
+  // 'sekarang' (default, perilaku lama) = uang diterima di tempat → lunas: true.
+  // 'nanti' = piutang: sesi ditutup, ruang bebas, tapi lunas: false.
+  modeBayar: z.enum(['sekarang', 'nanti']).default('sekarang'),
 })
 
 // ───────────────────────────────────────────────
