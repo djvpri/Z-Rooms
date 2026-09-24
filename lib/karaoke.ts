@@ -54,6 +54,9 @@ export const TOLERANSI_BOOKING_MENIT = 15
 /** Sisa waktu (menit) di mana kartu ruang mulai berkedip kuning. */
 export const AMBANG_MENDESAK_MENIT = 10
 
+/** Menit sebelum rencana selesai untuk MEMICU alarm bunyi (H-5). */
+export const AMBANG_ALARM_MENIT = 5
+
 const MS_MENIT = 60 * 1000
 const MS_JAM = 60 * MS_MENIT
 const SEHARI_MENIT = 24 * 60
@@ -406,6 +409,11 @@ export const tutupSesiSchema = z.object({
   // BOOKING → BERJALAN. Waktu mulai di-reset ke sekarang supaya waktu tunggu
   // tak ikut ditagih. Ditolak kalau sesi bukan BOOKING.
   mulaiSekarang: z.boolean().optional(),
+})
+
+// Perpanjang sesi berjalan: tambah 1 jam (default) atau N menit.
+export const perpanjangSchema = z.object({
+  tambahanMenit: z.number().int().min(1).max(24 * 60).default(60),
 })
 
 // ───────────────────────────────────────────────

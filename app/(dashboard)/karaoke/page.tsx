@@ -23,7 +23,7 @@ import {
   PlusLg, MusicNoteBeamed, ExclamationTriangleFill, X, CashCoin,
   ClockHistory, Printer, CupStraw, BarChartLine,
 } from 'react-bootstrap-icons'
-import { AMBANG_MENDESAK_MENIT, TOLERANSI_BOOKING_MENIT, formatDurasi } from '@/lib/karaoke'
+import { AMBANG_ALARM_MENIT, AMBANG_MENDESAK_MENIT, TOLERANSI_BOOKING_MENIT, formatDurasi } from '@/lib/karaoke'
 import {
   barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
   garisKertas, kertasPrefAktif,
@@ -130,6 +130,103 @@ export default function KaraokePage() {
   }, [muat])
 
   const sekarang = Date.now() + geser
+
+  // ── Alarm H-5 & konfirmasi lewat durasi ──
+  // Alarm menyala TEPAT di menit ambang (bukan tiap render di bawahnya) —
+  // `sudahBunyi` mencatat per sesi supaya bunyi sekali, bukan berulang tiap
+  // detak. Modal lewat juga sekali per sesi: kasir yang menunda ("biar mereka
+  // selesaikan lagu ini") tak akan dikejar dialog yang terus muncul.
+  const [sudahBunyi, setSudahBunyi] = useState<Set<string>>(new Set())
+  const [tanyaLanjut, setTanyaLanjut] = useState<Sesi | null>(null)
+  const [sudahDitanya, setSudahDitanya] = useState<Set<string>>(new Set())
+
+  /** Bunyi peringatan: Web Audio (sinetron 3 nada) + getar kalau didukung. */
+  const bunyiAlarm = useCallback(() => {
+    try {
+      const AudioCtx =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (AudioCtx) {
+        const ctx = new AudioCtx()
+        for (const [i, freq] of [880, 660, 880].entries()) {
+          const os = ctx.createOscillator()
+          const gain = ctx.createGain()
+          os.frequency.value = freq
+          os.type = 'sine'
+          gain.gain.value = 0.2
+          os.connect(gain)
+          gain.connect(ctx.destination)
+          const mulai = ctx.currentTime + i * 0.35
+          os.start(mulai)
+          os.stop(mulai + 0.3)
+        }
+        setTimeout(() => void ctx.close(), 1600)
+      }
+      navigator.vibrate?.([200, 100, 200])
+    } catch {
+      // Audio diblokir kebijakan autoplay peramban — layar sudah cukup.
+    }
+  }, [])
+
+  // Alarm H-5: hanya sesi BERJALAN dan hanya pada satu detak di menit ambang.
+  useEffect(() => {
+    for (const s of sesi) {
+      if (s.status !== 'BERJALAN') continue
+      const sisa = Math.round((new Date(s.rencanaSelesai).getTime() - sekarang) / 60000)
+      if (sisa === AMBANG_ALARM_MENIT && !sudahBunyi.has(s.id)) {
+        bunyiAlarm()
+        setSudahBunyi((p) => new Set(p).add(s.id))
+      }
+      // Sesi yang diperpanjang punya rencana baru → izinkan alarm H-5 lagi.
+      if (sisa > AMBANG_ALARM_MENIT && sudahBunyi.has(s.id)) {
+        setSudahBunyi((p) => {
+          const n = new Set(p)
+          n.delete(s.id)
+          return n
+        })
+      }
+    }
+  }, [sesi, sekarang, sudahBunyi, bunyiAlarm])
+
+  // Lewat durasi → tampilkan konfirmasi "lanjut atau berhenti", sekali per sesi.
+  useEffect(() => {
+    if (tanyaLanjut) return
+    for (const s of sesi) {
+      if (s.status !== 'BERJALAN' || sudahDitanya.has(s.id)) continue
+      if (new Date(s.rencanaSelesai).getTime() <= sekarang) {
+        setTanyaLanjut(s)
+        bunyiAlarm()
+        return
+      }
+    }
+  }, [sesi, sekarang, sudahDitanya, tanyaLanjut, bunyiAlarm])
+
+  async function lanjutkanSesi(s: Sesi) {
+    setProses(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/karaoke/sesi/${s.id}/perpanjang`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tambahanMenit: 60 }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal memperpanjang sesi.')
+      setPesan(`Sesi ${s.nomor} diperpanjang 1 jam. ${rupiah(data.ringkas?.tambahan ?? data.sesi.totalSewa)}.`)
+      setSudahDitanya((p) => new Set(p).add(s.id))
+      setTanyaLanjut(null)
+      // reset alarm sesi ini → alarm H-5 akan bunyi lagi di rencana baru
+      setSudahBunyi((p) => {
+        const n = new Set(p)
+        n.delete(s.id)
+        return n
+      })
+      await muat()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setProses(false)
+    }
+  }
 
   // Ruang → sesi yang memegangnya. BOOKING yang sudah lewat 15 menit dianggap
   // lepas (pelanggan tak datang) — dihitung di sini, bukan oleh cron.
@@ -528,6 +625,36 @@ export default function KaraokePage() {
       )}
 
       {/* Struk */}
+      {tanyaLanjut && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="text-3xl mb-2">⏰</div>
+            <h3 className="text-base font-bold mb-1">Durasi {tanyaLanjut.nomor} habis</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Ruang {tanyaLanjut.ruang?.nama}. Pelanggan masih di dalam?
+            </p>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-primary text-xs flex-1"
+                disabled={proses}
+                onClick={() => void lanjutkanSesi(tanyaLanjut)}
+              >
+                <ClockHistory aria-hidden="true" /> Lanjut 1 jam
+              </button>
+              <button
+                className="btn btn-ghost text-xs flex-1"
+                disabled={proses}
+                onClick={() => {
+                  setSudahDitanya((p) => new Set(p).add(tanyaLanjut.id))
+                  setTanyaLanjut(null)
+                }}
+              >
+                Nanti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {struk && <StrukKaraoke data={struk} onTutup={() => setStruk(null)} />}
     </div>
   )
