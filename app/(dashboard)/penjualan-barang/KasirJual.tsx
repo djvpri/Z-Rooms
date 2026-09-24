@@ -165,23 +165,41 @@ export default function KasirJual({
         return
       }
 
+      // Respons route: { penjualan: {...item[]}, stokMinus, pesan } — nested.
+      // DULU dibaca flat (data.nomor) sehingga banner sukses tampil
+      // "undefined — Rp NaN" dan nota cetak kosong.
+      const jual = data?.penjualan
+      if (!jual) {
+        setError(data?.pesan ?? 'Respons server tidak dikenal.')
+        return
+      }
       setPesan(
         tujuan
-          ? `${data.nomor} — ${rupiah(data.total)} dititipkan ke kamar, masuk tagihan saat check-out.`
-          : `${data.nomor} — ${rupiah(data.total)} terjual.`,
+          ? `${jual.nomor} — ${rupiah(Number(jual.total))} dititipkan ke kamar, masuk tagihan saat check-out.`
+          : `${jual.nomor} — ${rupiah(Number(jual.total))} terjual.`,
       )
       bersihkan()
       // Simpan nota utk tombol cetak. Reload DITUNDA: kalau langsung reload,
       // banner sukses (dan tombol Cetak Nota) lenyap sebelum sempat dibaca.
       setNotaSukses({
-        nomor: data.nomor,
-        total: data.total,
+        nomor: jual.nomor,
+        total: Number(jual.total),
         metodeBayar: METODE.find(m => m.nilai === metodeBayar)?.label ?? metodeBayar,
         kamar: kamarTerpilih?.nomor ?? null,
-        item: data.item as RiwayatItem[],
+        // ItemPenjualan memakai namaProduk/hargaSatuan(Decimal→string di JSON);
+        // nota memakai nama/hargaSatuan(number). Map di sini, bukan di cetak.
+        item: (jual.item ?? []).map((i: { id: string; namaProduk: string; jumlah: number; hargaSatuan: string | number }) => ({
+          id: i.id,
+          nama: i.namaProduk,
+          jumlah: i.jumlah,
+          hargaSatuan: Number(i.hargaSatuan),
+        })),
       })
     } catch {
-      setError('Gagal menyimpan penjualan.')
+      // Respons tak terima BUKAN berarti gagal tersimpan — server mungkin sudah
+      // menyimpannya (terjadi: PJ-0005 tersimpan, kasir lihat "gagal"). Kalau
+      // pesan ini menyuruh "coba lagi", kasir akan MENJUAL DUA KALI.
+      setError('Koneksi terputus saat menyimpan. Transaksi BISA SAJA sudah tersimpan — muat ulang halaman dan periksa riwayat sebelum menjual ulang barang yang sama.')
     } finally {
       setSimpan(false)
     }
