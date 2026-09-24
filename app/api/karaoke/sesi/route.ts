@@ -148,6 +148,9 @@ export async function POST(req: NextRequest) {
           jumlahJam: sewa.jumlahJam,
           totalSewa: sewa.total,
           jaminan: d.jaminan ?? 0,
+          // modeBayar 'sekarang' → sewa dibayar di muka = total sewa awal.
+          // Dihitung server dari tarif yang tersimpan, bukan dari klien.
+          bayarDiMuka: d.modeBayar === 'sekarang' ? sewa.total : 0,
           status: waktu.booking ? 'BOOKING' : 'BERJALAN',
           catatan: d.catatan?.trim() || null,
           item: {

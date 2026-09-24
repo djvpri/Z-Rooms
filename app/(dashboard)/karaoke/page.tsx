@@ -51,6 +51,7 @@ type Sesi = {
   totalSewa: string | number
   jaminan: string | number
   status: 'BOOKING' | 'BERJALAN' | 'SELESAI' | 'BATAL'
+  bayarDiMuka?: string | number
   catatan: string | null
   ruang?: { id: string; nama: string }
   minuman?: BarisMinuman[]
@@ -77,9 +78,9 @@ export default function KaraokePage() {
   const [geser, setGeser] = useState(0)
   const [, setDetak] = useState(0)
 
-  const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string; pada: string } | null>(null)
+  const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string; pada: string; modeBayar: 'sekarang' | 'nanti' } | null>(null)
   const [proses, setProses] = useState(false)
-  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number } } | null>(null)
+  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number } } | null>(null)
 
   // Minuman: katalog produk dimuat sekali (untuk panel minuman), dan sesi yang
   // panelnya sedang dibuka. Panel dibuka atas permintaan kasir — bukan otomatis
@@ -156,6 +157,7 @@ export default function KaraokePage() {
           namaPelanggan: formBuka.nama || null,
           durasiMenit: durasi,
           jaminan: formBuka.jaminan ? Number(formBuka.jaminan.replace(/[^\d]/g, '')) : 0,
+          modeBayar: formBuka.modeBayar,
           // Kosong = mulai sekarang (BERJALAN). Terisi = BOOKING untuk jam itu.
           // `new Date(...).toISOString()` mengubah waktu lokal kasir jadi UTC
           // berlabel, jadi server tak perlu tahu zona waktu perangkat.
@@ -346,7 +348,7 @@ export default function KaraokePage() {
               sesi={s}
               sekarang={sekarang}
               proses={proses}
-              onBuka={() => setFormBuka({ ruangId: r.id, nama: '', jam: '1', menit: '0', jaminan: '', pada: '' })}
+              onBuka={() => setFormBuka({ ruangId: r.id, nama: '', jam: '1', menit: '0', jaminan: '', pada: '', modeBayar: 'nanti' })}
               onTutup={s ? () => tutupSesi(s) : undefined}
               onBatal={s ? () => batalSesi(s) : undefined}
               onMinuman={s && s.status === 'BERJALAN' ? () => void bukaPanelMinuman(s) : undefined}
@@ -428,6 +430,31 @@ export default function KaraokePage() {
                 Jaminan bukan diskon — ia mengurangi yang dibayar di akhir, bukan totalnya.
               </span>
             </label>
+
+            <div className="mb-4">
+              <span className="block text-xs text-gray-500 mb-1">Pembayaran sewa</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`btn text-xs flex-1 ${formBuka.modeBayar === 'nanti' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setFormBuka((f) => (f ? { ...f, modeBayar: 'nanti' } : f))}
+                >
+                  Bayar nanti
+                </button>
+                            <button
+                              type="button"
+                              className={`btn text-xs flex-1 ${formBuka.modeBayar === 'sekarang' ? 'btn-primary' : 'btn-ghost'}`}
+                              onClick={() => setFormBuka((f) => (f ? { ...f, modeBayar: 'sekarang' } : f))}
+                >
+                  Bayar sekarang
+                </button>
+              </div>
+              <span className="block text-[11px] text-gray-400 mt-1">
+                {formBuka.modeBayar === 'sekarang'
+                  ? 'Sewa dibayar di muka. Minuman & jam tambahan dibayar saat selesai. Sesi cepat selesai = kembalian.'
+                  : 'Sewa + minuman + jam tambahan dibayar saat selesai.'}
+              </span>
+            </div>
 
             <label className="block mb-4">
               <span className="block text-xs text-gray-500 mb-1">Mulai</span>
@@ -601,10 +628,11 @@ function KartuRuang({
 
       <p className="text-[11px] text-gray-400 mt-2">
         Sewa tercatat {rupiah(sesi.totalSewa)}
-        {Number(sesi.jaminan) > 0 && ` · jaminan ${rupiah(sesi.jaminan)}`}
-        {totalMinuman > 0 && ` · minuman ${rupiah(totalMinuman)}`}
-        {mendesak && berjalan && !lampau && ' · siap-siap ruang kosong'}
-      </p>
+                {Number(sesi.bayarDiMuka) > 0 && ` · dibayar di muka ${rupiah(sesi.bayarDiMuka)}`}
+                {Number(sesi.jaminan) > 0 && ` · jaminan ${rupiah(sesi.jaminan)}`}
+                {totalMinuman > 0 && ` · minuman ${rupiah(totalMinuman)}`}
+                {mendesak && berjalan && !lampau && ' · siap-siap ruang kosong'}
+              </p>
 
       {/* Minuman: hanya sesi BERJALAN yang bisa dicatat. BOOKING belum
           didatangi pelanggannya, jadi mencatat minumannya berarti memotong
@@ -709,7 +737,7 @@ function StrukKaraoke({
   data,
   onTutup,
 }: {
-  data: { sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number } }
+  data: { sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number } }
   onTutup: () => void
 }) {
   const { sesi, ringkas } = data
@@ -754,12 +782,14 @@ function StrukKaraoke({
         barisKiriKanan('Sewa ruang', rupiah(ringkas.sewa), kertas),
         ...(ringkas.minuman > 0 ? [barisKiriKanan('Minuman', rupiah(ringkas.minuman), kertas)] : []),
         barisKiriKanan('TOTAL', rupiah(ringkas.total), kertas),
-        ...(ringkas.jaminan > 0
-          ? [
-              barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas),
-              barisKiriKanan('DIBAYAR SEKARANG', rupiah(ringkas.dibayar), kertas),
-            ]
-          : []),
+        ...(ringkas.bayarDiMuka > 0 ? [barisKiriKanan('Dibayar di muka', `-${rupiah(ringkas.bayarDiMuka)}`, kertas)] : []),
+        ...(ringkas.jaminan > 0 ? [barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas)] : []),
+        // Negatif = kembalian (prepay melebihi tagihan karena sesi cepat
+        // selesai). Labelnya harus beda — kasir tak boleh membaca nominal
+        // negatif sebagai "dibayar".
+        ...(ringkas.dibayar < 0
+          ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)]
+          : [barisKiriKanan('DIBAYAR', rupiah(ringkas.dibayar), kertas)]),
         garisKertas(kertas),
         barisTengah('Tarif per jam ditentukan', kertas),
         barisTengah('jam mulai tiap jam.', kertas),
@@ -855,22 +885,33 @@ function StrukKaraoke({
                 </div>
               )}
               <div className="flex justify-between font-bold border-t border-gray-300 pt-1">
-                <span>TOTAL</span>
-                <span>{rupiah(ringkas.total)}</span>
-              </div>
-              {ringkas.jaminan > 0 && (
-                <>
-                  <div className="flex justify-between text-xs">
-                    <span>Jaminan dibayar di depan</span>
-                    <span>-{rupiah(ringkas.jaminan)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span>DIBAYAR SEKARANG</span>
-                    <span>{rupiah(ringkas.dibayar)}</span>
-                  </div>
-                </>
-              )}
-            </div>
+                              <span>TOTAL</span>
+                              <span>{rupiah(ringkas.total)}</span>
+                            </div>
+                            {ringkas.bayarDiMuka > 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span>Dibayar di muka</span>
+                                <span>-{rupiah(ringkas.bayarDiMuka)}</span>
+                              </div>
+                            )}
+                            {ringkas.jaminan > 0 && (
+                              <div className="flex justify-between text-xs">
+                                <span>Jaminan dibayar di depan</span>
+                                <span>-{rupiah(ringkas.jaminan)}</span>
+                              </div>
+                            )}
+                            {ringkas.dibayar < 0 ? (
+                              <div className="flex justify-between font-bold text-teal-600">
+                                <span>KEMBALIAN</span>
+                                <span>{rupiah(-ringkas.dibayar)}</span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between font-bold">
+                                <span>DIBAYAR</span>
+                                <span>{rupiah(ringkas.dibayar)}</span>
+                              </div>
+                            )}
+                          </div>
 
             <div className="border-t border-dashed border-gray-300 my-3" />
             <p className="text-[10px] text-center text-gray-400">

@@ -145,10 +145,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       sewa: sewa.total,
       minuman: totalMinuman,
       jaminan: Number(hasil.jaminan),
-      // Jaminan mengurangi yang dibayar sekarang. Total tetap jumlah sewa +
-      // minuman — jaminan bukan diskon, cuma uang muka.
+      bayarDiMuka: Number(hasil.bayarDiMuka),
+      // Total = sewa + minuman. Dibayar = total − bayarDiMuka − jaminan.
+      // Minus = kembalian (prepay melebihi tagihan karena sesi cepat selesai).
       total: sewa.total + totalMinuman,
-      dibayar: Math.max(0, sewa.total + totalMinuman - Number(hasil.jaminan)),
+      dibayar: sewa.total + totalMinuman - Number(hasil.bayarDiMuka) - Number(hasil.jaminan),
     },
   })
 }

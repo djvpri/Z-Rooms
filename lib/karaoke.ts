@@ -391,6 +391,12 @@ export const bukaSesiSchema = z.object({
   // memesan jam, bukan memilih status — kalau klien bisa memilih, ia bisa
   // membuat "booking" yang mulai kemarin, atau sesi BERJALAN berjadwal besok.
   pada: z.string().datetime({ offset: true, message: 'Jam mulai tidak valid.' }).optional(),
+  // 'nanti' (default) = bayar saat selesai, `bayarDiMuka` 0.
+  // 'sekarang' = sewa dibayar di muka; server mengisi `bayarDiMuka` dari
+  // total sewa yang DIHITUNGNYA sendiri. Uang muka tak pernah datang dari
+  // klien — kalau boleh, klien bisa melaporkan sudah bayar Rp 0 untuk bisa
+  // menagih penuh saat tutup.
+  modeBayar: z.enum(['sekarang', 'nanti']).default('nanti'),
 })
 
 export const tutupSesiSchema = z.object({
