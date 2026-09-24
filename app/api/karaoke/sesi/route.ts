@@ -163,7 +163,14 @@ export async function POST(req: NextRequest) {
             })),
           },
         },
-        include: { ruang: { select: { id: true, nama: true } }, item: { orderBy: { jamKe: 'asc' } } },
+        // `item` ikut dikirim supaya struk pembayaran di muka bisa langsung
+        // dicetak tanpa memanggil GET — rincian per jam harus terbaca di struk.
+        include: {
+          ruang: { select: { id: true, nama: true } },
+          item: { orderBy: { jamKe: 'asc' } },
+          minuman: true,
+          properti: { select: { nama: true, alamat: true, kota: true, noHp: true, teksNota: true } },
+        },
       })
     })
 

@@ -80,7 +80,7 @@ export default function KaraokePage() {
 
   const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string; pada: string; modeBayar: 'sekarang' | 'nanti' } | null>(null)
   const [proses, setProses] = useState(false)
-  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number } } | null>(null)
+  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number }; penerimaan?: boolean } | null>(null)
 
   // Minuman: katalog produk dimuat sekali (untuk panel minuman), dan sesi yang
   // panelnya sedang dibuka. Panel dibuka atas permintaan kasir — bukan otomatis
@@ -167,11 +167,28 @@ export default function KaraokePage() {
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal membuka sesi.')
       const booking = data.sesi.status === 'BOOKING'
+      const muka = Number(data.sesi.bayarDiMuka ?? 0)
       setPesan(
         booking
           ? `Booking ${data.sesi.nomor} untuk ${new Date(data.sesi.mulaiPada).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}. ${rupiah(data.sesi.totalSewa)}.`
           : `Sesi ${data.sesi.nomor} dibuka. ${rupiah(data.sesi.totalSewa)} untuk ${data.sesi.jumlahJam} jam.`,
       )
+      // Bayar di muka → struk penerimaan langsung muncul. Kasir menyerahkan
+      // kertas ini ke pelanggan sebelum masuk ruang, bukan setelah keluar.
+      if (muka > 0) {
+              setStruk({
+                sesi: data.sesi,
+                ringkas: {
+                  sewa: Number(data.sesi.totalSewa),
+                  minuman: 0,
+                  jaminan: Number(data.sesi.jaminan ?? 0),
+                  bayarDiMuka: muka,
+                  total: Number(data.sesi.totalSewa),
+                  dibayar: muka,
+                },
+                penerimaan: true,
+              })
+            }
       setFormBuka(null)
       await muat()
     } catch (e) {
@@ -577,6 +594,8 @@ function KartuRuang({
   const lewatMenit = Math.floor((sekarang - mulai) / 60000)
   const lewatJam = Math.max(1, Math.ceil(lewatMenit / 60))
   const totalMinuman = (sesi.minuman ?? []).reduce((a, b) => a + Number(b.subtotal), 0)
+  // Sewa sudah dibayar di muka — penanda untuk label tombol & baris kartu.
+  const prepay = Number(sesi.bayarDiMuka ?? 0) > 0
 
   // Warna: BERJALAN tenang, mendesak kuning, lewat merah. BOOKING beda warna
   // supaya kasir tak mengira ruang sudah terisi.
@@ -704,10 +723,13 @@ function KartuRuang({
 
       <div className="flex gap-2 mt-3">
         {berjalan ? (
-          <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
-            <CashCoin aria-hidden="true" /> Selesai & bayar
-          </button>
-        ) : (
+                  // Sewa yang sudah dibayar di muka tidak ditagih dua kali: tombolnya
+                  // "Selesai" saja, bukan "Selesai & bayar". Yang dibayar saat tutup
+                  // tinggal minuman, jam tambahan, atau kembalian.
+                  <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
+                    <CashCoin aria-hidden="true" /> {prepay ? 'Selesai' : 'Selesai & bayar'}
+                  </button>
+                ) : (
           <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
             <ClockHistory aria-hidden="true" /> Pelanggan datang
           </button>
@@ -733,14 +755,22 @@ function KartuRuang({
  * bisa membaca jawabannya dari struk — inilah yang membuat aturan "per blok"
  * bisa diperiksa pelanggan, bukan cuma dipercaya.
  */
+// Struk karaoke — dua wajah: struk Akhir (saat sesi ditutup) dan struk
+// PENERIMAAN (pembayaran sewa di muka, dicetak saat sesi mulai). Keduanya
+// cetak ke printer yang sama; yang beda hanya judul dan baris akhir.
 function StrukKaraoke({
   data,
   onTutup,
 }: {
-  data: { sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number } }
+  data: {
+    sesi: Sesi
+    ringkas: { sewa: number; minuman: number; jaminan: number; bayarDiMuka: number; total: number; dibayar: number }
+    penerimaan?: boolean
+  }
   onTutup: () => void
 }) {
   const { sesi, ringkas } = data
+  const penerimaan = data.penerimaan ?? false
   const item = (sesi as Sesi & { item?: { jamKe: number; mulai: string; selesai: string; hargaPerJam: string | number }[] }).item ?? []
 
   const jam = (d: string | null) =>
@@ -761,7 +791,7 @@ function StrukKaraoke({
       const kertas = await kertasPrefAktif()
       const baris: string[] = [
         barisTengah('ZXRoom', kertas),
-        barisTengah('Struk Karaoke', kertas),
+                barisTengah(penerimaan ? 'Penerimaan Sewa' : 'Struk Karaoke', kertas),
         garisKertas(kertas),
         barisKiriKanan(sesi.nomor, jam(sesi.mulaiPada), kertas),
         barisDuaKolom('Ruang', sesi.ruang?.nama ?? '-', kertas),
@@ -788,13 +818,13 @@ function StrukKaraoke({
         // selesai). Labelnya harus beda — kasir tak boleh membaca nominal
         // negatif sebagai "dibayar".
         ...(ringkas.dibayar < 0
-          ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)]
-          : [barisKiriKanan('DIBAYAR', rupiah(ringkas.dibayar), kertas)]),
-        garisKertas(kertas),
-        barisTengah('Tarif per jam ditentukan', kertas),
-        barisTengah('jam mulai tiap jam.', kertas),
-        barisTengah('Terima kasih.', kertas),
-      ]
+                  ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)]
+                  : [barisKiriKanan(penerimaan ? 'DITERIMA' : 'DIBAYAR', rupiah(ringkas.dibayar), kertas)]),
+                garisKertas(kertas),
+        ...(penerimaan
+                  ? [barisTengah('Simpan struk ini.', kertas), barisTengah('Bukti sewa sudah dibayar.', kertas)]
+                  : [barisTengah('Tarif per jam ditentukan', kertas), barisTengah('jam mulai tiap jam.', kertas), barisTengah('Terima kasih.', kertas)]),
+              ]
       await cetakNotaKasir(baris)
       setPesan('Struk terkirim ke printer.')
     } catch (e) {
@@ -822,7 +852,7 @@ function StrukKaraoke({
           <div id="nota-karaoke" className="p-6 font-mono text-sm">
             <div className="text-center mb-3">
               <div className="text-base font-bold">ZXRoom</div>
-              <div className="text-xs text-gray-500">Struk Karaoke</div>
+                            <div className="text-xs text-gray-500">{penerimaan ? 'Penerimaan Sewa' : 'Struk Karaoke'}</div>
             </div>
 
             <div className="border-t border-dashed border-gray-300 my-3" />
@@ -907,7 +937,7 @@ function StrukKaraoke({
                               </div>
                             ) : (
                               <div className="flex justify-between font-bold">
-                                <span>DIBAYAR</span>
+                                <span>{penerimaan ? 'DITERIMA' : 'DIBAYAR'}</span>
                                 <span>{rupiah(ringkas.dibayar)}</span>
                               </div>
                             )}
