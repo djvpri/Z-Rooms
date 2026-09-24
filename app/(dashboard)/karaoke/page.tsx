@@ -57,6 +57,14 @@ type Sesi = {
   minuman?: BarisMinuman[]
 }
 
+type NotaProperti = {
+  nama?: string | null
+  alamat?: string | null
+  kota?: string | null
+  noHp?: string | null
+  teksNota?: string | null
+}
+
 const rupiah = (n: unknown) => 'Rp ' + Number(n).toLocaleString('id-ID')
 
 /** "2026-09-18T19:00" untuk input datetime-local, dari waktu server. */
@@ -770,10 +778,15 @@ function StrukKaraoke({
   onTutup: () => void
 }) {
   const { sesi, ringkas } = data
-  const penerimaan = data.penerimaan ?? false
-  const item = (sesi as Sesi & { item?: { jamKe: number; mulai: string; selesai: string; hargaPerJam: string | number }[] }).item ?? []
+    const penerimaan = data.penerimaan ?? false
+    // Kop nota dari `properti` yang di-include API. Struk akhir dari PATCH
+    // tutup memuatnya; POST buka sesi juga sudah di-include.
+    const p = (sesi as Sesi & { properti?: NotaProperti }).properti ?? {}
+    const item = (sesi as Sesi & { item?: { jamKe: number; mulai: string; selesai: string; hargaPerJam: string | number }[] }).item ?? []
+    // Sisa setelah prepay + jaminan. Nol = lunas di muka; negatif = kembalian.
+    const sudahLunas = ringkas.dibayar <= 0
 
-  const jam = (d: string | null) =>
+    const jam = (d: string | null) =>
     d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
 
   const [pesan, setPesan] = useState('')
@@ -790,14 +803,25 @@ function StrukKaraoke({
     try {
       const kertas = await kertasPrefAktif()
       const baris: string[] = [
-        barisTengah('ZXRoom', kertas),
-                barisTengah(penerimaan ? 'Penerimaan Sewa' : 'Struk Karaoke', kertas),
+        // Kop nota: nama tenant, alamat, HP — pola sama dengan nota booking.
+        // 'ZXRoom' hanya fallback kalau nama tenant belum disetel.
+        barisTengah(p.nama || 'ZXRoom', kertas),
+        // Alamat/HP kosong = baris dilewati, jangan fallback teks generik.
+        ...([p.alamat, p.kota].some((v) => v && v !== '-')
+          ? [barisTengah([p.alamat, p.kota].filter((v) => v && v !== '-').join(', '), kertas)]
+          : []),
+        ...(p.noHp ? [barisTengah(`HP ${p.noHp}`, kertas)] : []),
+        garisKertas(kertas),
+        barisTengah('Karaoke Room', kertas),
         garisKertas(kertas),
         barisKiriKanan(sesi.nomor, jam(sesi.mulaiPada), kertas),
         barisDuaKolom('Ruang', sesi.ruang?.nama ?? '-', kertas),
         barisDuaKolom('Pelanggan', sesi.namaPelanggan || 'Umum', kertas),
         barisDuaKolom('Mulai', jam(sesi.mulaiPada), kertas),
-        barisDuaKolom('Selesai', jam(sesi.selesaiAktual), kertas),
+        // Kolom Selesai tak boleh '-' — jam akhir sesi selalu diketahui saat
+        // struk dicetak: rencana untuk sesi berjalan, aktual untuk yang sudah
+        // ditutup. Pelanggan butuh tahu kapan ruang harus dikosongkan.
+        barisDuaKolom('Selesai', jam(sesi.selesaiAktual ?? sesi.rencanaSelesai), kertas),
         barisDuaKolom('Durasi ditagih', `${sesi.jumlahJam} jam`, kertas),
         garisKertas(kertas),
         // Rincian per jam — jawaban untuk "kok mahal?" (aturan aturan blok
@@ -808,23 +832,19 @@ function StrukKaraoke({
         ...(item.length === 0
           ? [barisKiriKanan(`Sewa ${sesi.jumlahJam} jam`, Number(ringkas.sewa).toLocaleString('id-ID'), kertas)]
           : []),
-        garisKertas(kertas),
-        barisKiriKanan('Sewa ruang', rupiah(ringkas.sewa), kertas),
         ...(ringkas.minuman > 0 ? [barisKiriKanan('Minuman', rupiah(ringkas.minuman), kertas)] : []),
+        garisKertas(kertas),
         barisKiriKanan('TOTAL', rupiah(ringkas.total), kertas),
-        ...(ringkas.bayarDiMuka > 0 ? [barisKiriKanan('Dibayar di muka', `-${rupiah(ringkas.bayarDiMuka)}`, kertas)] : []),
         ...(ringkas.jaminan > 0 ? [barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas)] : []),
-        // Negatif = kembalian (prepay melebihi tagihan karena sesi cepat
-        // selesai). Labelnya harus beda — kasir tak boleh membaca nominal
-        // negatif sebagai "dibayar".
-        ...(ringkas.dibayar < 0
-                  ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)]
-                  : [barisKiriKanan(penerimaan ? 'DITERIMA' : 'DIBAYAR', rupiah(ringkas.dibayar), kertas)]),
-                garisKertas(kertas),
-        ...(penerimaan
-                  ? [barisTengah('Simpan struk ini.', kertas), barisTengah('Bukti sewa sudah dibayar.', kertas)]
-                  : [barisTengah('Tarif per jam ditentukan', kertas), barisTengah('jam mulai tiap jam.', kertas), barisTengah('Terima kasih.', kertas)]),
-              ]
+        ...(ringkas.dibayar < 0 ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)] : []),
+        // LUNAS saat sisa nol (prepay menutup total), BELUM LUNAS saat masih
+        // ada sisa — satu baris penutup angka, bukan dua baris yang bisa
+        // dibaca orang sebagai "dibayar dua kali".
+        barisKiriKanan(sudahLunas ? 'LUNAS' : 'BELUM LUNAS', sudahLunas ? '' : rupiah(ringkas.dibayar), kertas),
+        garisKertas(kertas),
+        barisTengah(p.teksNota || 'Terima kasih.', kertas),
+        barisTengah('Powered by ZXRoom', kertas),
+      ]
       await cetakNotaKasir(baris)
       setPesan('Struk terkirim ke printer.')
     } catch (e) {
@@ -850,10 +870,16 @@ function StrukKaraoke({
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
           <div id="nota-karaoke" className="p-6 font-mono text-sm">
-            <div className="text-center mb-3">
-              <div className="text-base font-bold">ZXRoom</div>
-                            <div className="text-xs text-gray-500">{penerimaan ? 'Penerimaan Sewa' : 'Struk Karaoke'}</div>
-            </div>
+                      <div className="text-center mb-3">
+                        <div className="text-base font-bold">{p.nama || 'ZXRoom'}</div>
+                        {[p.alamat, p.kota].some((v) => v && v !== '-') && (
+                          <div className="text-xs text-gray-500">
+                            {[p.alamat, p.kota].filter((v) => v && v !== '-').join(', ')}
+                          </div>
+                        )}
+                        {p.noHp && <div className="text-xs text-gray-500">HP {p.noHp}</div>}
+                        <div className="text-xs text-gray-500 mt-1">Karaoke Room</div>
+                      </div>
 
             <div className="border-t border-dashed border-gray-300 my-3" />
 
@@ -872,9 +898,9 @@ function StrukKaraoke({
                 <span>{jam(sesi.mulaiPada)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Selesai</span>
-                <span>{jam(sesi.selesaiAktual)}</span>
-              </div>
+                              <span>Selesai</span>
+                              <span>{jam(sesi.selesaiAktual ?? sesi.rencanaSelesai)}</span>
+                            </div>
               <div className="flex justify-between font-medium">
                 <span>Durasi ditagih</span>
                 <span>{sesi.jumlahJam} jam</span>
@@ -904,50 +930,42 @@ function StrukKaraoke({
             <div className="border-t border-dashed border-gray-300 my-3" />
 
             <div className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <span>Sewa ruang</span>
-                <span>{rupiah(ringkas.sewa)}</span>
-              </div>
-              {ringkas.minuman > 0 && (
-                <div className="flex justify-between">
-                  <span>Minuman</span>
-                  <span>{rupiah(ringkas.minuman)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold border-t border-gray-300 pt-1">
-                              <span>TOTAL</span>
-                              <span>{rupiah(ringkas.total)}</span>
+                          {ringkas.minuman > 0 && (
+                            <div className="flex justify-between">
+                              <span>Minuman</span>
+                              <span>{rupiah(ringkas.minuman)}</span>
                             </div>
-                            {ringkas.bayarDiMuka > 0 && (
-                              <div className="flex justify-between text-xs">
-                                <span>Dibayar di muka</span>
-                                <span>-{rupiah(ringkas.bayarDiMuka)}</span>
-                              </div>
-                            )}
-                            {ringkas.jaminan > 0 && (
-                              <div className="flex justify-between text-xs">
-                                <span>Jaminan dibayar di depan</span>
-                                <span>-{rupiah(ringkas.jaminan)}</span>
-                              </div>
-                            )}
-                            {ringkas.dibayar < 0 ? (
-                              <div className="flex justify-between font-bold text-teal-600">
-                                <span>KEMBALIAN</span>
-                                <span>{rupiah(-ringkas.dibayar)}</span>
-                              </div>
-                            ) : (
-                              <div className="flex justify-between font-bold">
-                                <span>{penerimaan ? 'DITERIMA' : 'DIBAYAR'}</span>
-                                <span>{rupiah(ringkas.dibayar)}</span>
-                              </div>
-                            )}
+                          )}
+                          <div className="flex justify-between font-bold border-t border-gray-300 pt-1">
+                            <span>TOTAL</span>
+                            <span>{rupiah(ringkas.total)}</span>
                           </div>
+                          {ringkas.jaminan > 0 && (
+                            <div className="flex justify-between text-xs">
+                              <span>Jaminan dibayar di depan</span>
+                              <span>-{rupiah(ringkas.jaminan)}</span>
+                            </div>
+                          )}
+                          {ringkas.dibayar < 0 && (
+                            <div className="flex justify-between font-bold text-teal-600">
+                              <span>KEMBALIAN</span>
+                              <span>{rupiah(-ringkas.dibayar)}</span>
+                            </div>
+                          )}
+                          <div className={`flex justify-between font-bold ${sudahLunas ? 'text-teal-600' : 'text-amber-600'}`}>
+                            <span>{sudahLunas ? 'LUNAS' : 'BELUM LUNAS'}</span>
+                            <span>{sudahLunas ? '' : rupiah(ringkas.dibayar)}</span>
+                          </div>
+                        </div>
 
-            <div className="border-t border-dashed border-gray-300 my-3" />
-            <p className="text-[10px] text-center text-gray-400">
-              Tarif per jam ditentukan jam mulai tiap jam. Terima kasih.
-            </p>
-          </div>
+                        <div className="border-t border-dashed border-gray-300 my-3" />
+                        <p className="text-[10px] text-center text-gray-400">
+                          {p.teksNota || 'Terima kasih.'}
+                        </p>
+                        <p className="text-[10px] text-center text-gray-400">
+                          Powered by ZXRoom
+                        </p>
+                      </div>
 
           <div className="flex gap-2 p-4 border-t border-gray-100">
             <button className="btn btn-primary flex-1" onClick={() => cetak()} disabled={mengirim}>
