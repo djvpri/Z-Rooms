@@ -52,8 +52,14 @@ const METODE = [
 ] as const
 
 export default function KasirJual({
-  produk, kamar, riwayat, tujuanAwal = '',
-}: { produk: Produk[]; kamar: Kamar[]; riwayat: Riwayat[]; tujuanAwal?: string }) {
+  produk, kamar, riwayat, tujuanAwal = '', notaProperti,
+}: {
+  produk: Produk[]
+  kamar: Kamar[]
+  riwayat: Riwayat[]
+  tujuanAwal?: string
+  notaProperti?: { nama: string; alamat: string; kota: string; noHp: string | null }
+}) {
   const [keranjang, setKeranjang] = useState<{ produkId: string; jumlah: number }[]>([])
   const [cari, setCari] = useState('')
   const [kategori, setKategori] = useState('')
@@ -217,7 +223,16 @@ export default function KasirJual({
     try {
       const kertas = await kertasPrefAktif()
       const baris: string[] = [
-        barisTengah('ZXRoom', kertas),
+        // Nama tenant (properti), bukan "ZXRoom" — ZXRoom cuma nama produk.
+        barisTengah(notaProperti?.nama || 'ZXRoom', kertas),
+        // Alamat: nilai '-' di DB mencetak "-, -" di kertas (bug yang sama di
+        // nota booking), jadi '-' dianggap kosong. Baris dilewati kalau kosong.
+        ...((notaProperti?.alamat && notaProperti.alamat !== '-') || (notaProperti?.kota && notaProperti.kota !== '-')
+          ? [barisTengah([notaProperti?.alamat, notaProperti?.kota].filter(v => v && v !== '-').join(', '), kertas)]
+          : []),
+        ...(notaProperti?.noHp && notaProperti.noHp !== '-'
+          ? [barisTengah(`HP ${notaProperti.noHp}`, kertas)]
+          : []),
         barisTengah('NOTA PENJUALAN', kertas),
         garisKertas(kertas),
         barisDuaKolom('No.', notaSukses.nomor, kertas),
@@ -235,6 +250,8 @@ export default function KasirJual({
         barisDuaKolom('Bayar', notaSukses.metodeBayar, kertas),
         garisKertas(kertas),
         barisTengah('Terima kasih.', kertas),
+        garisKertas(kertas),
+        barisTengah('Powered by ZXRoom', kertas),
       ]
       await cetakNotaKasir(baris)
       setPesanCetakNota('Nota terkirim ke printer.')

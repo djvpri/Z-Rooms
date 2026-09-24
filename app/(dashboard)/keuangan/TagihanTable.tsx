@@ -107,6 +107,8 @@ export default function TagihanTable({ tagihan, bulanLabel, properti }: {
         ...(t.status === 'LUNAS' ? [barisTengah('LUNAS', kertas)] : []),
         garisKertas(kertas),
         barisTengah(properti?.teksNota || 'Terima kasih atas kepercayaan Anda.', kertas),
+        garisKertas(kertas),
+        barisTengah('Powered by ZXRoom', kertas),
       ]
       await cetakNotaKasir(baris)
       setPesanCetak('Nota terkirim ke printer.')

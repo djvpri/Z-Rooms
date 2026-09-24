@@ -66,6 +66,12 @@ export default async function PenjualanBarangPage({
       </div>
 
       <KasirJual
+        notaProperti={{
+          nama: properti.nama,
+          alamat: properti.alamat,
+          kota: properti.kota,
+          noHp: properti.noHp,
+        }}
         produk={produk.map(p => ({
           id: p.id,
           nama: p.nama,
