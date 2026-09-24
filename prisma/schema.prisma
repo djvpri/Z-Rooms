@@ -538,12 +538,6 @@ model SesiKaraoke {
   totalSewa      Decimal       @db.Decimal(12, 0)  // DISALIN, tak dihitung ulang
   jaminan        Decimal       @db.Decimal(12, 0) @default(0)
   status         StatusKaraoke @default(BERJALAN)
-  // Piutang karaoke (pola "Bon Gantung" ZPos): sesi boleh ditutup sebelum
-  // uang diterima. Default true = semua sesi lama dianggap sudah lunas,
-  // karena sebelum kolom ini tak ada pilihan selain bayar di tempat.
-  // Total piutang = totalSewa + minuman - jaminan (jaminan = uang muka).
-  lunas          Boolean       @default(true)
-  dibayarPada    DateTime?
   catatan        String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

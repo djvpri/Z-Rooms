@@ -51,7 +51,6 @@ type Sesi = {
   totalSewa: string | number
   jaminan: string | number
   status: 'BOOKING' | 'BERJALAN' | 'SELESAI' | 'BATAL'
-  lunas?: boolean
   catatan: string | null
   ruang?: { id: string; nama: string }
   minuman?: BarisMinuman[]
@@ -80,11 +79,7 @@ export default function KaraokePage() {
 
   const [formBuka, setFormBuka] = useState<{ ruangId: string; nama: string; jam: string; menit: string; jaminan: string; pada: string } | null>(null)
   const [proses, setProses] = useState(false)
-  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number; lunas?: boolean } } | null>(null)
-
-  // Piutang karaoke: sesi SELESAI tapi belum bayar.
-  const [piutang, setPiutang] = useState<Sesi[]>([])
-  const [prosesLunas, setProsesLunas] = useState(false)
+  const [struk, setStruk] = useState<{ sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number } } | null>(null)
 
   // Minuman: katalog produk dimuat sekali (untuk panel minuman), dan sesi yang
   // panelnya sedang dibuka. Panel dibuka atas permintaan kasir — bukan otomatis
@@ -100,18 +95,15 @@ export default function KaraokePage() {
   const muat = useCallback(async (pertama = false) => {
     if (pertama) setLoading(true)
     try {
-      const [rRes, sRes, pRes] = await Promise.all([
+      const [rRes, sRes] = await Promise.all([
         fetch('/api/karaoke/ruang', { cache: 'no-store' }),
         fetch('/api/karaoke/sesi?status=jalan', { cache: 'no-store' }),
-        fetch('/api/karaoke/sesi?belumLunas=1', { cache: 'no-store' }),
       ])
       const rData = await rRes.json().catch(() => null)
       const sData = await sRes.json().catch(() => null)
-      const pData = await pRes.json().catch(() => null)
       if (pertama && !rRes.ok) throw new Error(rData?.error?.message ?? 'Gagal memuat ruang.')
       setRuang(rData?.ruang ?? [])
       setSesi(sData?.sesi ?? [])
-      setPiutang(pData?.sesi ?? [])
 
       // Waktu server dari header HTTP — tak perlu endpoint khusus.
       const tgl = rRes.headers.get('date')
@@ -249,60 +241,33 @@ export default function KaraokePage() {
     }
   }
 
-  async function tutupSesi(s: Sesi, modeBayar: 'sekarang' | 'nanti') {
-      // BOOKING = pelanggan baru datang → mulai berjalan. Waktu mulai di-reset ke
-      // sekarang: tak masuk akal menagih waktu tunggu sejak slot dijadwalkan.
-      const pesanKonfirmasi = s.status === 'BOOKING'
-        ? `Mulai sesi ${s.nomor} sekarang? Hitungan waktu berjalan dari saat ini.`
-        : modeBayar === 'nanti'
-          ? `Tutup sesi ${s.nomor} dan catat sebagai BELUM LUNAS? Ruang langsung bebas, uang menyusul.`
-          : `Tutup sesi ${s.nomor} dan hitung biayanya?`
-      if (!window.confirm(pesanKonfirmasi)) return
-      setError('')
-      setPesan('')
-      setProses(true)
-      try {
-        const res = await fetch(`/api/karaoke/sesi/${s.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          // `mulaiSekarang: true` hanya untuk BOOKING → BERJALAN. Tanpa ini,
-          // server menutup sesi dan menagih dari `mulaiPada` (waktu booking),
-          // yang bisa berarti berjam-jam waktu tunggu ikut ditagih.
-          body: JSON.stringify(
-            s.status === 'BOOKING' ? { mulaiSekarang: true } : { modeBayar },
-          ),
-        })
-        const data = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal menutup sesi.')
-        setStruk({ sesi: data.sesi, ringkas: data.ringkas })
-        if (modeBayar === 'nanti') {
-          setPesan(`Sesi ${data.sesi.nomor} ditutup — belum lunas ${rupiah(data.ringkas?.dibayar ?? data.sesi.totalSewa)}.`)
-        }
-        await muat()
-      } catch (e) {
-        setError((e as Error).message)
-      } finally {
-        setProses(false)
-      }
-    }
-
-  /** Kasir menerima uang piutang → tandai lunas. */
-  async function tandaiLunas(s: Sesi) {
-    const sisa = Number(s.totalSewa) + (s.minuman ?? []).reduce((a, b) => a + Number(b.subtotal), 0) - Number(s.jaminan)
-    if (!window.confirm(`Terima pembayaran ${rupiah(Math.max(0, sisa))} untuk sesi ${s.nomor}?`)) return
+  async function tutupSesi(s: Sesi) {
+    // BOOKING = pelanggan baru datang → mulai berjalan. Waktu mulai di-reset ke
+    // sekarang: tak masuk akal menagih waktu tunggu sejak slot dijadwalkan.
+    const pesanKonfirmasi = s.status === 'BOOKING'
+      ? `Mulai sesi ${s.nomor} sekarang? Hitungan waktu berjalan dari saat ini.`
+      : `Tutup sesi ${s.nomor} dan hitung biayanya?`
+    if (!window.confirm(pesanKonfirmasi)) return
     setError('')
     setPesan('')
-    setProsesLunas(true)
+    setProses(true)
     try {
-      const res = await fetch(`/api/karaoke/sesi/${s.id}/lunas`, { method: 'POST' })
+      const res = await fetch(`/api/karaoke/sesi/${s.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        // `mulaiSekarang: true` hanya untuk BOOKING → BERJALAN. Tanpa ini,
+        // server menutup sesi dan menagih dari `mulaiPada` (waktu booking),
+        // yang bisa berarti berjam-jam waktu tunggu ikut ditagih.
+        body: JSON.stringify(s.status === 'BOOKING' ? { mulaiSekarang: true } : {}),
+      })
       const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal menandai lunas.')
-      setPesan(`Sesi ${s.nomor} lunas.`)
+      if (!res.ok) throw new Error(data?.error?.message ?? 'Gagal menutup sesi.')
+      setStruk({ sesi: data.sesi, ringkas: data.ringkas })
       await muat()
     } catch (e) {
       setError((e as Error).message)
     } finally {
-      setProsesLunas(false)
+      setProses(false)
     }
   }
 
@@ -370,53 +335,6 @@ export default function KaraokePage() {
         </div>
       )}
 
-      {/* Panel piutang: sesi selesai tapi belum dibayar. Selalu tampil kalau
-          ada — piutang yang tersembunyi adalah piutang yang terlupakan. */}
-      {!loading && piutang.length > 0 && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs font-medium text-amber-800 mb-2">
-            Belum lunas: {piutang.length} sesi ·{' '}
-            {rupiah(
-              piutang.reduce(
-                (a, s) =>
-                  a +
-                  Math.max(
-                    0,
-                    Number(s.totalSewa) +
-                      (s.minuman ?? []).reduce((b, m) => b + Number(m.subtotal), 0) -
-                      Number(s.jaminan),
-                  ),
-                0,
-              ),
-            )}
-          </p>
-          <div className="space-y-1">
-            {piutang.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-gray-600">
-                  {s.nomor} · {s.ruang?.nama ?? '-'} · {s.namaPelanggan || 'Umum'} ·{' '}
-                  {rupiah(
-                    Math.max(
-                      0,
-                      Number(s.totalSewa) +
-                        (s.minuman ?? []).reduce((b, m) => b + Number(m.subtotal), 0) -
-                        Number(s.jaminan),
-                    ),
-                  )}
-                </span>
-                <button
-                  className="btn btn-primary text-xs shrink-0"
-                  onClick={() => void tandaiLunas(s)}
-                  disabled={prosesLunas}
-                >
-                  <CashCoin aria-hidden="true" /> Terima & lunasi
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Papan ruang */}
       <div className="grid gap-3 sm:grid-cols-2">
         {ruang.map((r) => {
@@ -429,9 +347,8 @@ export default function KaraokePage() {
               sekarang={sekarang}
               proses={proses}
               onBuka={() => setFormBuka({ ruangId: r.id, nama: '', jam: '1', menit: '0', jaminan: '', pada: '' })}
-                            onBayar={s ? () => void tutupSesi(s, 'sekarang') : undefined}
-                            onTunda={s ? () => void tutupSesi(s, 'nanti') : undefined}
-                            onBatal={s ? () => batalSesi(s) : undefined}
+              onTutup={s ? () => tutupSesi(s) : undefined}
+              onBatal={s ? () => batalSesi(s) : undefined}
               onMinuman={s && s.status === 'BERJALAN' ? () => void bukaPanelMinuman(s) : undefined}
               onHapusMinuman={s ? (b) => void hapusMinuman(s.id, b) : undefined}
               minumanDibuka={panelMinuman?.sesiId === s?.id}
@@ -575,8 +492,7 @@ function KartuRuang({
   sekarang,
   proses,
   onBuka,
-  onBayar,
-  onTunda,
+  onTutup,
   onBatal,
   onMinuman,
   onHapusMinuman,
@@ -591,8 +507,7 @@ function KartuRuang({
   sekarang: number
   proses: boolean
   onBuka: () => void
-  onBayar?: () => void
-  onTunda?: () => void
+  onTutup?: () => void
   onBatal?: () => void
   onMinuman?: () => void
   onHapusMinuman?: (b: BarisMinuman) => void
@@ -761,16 +676,11 @@ function KartuRuang({
 
       <div className="flex gap-2 mt-3">
         {berjalan ? (
-          <>
-            <button className="btn btn-primary text-xs flex-1" onClick={onBayar} disabled={proses}>
-              <CashCoin aria-hidden="true" /> Bayar sekarang
-            </button>
-            <button className="btn btn-ghost text-xs flex-1" onClick={onTunda} disabled={proses}>
-              <ClockHistory aria-hidden="true" /> Bayar nanti
-            </button>
-          </>
+          <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
+            <CashCoin aria-hidden="true" /> Selesai & bayar
+          </button>
         ) : (
-          <button className="btn btn-primary text-xs flex-1" onClick={onBayar} disabled={proses}>
+          <button className="btn btn-primary text-xs flex-1" onClick={onTutup} disabled={proses}>
             <ClockHistory aria-hidden="true" /> Pelanggan datang
           </button>
         )}
@@ -799,7 +709,7 @@ function StrukKaraoke({
   data,
   onTutup,
 }: {
-  data: { sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number; lunas?: boolean } }
+  data: { sesi: Sesi; ringkas: { sewa: number; minuman: number; jaminan: number; total: number; dibayar: number } }
   onTutup: () => void
 }) {
   const { sesi, ringkas } = data
@@ -849,11 +759,6 @@ function StrukKaraoke({
               barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas),
               barisKiriKanan('DIBAYAR SEKARANG', rupiah(ringkas.dibayar), kertas),
             ]
-          : []),
-        // Piutang harus terbaca dari struk — pelanggan yang membawa struk
-        // "BELUM LUNAS" tahu ia masih punya utang, bukan cuma kasir.
-        ...(ringkas.lunas === false
-          ? [garisKertas(kertas), barisTengah('** BELUM LUNAS **', kertas), barisTengah(`Tagihan: ${rupiah(ringkas.dibayar)}`, kertas)]
           : []),
         garisKertas(kertas),
         barisTengah('Tarif per jam ditentukan', kertas),
@@ -964,12 +869,6 @@ function StrukKaraoke({
                     <span>{rupiah(ringkas.dibayar)}</span>
                   </div>
                 </>
-              )}
-              {ringkas.lunas === false && (
-                <div className="mt-2 rounded border border-coral-300 bg-coral-50 px-3 py-2 text-center">
-                  <p className="text-sm font-bold text-coral-600">** BELUM LUNAS **</p>
-                  <p className="text-xs text-coral-500">Tagihan: {rupiah(ringkas.dibayar)}</p>
-                </div>
               )}
             </div>
 

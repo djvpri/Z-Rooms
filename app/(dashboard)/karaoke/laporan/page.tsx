@@ -39,7 +39,6 @@ type Laporan = {
     totalSewa: number
     totalMinuman: number
     jaminan: number
-    lunas?: boolean
   }[]
 }
 
@@ -270,7 +269,6 @@ export default function LaporanKaraokePage() {
                   <th className="text-right py-1.5">Jam</th>
                   <th className="text-right py-1.5">Sewa</th>
                   <th className="text-right py-1.5">Minuman</th>
-                  <th className="text-center py-1.5">Lunas</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,12 +281,9 @@ export default function LaporanKaraokePage() {
                     <td className="py-1.5 text-right tabular-nums text-gray-600">{s.jumlahJam}</td>
                     <td className="py-1.5 text-right tabular-nums text-gray-600">{rupiah(s.totalSewa)}</td>
                     <td className="py-1.5 text-right tabular-nums text-gray-600">
-                                          {s.totalMinuman > 0 ? rupiah(s.totalMinuman) : '—'}
-                                        </td>
-                                        <td className={`py-1.5 text-center ${s.lunas === false ? 'text-coral-600 font-medium' : 'text-gray-400'}`}>
-                                          {s.lunas === false ? 'belum' : '✓'}
-                                        </td>
-                                      </tr>
+                      {s.totalMinuman > 0 ? rupiah(s.totalMinuman) : '—'}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>

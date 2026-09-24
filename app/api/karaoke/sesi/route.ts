@@ -34,23 +34,16 @@ export async function GET(req: NextRequest) {
   const sp = new URL(req.url).searchParams
   const ruangId = sp.get('ruangId') ?? undefined
   const status = sp.get('status')
-  const belumLunas = sp.get('belumLunas') === '1'
 
   const sesi = await prisma.sesiKaraoke.findMany({
     where: {
       propertiId: k.properti.id,
       ...(ruangId ? { ruangId } : {}),
       ...(status === 'jalan' ? { status: { in: ['BOOKING', 'BERJALAN'] } } : {}),
-      // Panel piutang: sesi SELESAI tapi uang belum diterima.
-      ...(belumLunas ? { status: 'SELESAI', lunas: false } : {}),
     },
     orderBy: { mulaiPada: 'desc' },
     take: 100,
-    include: {
-      ruang: { select: { id: true, nama: true } },
-      // Piutang butuh rincian minuman — total tagihan = sewa + minuman - jaminan.
-      minuman: { select: { subtotal: true } },
-    },
+    include: { ruang: { select: { id: true, nama: true } } },
   })
   return NextResponse.json({ sesi })
 }

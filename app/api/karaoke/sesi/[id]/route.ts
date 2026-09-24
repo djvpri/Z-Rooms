@@ -129,9 +129,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         selesaiAktual: sekarang,
         jumlahJam: sewa.jumlahJam,
         totalSewa: sewa.total,
-        // modeBayar 'nanti' → piutang: sesi ditutup & ruang bebas, uang menyusul.
-        lunas: d.modeBayar === 'sekarang',
-        dibayarPada: d.modeBayar === 'sekarang' ? sekarang : null,
         ...(d.catatan !== undefined ? { catatan: d.catatan?.trim() || null } : {}),
       },
       include: {
@@ -152,7 +149,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // minuman — jaminan bukan diskon, cuma uang muka.
       total: sewa.total + totalMinuman,
       dibayar: Math.max(0, sewa.total + totalMinuman - Number(hasil.jaminan)),
-      lunas: hasil.lunas,
     },
   })
 }
