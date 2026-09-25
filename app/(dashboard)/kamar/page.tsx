@@ -9,6 +9,7 @@ import { namaTipe, fasilitasEfektif, hargaEfektif, depositEfektif } from '@/lib/
 import Link from 'next/link'
 import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
+import TombolCheckin from '@/components/kamar/TombolCheckin'
 import TombolJual from '@/components/kamar/TombolJual'
 import TabelKamar from '@/components/kamar/TabelKamar'
 import { PemicuJadwal } from '@/components/kamar/JadwalKamar'
@@ -259,12 +260,24 @@ export default async function KamarPage() {
               <div className="mt-2">
                 <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
               </div>
-              {sewaAktif && (
-                <CheckoutModal
-                  sewa={ringkasSewa(k, sewaAktif)}
-                  kamarTersedia={kamarTersediaUntuk(k.id)}
-                />
-              )}
+              {/* Check-in tamu yang memesan tapi belum di-check-in (tanggal masuk sudah
+                                lewat). Di atas check-out karena ini yang harus diselesaikan
+                                dulu: kamar TERISI oleh "hantu" sampai ditangani. */}
+                            {k.sewa.filter(x => x.statusSewa === 'PENDING' && new Date(x.tanggalMasuk) <= sekarang).map(x => (
+                              <div key={x.id} className="mt-2">
+                                <TombolCheckin
+                                  sewaId={x.id}
+                                  nama={x.penyewa?.nama ?? 'tanpa nama'}
+                                  kamar={k.nomor}
+                                />
+                              </div>
+                            ))}
+                            {sewaAktif && (
+                              <CheckoutModal
+                                sewa={ringkasSewa(k, sewaAktif)}
+                                kamarTersedia={kamarTersediaUntuk(k.id)}
+                              />
+                            )}
               {sewaAktif && <TombolJual sewaId={sewaAktif.id} />}
             </div>
           )
