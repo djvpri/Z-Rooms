@@ -312,12 +312,15 @@ export default async function KamarPage() {
               return {
                 id: k.id,
                 aksi: (
-                  <div className="flex items-center gap-1">
-                    <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
-                    {sewaAktif && (
-                      <div className="w-28">
-                        <CheckoutModal
-                          sewa={ringkasSewa(k, sewaAktif)}
+                                  <div className="flex items-center gap-1">
+                                    <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                                    {k.sewa.filter(x => x.statusSewa === 'PENDING' && new Date(x.tanggalMasuk) <= sekarang).map(x => (
+                                      <TombolCheckin key={x.id} sewaId={x.id} nama={x.penyewa?.nama ?? 'tanpa nama'} kamar={k.nomor} />
+                                    ))}
+                                    {sewaAktif && (
+                                      <div className="w-28">
+                                        <CheckoutModal
+                                          sewa={ringkasSewa(k, sewaAktif)}
                           kamarTersedia={kamarTersediaUntuk(k.id)}
                         />
                         <TombolJual sewaId={sewaAktif.id} />
