@@ -12,9 +12,8 @@ export default auth((req) => {
     pathname === '/api/health' ||
     pathname === '/api/admin/cross-app' ||
     pathname.startsWith('/api/demo') ||
-    pathname === '/auth/qr-approve' || 
-        pathname === '/sso' ||
-        pathname === '/api/debug-sewa'
+    pathname === '/auth/qr-approve' ||
+    pathname === '/sso'
   ) {
     return NextResponse.next()
   }
