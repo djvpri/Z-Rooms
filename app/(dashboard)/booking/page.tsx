@@ -509,7 +509,8 @@ export default function BookingPage() {
       barisDuaKolom('Bayar', nota.bayarSekarang ? metodeBayarLabel(nota.metodeBayar) : 'Bayar saat check-out', kertas),
       ...(nota.catatan ? [garisKertas(kertas), barisDuaKolom('Catatan', nota.catatan, kertas)] : []),
       garisKertas(kertas),
-      barisTengah(propertiNota?.teksNota || 'Powered by ZXRoom', kertas),
+      barisTengah(propertiNota?.teksNota || 'Terima kasih.', kertas),
+      barisTengah('Powered by ZXRoom', kertas),
     ]
     setMenungguCetak(true)
     setPesanCetakNota('')
@@ -1157,10 +1158,11 @@ export default function BookingPage() {
 
               <div className="border-t border-dashed border-gray-300 my-3" />
               <div className="text-center text-xs text-gray-500 whitespace-pre-line">
-                {propertiNota?.teksNota
-                  ? propertiNota.teksNota
-                  : <p>Powered by ZXRoom</p>}
-              </div>
+                              {propertiNota?.teksNota || 'Terima kasih.'}
+                            </div>
+                            <div className="text-center text-[10px] text-gray-400">
+                              Powered by ZXRoom
+                            </div>
             </div>
 
             <div className="flex gap-3 px-6 pb-5">
