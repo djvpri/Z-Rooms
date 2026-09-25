@@ -491,7 +491,7 @@ export default function BookingPage() {
         : []),
       ...(propertiNota?.noHp ? [barisTengah(`HP ${propertiNota.noHp}`, kertas)] : []),
       garisKertas(kertas),
-      barisTengah('NOTA BOOKING SEWA', kertas),
+      barisTengah('NOTA BOOKING KAMAR', kertas),
       garisKertas(kertas),
       barisDuaKolom('Tanggal', new Date(nota.tanggalCetak).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), kertas),
       garisKertas(kertas),
@@ -1073,7 +1073,7 @@ export default function BookingPage() {
                 <div className="border-t border-dashed border-gray-300 my-3" />
               </div>
 
-              <div className="text-center text-xs font-medium text-gray-600 mb-3">NOTA BOOKING SEWA</div>
+              <div className="text-center text-xs font-medium text-gray-600 mb-3">NOTA BOOKING KAMAR</div>
 
               <div className="space-y-1 text-xs mb-3">
                 <div className="flex justify-between">
