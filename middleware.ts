@@ -31,7 +31,14 @@ export default auth((req) => {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
   
-  return NextResponse.next()
+  const res = NextResponse.next()
+  // Halaman di bawah /dashboard menampilkan data real-time (booking lewat
+  // check-in, sesi karaoke). WebView APK kadang menyajikan dokumen basi
+  // sehingga kartu selesai muncul lagi. Header eksplisit no-store.
+  if (pathname.startsWith('/dashboard')) {
+    res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+  }
+  return res
 })
 
 export const config = {
