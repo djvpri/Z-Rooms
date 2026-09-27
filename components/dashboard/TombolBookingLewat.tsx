@@ -88,7 +88,21 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
   }
 
   if (selesai) {
-    return <p className="text-[10px] font-medium text-teal-600">Selesai ✓</p>
+    // Hapus kartu dari DOM secara fisik. "Selesai ✓" pun tak cukup —
+    // WebView APK menyajikan ulang dokumen basi sehingga kartu muncul lagi
+    // setelah 30 dtk auto-refresh.
+    return (
+      <span className="text-[10px] font-medium text-teal-600"
+        ref={(el) => {
+          if (!el) return
+          // Naik ke kartu induk (Link dengan class kartu).
+          const kartu = el.closest('a')
+          if (kartu && kartu.parentElement) kartu.remove()
+        }}
+      >
+        Selesai ✓
+      </span>
+    )
   }
 
   return (
