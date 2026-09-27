@@ -4,36 +4,42 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { catat } from '@/lib/logError'
 
-/**
- * Tombol check-in / batalkan booking yang LEWAT waktu. Dipakai di kartu
- * dasbor supaya kasir tak perlu pindah ke /booking dulu.
+/** Tombol check-in / batalkan booking yang LEWAT waktu.
  *
- * DULU kartu ini cuma `<Link href="/booking">` — petunjuknya ada
- * ("perlu check-in / batal") tapi aksinya butuh 2 langkah, jadi booking
- * hantu tertahan berhari-hari.
- *
- * Setelah aksi sukses, tombol disembunyikan & kartu ditandai "selesai"
- * secara optimistik — kalau `router.refresh()` lambat/diam di WebView APK,
- * kasir tak sempat klik kedua kali (yang akan kena 409 karena sewa sudah
- * bukan PENDING lagi).
+ * Kenapa pakai sessionStorage: WebView APK menyajikan ulang kartu "tak
+ * check-in" walau query server mengembalikan 0 PENDING, dan storage ini
+ * bertahan walau dokumennya basi. Sewa yang sudah ditangani tak perlu
+ * ditawari tombol lagi — klik kedua selalu berujung 409.
  */
+
+const KUNCI = 'zxroom.booking-selesai'
+
+function sudahDitangani(sewaId: string): boolean {
+  if (typeof sessionStorage === 'undefined') return false
+  try { return (sessionStorage.getItem(KUNCI) ?? '').split(',').includes(sewaId) } catch { return false }
+}
+
+function tandaiSelesai(sewaId: string) {
+  try {
+    const lama = (sessionStorage.getItem(KUNCI) ?? '').split(',').filter(Boolean)
+    if (!lama.includes(sewaId)) lama.push(sewaId)
+    sessionStorage.setItem(KUNCI, lama.slice(-100).join(','))
+  } catch { /* abaikan */ }
+}
+
 export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: string }) {
   const [jalan, setJalan] = useState<'checkin' | 'batal' | null>(null)
   const [pesan, setPesan] = useState<string | null>(null)
-  const [selesai, setSelesai] = useState(false)
+  const [selesai, setSelesai] = useState(() => sudahDitangani(sewaId))
   const router = useRouter()
 
   async function aksi(jenis: 'checkin' | 'batal', e: React.MouseEvent) {
-    e.preventDefault() // kartunya <Link>; jangan ikut navigasi
+    e.preventDefault()
     e.stopPropagation()
     setJalan(jenis)
     setPesan(null)
     const url = `/api/booking/${sewaId}/${jenis}`
     const mulai = Date.now()
-    // ── Instrumentasi ──
-    // Keluhan "tombol check-in/batal tak berguna" tak bisa dibuktikan tanpa
-    // jejak ini: sewaId, status HTTP, durasi, dan body respons ikut tercatat
-    // sehingga terbaca apakah request sampai server, atau gagal sebelum itu.
     catat('INFO', `tombol booking: ${jenis} diklik`, `sewaId=${sewaId} url=${url}`)
     try {
       const res = await fetch(url, { method: 'POST' })
@@ -43,44 +49,25 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
       catat(
         res.ok ? 'INFO' : 'ERROR',
         `${jenis} -> HTTP ${res.status} (${Date.now() - mulai} ms)`,
-        // Body mentah ikut: server kadang balas HTML error page, bukan JSON.
         `body=${teksMentah.slice(0, 300)}`,
       )
       if (!res.ok) {
-        // 409 = sewa sudah bukan PENDING (sudah di-check-in/dibatalkan sebelumnya).
-        // Bukan error — kartunya basi. Anggap selesai & refresh.
-        if (res.status === 409) {
-          catat('WARN', `${jenis} 409 — sewa sudah ditangani sebelumnya`, `sewaId=${sewaId}`)
+        // 409: sewa pernah di-check-in — kartunya basi.
+        // 404: kartu benar-benar usang.
+        if (res.status === 409 || res.status === 404) {
+          catat('WARN', `${jenis} ${res.status} — kartu basi`, `sewaId=${sewaId}`)
           setSelesai(true)
-          router.refresh()
+          tandaiSelesai(sewaId)
           return
         }
         throw new Error((data as { error?: string } | null)?.error ?? 'Gagal.')
       }
-      // Sembunyikan tombol langsung — tak tunggu server refresh.
       setSelesai(true)
-      // Refresh server component supaya kartu hilang dari daftar.
-      // Fallback window.location.reload kalau router.refresh tak mengubah DOM
-      // (terjadi di WebView APK yang kadang tak re-render).
+      tandaiSelesai(sewaId)
       router.refresh()
-      // WebView APK memegang cache dokumen: reload biasa bisa menyajikan HTML
-      // basi (kartu "tak check-in" muncul lagi meski server sudah tak
-      // mengirimnya). URL unik memaksa ambil dokumen baru dari server.
-      setTimeout(() => {
-        if (document.hidden) return
-        const u = new URL(window.location.href)
-        u.searchParams.set('_r', String(Date.now()))
-        window.location.replace(u.toString())
-      }, 1200)
     } catch (e) {
-      // TypeError dari fetch = request tak pernah sampai server (koneksi
-      // putus, APK offline, mixed-content diblokir WebView). Ini pola "tombol
-      // tak berguna" yang paling sering.
-      catat(
-        'ERROR',
-        `${jenis} GAGAL sebelum dapat respons: ${(e as Error).message}`,
-        `sewaId=${sewaId} url=${url} durasi=${Date.now() - mulai}ms online=${navigator.onLine}`,
-      )
+      catat('ERROR', `${jenis} GAGAL: ${(e as Error).message}`,
+        `sewaId=${sewaId} url=${url} durasi=${Date.now() - mulai}ms online=${navigator.onLine}`)
       setPesan((e as Error).message)
     } finally {
       setJalan(null)
@@ -88,18 +75,13 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
   }
 
   if (selesai) {
-    // Hapus kartu dari DOM secara fisik. "Selesai ✓" pun tak cukup —
-    // WebView APK menyajikan ulang dokumen basi sehingga kartu muncul lagi
-    // setelah 30 dtk auto-refresh.
     return (
-      <span className="text-[10px] font-medium text-teal-600"
-        ref={(el) => {
-          if (!el) return
-          // Naik ke kartu induk (Link dengan class kartu).
-          const kartu = el.closest('a')
-          if (kartu && kartu.parentElement) kartu.remove()
-        }}
-      >
+      <span className="text-[10px] font-medium text-teal-600" ref={(el) => {
+        if (!el) return
+        // Kartunya basi di layar; buang node-nya.
+        const kartu = el.closest('a')
+        if (kartu && kartu.parentElement) kartu.remove()
+      }}>
         Selesai ✓
       </span>
     )
