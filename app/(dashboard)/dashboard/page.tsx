@@ -11,6 +11,7 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
 import DemoBanner from '@/components/demo/DemoBanner'
 import { TombolBookingLewat } from '@/components/dashboard/TombolBookingLewat'
+import { AutoRefresh } from '@/components/dashboard/AutoRefresh'
 import {
   DoorClosedFill, PersonCheckFill, CashCoin, Receipt, Speedometer2,
   KeyFill, ClockFill, WrenchAdjustable, DoorOpen, GraphUpArrow, GraphDownArrow,
@@ -216,6 +217,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
+          {/* WebView APK kadang menyajikan dokumen basi sehingga kartu selesai
+              muncul lagi. Navigasi penuh tiap 30 dtk menjaga data tetap nyata. */}
+          <AutoRefresh detik={30} />
           {properti.isDemo && <DemoBanner />}
 
           {/* ── Segera berakhir: karaoke (rencana selesai) & kamar (jam checkout).
