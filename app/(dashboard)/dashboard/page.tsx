@@ -11,6 +11,7 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
 import DemoBanner from '@/components/demo/DemoBanner'
 import { TombolBookingLewat } from '@/components/dashboard/TombolBookingLewat'
+import { BersihkanPanel } from '@/components/dashboard/BersihkanPanel'
 import { AutoRefresh } from '@/components/dashboard/AutoRefresh'
 import {
   DoorClosedFill, PersonCheckFill, CashCoin, Receipt, Speedometer2,
@@ -234,6 +235,7 @@ export default async function DashboardPage() {
                 <span className="badge bg-amber-50 text-amber-700">{mendesak.length}</span>
               </h2>
               <div className="space-y-2">
+                <BersihkanPanel />
                 {mendesak.map((m) => (
                   <Link
                     key={`${m.jenis}-${m.judul}-${m.batasMs}`}
