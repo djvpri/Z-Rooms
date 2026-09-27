@@ -140,30 +140,12 @@ export default function KaraokePage() {
   const [tanyaLanjut, setTanyaLanjut] = useState<Sesi | null>(null)
   const [sudahDitanya, setSudahDitanya] = useState<Set<string>>(new Set())
 
-  /** Bunyi peringatan: Web Audio (sinetron 3 nada) + getar kalau didukung. */
+  /** Bunyi peringatan: getar kalau didukung. Suara dimatikan atas permintaan. */
   const bunyiAlarm = useCallback(() => {
     try {
-      const AudioCtx =
-        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (AudioCtx) {
-        const ctx = new AudioCtx()
-        for (const [i, freq] of [880, 660, 880].entries()) {
-          const os = ctx.createOscillator()
-          const gain = ctx.createGain()
-          os.frequency.value = freq
-          os.type = 'sine'
-          gain.gain.value = 0.2
-          os.connect(gain)
-          gain.connect(ctx.destination)
-          const mulai = ctx.currentTime + i * 0.35
-          os.start(mulai)
-          os.stop(mulai + 0.3)
-        }
-        setTimeout(() => void ctx.close(), 1600)
-      }
       navigator.vibrate?.([200, 100, 200])
     } catch {
-      // Audio diblokir kebijakan autoplay peramban — layar sudah cukup.
+      // Getar diblokir/tak didukung — layar sudah cukup.
     }
   }, [])
 
