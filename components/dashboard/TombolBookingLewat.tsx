@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { catat } from '@/lib/logError'
+import { ModalBatal } from '@/components/ModalBatal'
 
 /** Tombol check-in / batalkan booking yang LEWAT waktu.
  *
@@ -27,22 +28,25 @@ function tandaiSelesai(sewaId: string) {
   } catch { /* abaikan */ }
 }
 
-export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: string }) {
+export function TombolBookingLewat({ sewaId, nama, butuhPin }: { sewaId: string; nama: string; butuhPin?: boolean }) {
   const [jalan, setJalan] = useState<'checkin' | 'batal' | null>(null)
   const [pesan, setPesan] = useState<string | null>(null)
   const [selesai, setSelesai] = useState(() => sudahDitangani(sewaId))
+  const [modalBatal, setModalBatal] = useState(false)
   const router = useRouter()
 
-  async function aksi(jenis: 'checkin' | 'batal', e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
+  async function aksi(jenis: 'checkin' | 'batal', isi?: { alasan?: string; pin?: string }) {
     setJalan(jenis)
     setPesan(null)
     const url = `/api/booking/${sewaId}/${jenis}`
     const mulai = Date.now()
     catat('INFO', `tombol booking: ${jenis} diklik`, `sewaId=${sewaId} url=${url}`)
     try {
-      const res = await fetch(url, { method: 'POST' })
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isi?.alasan || isi?.pin ? { alasan: isi?.alasan, pin: isi?.pin } : undefined),
+      })
       const teksMentah = await res.text().catch(() => '')
       let data: unknown = null
       try { data = JSON.parse(teksMentah) } catch { data = null }
@@ -91,14 +95,14 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-1">
         <button
-          onClick={(e) => void aksi('checkin', e)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void aksi('checkin') }}
           disabled={jalan !== null}
           className="rounded border border-teal-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
         >
           {jalan === 'checkin' ? 'Memproses…' : 'Check-in'}
         </button>
         <button
-          onClick={(e) => void aksi('batal', e)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModalBatal(true) }}
           disabled={jalan !== null}
           className="rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-coral-600 hover:bg-coral-50 disabled:opacity-50"
         >
@@ -106,6 +110,14 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
         </button>
       </div>
       {pesan ? <p className="text-[10px] text-coral-600">{pesan}</p> : null}
+      {modalBatal && (
+        <ModalBatal
+          judul={` Kamar ${nama}`}
+          butuhPin={!!butuhPin}
+          tutup={() => setModalBatal(false)}
+          batal={(isi) => aksi('batal', isi)}
+        />
+      )}
     </div>
   )
 }

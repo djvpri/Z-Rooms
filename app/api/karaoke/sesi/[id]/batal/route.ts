@@ -14,13 +14,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { cekPinBatal, catatAktivitas } from '@/lib/pinBatal'
 
 async function konteks() {
   const session = await auth()
   if (!session?.user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   const properti = await propertiAktif(session.user.id as string)
   if (!properti) return { error: NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 }) }
-  return { properti }
+  return { session, properti }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,11 +30,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params
   const body = await req.json().catch(() => null)
-  const alasan = typeof body?.catatan === 'string' ? body.catatan.trim().slice(0, 200) : ''
+
+  // PIN & alasan wajib (kalau PIN sudah diatur di Pengaturan).
+  const validasi = await cekPinBatal({ id: k.properti.id, pinBatal: k.properti.pinBatal }, body)
+  if (!validasi.ok) return validasi.res
 
   const sesi = await prisma.sesiKaraoke.findFirst({
     where: { id, propertiId: k.properti.id },
-    include: { minuman: true },
+    include: { minuman: true, ruang: { select: { nama: true } } },
   })
   if (!sesi) return NextResponse.json({ error: { message: 'Sesi tidak ditemukan.' } }, { status: 404 })
   if (sesi.status === 'BATAL') return NextResponse.json({ error: { message: 'Sesi sudah dibatalkan.' } }, { status: 409 })
@@ -60,9 +64,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: { id },
       data: {
         status: 'BATAL',
-        catatan: alasan ? `DIBATALKAN: ${alasan}` : 'DIBATALKAN',
+        catatan: `DIBATALKAN: ${validasi.alasan}`,
       },
     })
+  })
+
+  await catatAktivitas({
+    propertiId: k.properti.id,
+    userId: k.session.user?.id as string | undefined,
+    userEmail: k.session.user?.email ?? null,
+    aksi: 'BATAL_KARAOKE',
+    referensiId: sesi.id,
+    alasan: validasi.alasan,
+    detail: `Sesi ${sesi.nomor}${sesi.ruang?.nama ? ` · ${sesi.ruang.nama}` : ''}`,
   })
 
   return NextResponse.json({

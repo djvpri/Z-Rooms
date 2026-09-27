@@ -262,7 +262,7 @@ export default async function DashboardPage() {
                                         {/* Booking lewat: tombol aksi LANGSUNG di kartu. DULU cuma teks
                                             'perlu check-in / batal' — kasir harus buka /booking dulu. */}
                                         {m.aksiBooking && m.sewaId ? (
-                                          <TombolBookingLewat sewaId={m.sewaId} nama={m.namaPenyewa ?? ''} />
+                                          <TombolBookingLewat sewaId={m.sewaId} nama={m.namaPenyewa ?? ''} butuhPin={!!properti.pinBatal} />
                                         ) : (
                                           <p className="text-[10px] text-gray-400">
                                           {m.lewat

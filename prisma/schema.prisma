@@ -108,6 +108,13 @@ model Properti {
   // yang sama. NULL = belum diatur -> lib/cetak.ts memakai bawaan.
   prefCetak String?
 
+  // PIN (4-8 digit) untuk mengesahkan PEMBATALAN — karaoke & booking kamar.
+  // Hash bcrypt, bukan teks: PIN dipakai staf bergantian di satu tablet, dan
+  // pakai federasi ke OAuth jadi Users dari Z Boys. Migrasi Google/Facebook
+  // tak bisa dipakai buat autentikasi lokal.
+  // NULL = belum diatur -> tombol batal tak menanyakan PIN.
+  pinBatal String?
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -648,4 +655,20 @@ enum StatusJual {
   LUNAS
   BELUM_BAYAR   // hanya dipakai kalau sewaId diisi (titipan kamar)
   BATAL
+}
+
+model LogAktivitas {
+  id          String   @id @default(cuid())
+  propertiId  String
+  // Siapa yang melakukan — email staf. Bisa kosong kalau aksi lewat
+  // jembatan APK tanpa session penuh (kasus langka).
+  userId      String?
+  userEmail   String?
+  aksi        String   // "BATAL_KARAOKE", "BATAL_BOOKING"
+  referensiId String?  // sesiKaraokeId / sewaId
+  alasan      String   // wajib diisi staf
+  detail      String?  // tambahan (nomor sesi, nomor kamar, dll)
+  wktPada     DateTime @default(now())
+
+  @@index([propertiId, wktPada])
 }

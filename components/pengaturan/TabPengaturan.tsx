@@ -11,6 +11,7 @@ const TAB = [
   { href: '/pengaturan/produk', label: 'Produk' },
   { href: '/pengaturan/karaoke', label: 'Karaoke' },
   { href: '/pengaturan/cetak', label: 'Cetak' },
+  { href: '/pengaturan/log-aktivitas', label: 'Log' },
   { href: '/lisensi', label: 'Lisensi' },
 ] as const
 

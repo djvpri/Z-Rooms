@@ -5,6 +5,7 @@ import { jamKeMenit } from '@/lib/checkout'
 import TabPengaturan from '@/components/pengaturan/TabPengaturan'
 import FormPengaturan from './FormPengaturan'
 import KirimLogError from '@/components/pengaturan/KirimLogError'
+import { FormPinBatal } from '@/components/pengaturan/FormPinBatal'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,8 @@ export default async function PengaturanPage() {
       <TabPengaturan aktif="/pengaturan" />
 
       <FormPengaturan jam={`${jj}:${mm}`} toleransi={aturan.toleransiCheckout} />
+
+      <FormPinBatal adaPin={!!properti.pinBatal} />
 
       <div className="mt-4 space-y-4">
         {/* Versi = hash yang di-build, sama dengan yang dilaporkan /api/health.
