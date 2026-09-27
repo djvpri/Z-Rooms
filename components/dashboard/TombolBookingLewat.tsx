@@ -46,7 +46,15 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
       // Fallback window.location.reload kalau router.refresh tak mengubah DOM
       // (terjadi di WebView APK yang kadang tak re-render).
       router.refresh()
-      setTimeout(() => { if (!document.hidden) window.location.reload() }, 1500)
+      // WebView APK memegang cache dokumen: reload biasa bisa menyajikan HTML
+      // basi (kartu "tak check-in" muncul lagi meski server sudah tak
+      // mengirimnya). URL unik memaksa ambil dokumen baru dari server.
+      setTimeout(() => {
+        if (document.hidden) return
+        const u = new URL(window.location.href)
+        u.searchParams.set('_r', String(Date.now()))
+        window.location.replace(u.toString())
+      }, 1200)
     } catch (e) {
       setPesan((e as Error).message)
     } finally {
