@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { catat } from '@/lib/logError'
 
 /**
  * Tombol check-in / batalkan booking yang LEWAT waktu. Dipakai di kartu
@@ -27,18 +28,34 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
     e.stopPropagation()
     setJalan(jenis)
     setPesan(null)
+    const url = `/api/booking/${sewaId}/${jenis}`
+    const mulai = Date.now()
+    // ── Instrumentasi ──
+    // Keluhan "tombol check-in/batal tak berguna" tak bisa dibuktikan tanpa
+    // jejak ini: sewaId, status HTTP, durasi, dan body respons ikut tercatat
+    // sehingga terbaca apakah request sampai server, atau gagal sebelum itu.
+    catat('INFO', `tombol booking: ${jenis} diklik`, `sewaId=${sewaId} url=${url}`)
     try {
-      const res = await fetch(`/api/booking/${sewaId}/${jenis}`, { method: 'POST' })
-      const data = await res.json().catch(() => null)
+      const res = await fetch(url, { method: 'POST' })
+      const teksMentah = await res.text().catch(() => '')
+      let data: unknown = null
+      try { data = JSON.parse(teksMentah) } catch { data = null }
+      catat(
+        res.ok ? 'INFO' : 'ERROR',
+        `${jenis} -> HTTP ${res.status} (${Date.now() - mulai} ms)`,
+        // Body mentah ikut: server kadang balas HTML error page, bukan JSON.
+        `body=${teksMentah.slice(0, 300)}`,
+      )
       if (!res.ok) {
         // 409 = sewa sudah bukan PENDING (sudah di-check-in/dibatalkan sebelumnya).
         // Bukan error — kartunya basi. Anggap selesai & refresh.
         if (res.status === 409) {
+          catat('WARN', `${jenis} 409 — sewa sudah ditangani sebelumnya`, `sewaId=${sewaId}`)
           setSelesai(true)
           router.refresh()
           return
         }
-        throw new Error(data?.error ?? 'Gagal.')
+        throw new Error((data as { error?: string } | null)?.error ?? 'Gagal.')
       }
       // Sembunyikan tombol langsung — tak tunggu server refresh.
       setSelesai(true)
@@ -56,6 +73,14 @@ export function TombolBookingLewat({ sewaId, nama }: { sewaId: string; nama: str
         window.location.replace(u.toString())
       }, 1200)
     } catch (e) {
+      // TypeError dari fetch = request tak pernah sampai server (koneksi
+      // putus, APK offline, mixed-content diblokir WebView). Ini pola "tombol
+      // tak berguna" yang paling sering.
+      catat(
+        'ERROR',
+        `${jenis} GAGAL sebelum dapat respons: ${(e as Error).message}`,
+        `sewaId=${sewaId} url=${url} durasi=${Date.now() - mulai}ms online=${navigator.onLine}`,
+      )
       setPesan((e as Error).message)
     } finally {
       setJalan(null)
