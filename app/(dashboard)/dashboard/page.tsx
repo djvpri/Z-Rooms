@@ -10,6 +10,7 @@ import { batasCheckout } from '@/lib/checkout'
 import { startOfMonth, endOfMonth } from 'date-fns'
 import Link from 'next/link'
 import DemoBanner from '@/components/demo/DemoBanner'
+import { TombolBookingLewat } from '@/components/dashboard/TombolBookingLewat'
 import {
   DoorClosedFill, PersonCheckFill, CashCoin, Receipt, Speedometer2,
   KeyFill, ClockFill, WrenchAdjustable, DoorOpen, GraphUpArrow, GraphDownArrow,
@@ -141,6 +142,9 @@ export default async function DashboardPage() {
     menit: number
     lewat: boolean
     href: string
+    sewaId?: string
+    aksiBooking?: boolean
+    namaPenyewa?: string
   }[] = [
     ...sesiKaraoke.map((s) => {
       const ms = new Date(s.rencanaSelesai).getTime()
@@ -178,6 +182,9 @@ export default async function DashboardPage() {
             menit,
             lewat: true,
             href: '/booking',
+            sewaId: s.id,
+            aksiBooking: true,
+            namaPenyewa: namaPenyewa(s.penyewa?.nama),
           }
         }),
       ].sort((a, b) => a.batasMs - b.batasMs)
@@ -246,11 +253,17 @@ export default async function DashboardPage() {
                                               : `lewat ${Math.abs(m.menit)} mnt`
                                             : `${m.menit} mnt lagi`}
                                         </p>
-                                        <p className="text-[10px] text-gray-400">
-                                          {m.href === '/booking' ? 'perlu check-in / batal' : m.lewat
+                                        {/* Booking lewat: tombol aksi LANGSUNG di kartu. DULU cuma teks
+                                            'perlu check-in / batal' — kasir harus buka /booking dulu. */}
+                                        {m.aksiBooking && m.sewaId ? (
+                                          <TombolBookingLewat sewaId={m.sewaId} nama={m.namaPenyewa ?? ''} />
+                                        ) : (
+                                          <p className="text-[10px] text-gray-400">
+                                          {m.lewat
                                             ? 'sudah habis'
                                             : new Date(m.batasMs).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
+                                          </p>
+                                        )}
                     </div>
                   </Link>
                 ))}
