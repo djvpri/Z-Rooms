@@ -15,7 +15,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const SQL = `
+const SQL_FN = `
 CREATE OR REPLACE FUNCTION fn_audit_sewa() RETURNS trigger AS $$
 BEGIN
   INSERT INTO "AuditSewa" ("id", "sewaId", "aksi", "statusLama", "statusBaru", "kamarNomor", "pengguna", "wktPada")
@@ -32,16 +32,20 @@ BEGIN
   RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_audit_sewa ON "Sewa";
-CREATE TRIGGER trg_audit_sewa
-AFTER INSERT OR UPDATE OR DELETE ON "Sewa"
-FOR EACH ROW EXECUTE FUNCTION fn_audit_sewa();
 `
+
+const SQL_DROP = `DROP TRIGGER IF EXISTS trg_audit_sewa ON "Sewa";`
+
+const SQL_CREATE = `CREATE TRIGGER trg_audit_sewa
+AFTER INSERT OR UPDATE OR DELETE ON "Sewa"
+FOR EACH ROW EXECUTE FUNCTION fn_audit_sewa();`
 
 async function main() {
   try {
-    await prisma.$executeRawUnsafe(SQL)
+    // $executeRawUnsafe = prepared statement: satu perintah per panggilan.
+    await prisma.$executeRawUnsafe(SQL_FN)
+    await prisma.$executeRawUnsafe(SQL_DROP)
+    await prisma.$executeRawUnsafe(SQL_CREATE)
     console.log('✓ Trigger audit Sewa terpasang (AuditSewa)')
   } catch (e) {
     console.error('⚠ Trigger audit Sewa GAGAL dipasang:', e.message)
