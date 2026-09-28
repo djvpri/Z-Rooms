@@ -64,7 +64,7 @@ export async function catatAktivitas(d: {
   propertiId: string
   userId?: string | null
   userEmail?: string | null
-  aksi: 'BATAL_KARAOKE' | 'BATAL_BOOKING'
+  aksi: 'BATAL_KARAOKE' | 'BATAL_BOOKING' | 'CHECKIN_BOOKING' | 'BOOKING_BARU'
   referensiId: string
   alasan: string
   detail?: string
@@ -82,6 +82,6 @@ export async function catatAktivitas(d: {
       },
     })
   } catch {
-    // Log gagal jangan sampai membatalkan pembatalan.
+    // Log gagal jangan sampai membatalkan aksi utama.
   }
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
+import { catatAktivitas } from '@/lib/pinBatal'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -41,6 +42,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       data: { statusSewa: 'AKTIF', tanggalMasuk: sekarang },
       include: { kamar: { select: { nomor: true } }, penyewa: { select: { nama: true } } },
     })
+  })
+
+  await catatAktivitas({
+    propertiId: properti.id,
+    userId: session.user.id as string,
+    userEmail: session.user.email ?? null,
+    aksi: 'CHECKIN_BOOKING',
+    referensiId: hasil.id,
+    alasan: 'Check-in tamu booking',
+    detail: `Kamar ${hasil.kamar.nomor} · ${hasil.penyewa?.nama ?? 'tanpa nama'} · masuk ${sekarang.toISOString()} · sebelumnya PENDING dari ${sewa.tanggalMasuk.toISOString()}`,
   })
 
   return NextResponse.json({

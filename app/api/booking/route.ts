@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { addDays } from 'date-fns'
 import { tanggalKeluar } from '@/lib/sewa'
 import { bolehDipesan, statusUntuk } from '@/lib/jadwalKamar'
+import { catatAktivitas } from '@/lib/pinBatal'
 
 const bookingSchema = z.object({
   // Penyewa — nama & noHp opsional (penyewa boleh dicatat dulu tanpa data
@@ -219,6 +220,22 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[booking] transaction error:', err)
     return NextResponse.json({ error: err?.message ?? 'Terjadi kesalahan server' }, { status: 500 })
+  }
+
+  // Catat ke LogAktivitas — untuk melacak siapa/kapan booking dibuat.
+  // Tanpa ini, mustahil tahu kenapa PENDING muncul tiba-tiba.
+  try {
+    await catatAktivitas({
+      propertiId: kamar.propertiId,
+      userId: session.user.id as string,
+      userEmail: session.user.email ?? null,
+      aksi: 'BOOKING_BARU',
+      referensiId: result.sewa.id,
+      alasan: 'Booking baru dibuat',
+      detail: `Kamar ${kamar.nomor} · ${nama ?? 'tanpa nama'} · masuk ${result.masuk} · status ${result.sewa.statusSewa}`,
+    })
+  } catch {
+    // Log gagal jangan ganggu respons sukses.
   }
 
   return NextResponse.json(result, { status: 201 })
