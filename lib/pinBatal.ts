@@ -81,7 +81,8 @@ export async function catatAktivitas(d: {
         detail: d.detail?.slice(0, 300) ?? null,
       },
     })
-  } catch {
-    // Log gagal jangan sampai membatalkan aksi utama.
+  } catch (e) {
+    // JANGAN diamkan: dari sinilah kita tahu kenapa aksi tak tercatat.
+    console.error('[catatAktivitas] GAGAL:', d.aksi, d.referensiId, e)
   }
 }
