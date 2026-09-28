@@ -6,7 +6,8 @@ import { formatRupiah, namaPenyewa } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns'
 import { piutangBarang } from '@/lib/piutang'
 import TagihanTable from './TagihanTable'
-import { FilterPeriode, defaultRentang } from '@/components/keuangan/FilterPeriode'
+import { FilterPeriode } from '@/components/keuangan/FilterPeriode'
+import { defaultRentang } from '@/lib/rentang'
 
 export const dynamic = 'force-dynamic'
 

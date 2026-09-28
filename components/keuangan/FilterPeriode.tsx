@@ -2,8 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { rentangCepat } from '@/lib/rentang'
 
-/** Rentang cepat. Nilai = jumlah hari ke belakang; 'bulan' & 'lalu' khusus. */
 const CEPAT = [
   { kode: 'hari', label: 'Hari ini' },
   { kode: '7', label: '7 hari' },
@@ -11,41 +11,6 @@ const CEPAT = [
   { kode: 'bulan', label: 'Bulan ini' },
   { kode: 'lalu', label: 'Bulan lalu' },
 ] as const
-
-/** Tanggal YYYY-MM-DD di zona WIB (bukan UTC — jam 23:00 WIB = 16:00 UTC
- *  hari yang sama, dan WIB-lah yang dipakai kasir membaca "hari ini"). */
-function hariIniWib(): string {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
-}
-
-function rentangCepat(kode: string): { dari: string; sampai: string } | null {
-  const s = new Date(Date.now() + 7 * 3600_000)
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
-  switch (kode) {
-    case 'hari': {
-      const h = iso(s)
-      return { dari: h, sampai: h }
-    }
-    case '7':
-    case '30': {
-      const n = Number(kode)
-      const awal = new Date(s)
-      awal.setUTCDate(awal.getUTCDate() - (n - 1))
-      return { dari: iso(awal), sampai: iso(s) }
-    }
-    case 'bulan': {
-      const awal = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1))
-      return { dari: iso(awal), sampai: iso(s) }
-    }
-    case 'lalu': {
-      const awal = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth() - 1, 1))
-      const akhir = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 0))
-      return { dari: iso(awal), sampai: iso(akhir) }
-    }
-    default:
-      return null
-  }
-}
 
 export function FilterPeriode({ dari, sampai }: { dari: string; sampai: string }) {
   const router = useRouter()
@@ -117,9 +82,4 @@ export function FilterPeriode({ dari, sampai }: { dari: string; sampai: string }
       </span>
     </div>
   )
-}
-
-/** Default rentang: bulan berjalan (WIB). */
-export function defaultRentang(): { dari: string; sampai: string } {
-  return rentangCepat('bulan') ?? { dari: hariIniWib(), sampai: hariIniWib() }
 }
