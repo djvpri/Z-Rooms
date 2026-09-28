@@ -14,7 +14,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// pemanggil뢇$ueryRawUnsafe = prepared statement: SATU perintah per panggilan.
+// $executeRawUnsafe = prepared statement: SATU perintah per panggilan.
 const SQL_FN = `
 CREATE OR REPLACE FUNCTION fn_audit_sewa() RETURNS trigger AS $$
 BEGIN
@@ -54,11 +54,12 @@ async function main() {
     )
     console.log('· trigger di DB:', JSON.stringify(ada))
 
-    // Uji tembak: satu UPDATE harus melahirkan satu baris AuditSewa.
+    // Uji tembak: UPDATE field nyata harus melahirkan satu baris AuditSewa.
+    // data:{} kosong = Prisma skip UPDATE = trigger tak jalan (false negative).
     const s = await prisma.sewa.findFirst({ where: { statusSewa: 'AKTIF' }, select: { id: true } })
     if (s) {
       const sebelum = await prisma.auditSewa.count()
-      await prisma.sewa.update({ where: { id: s.id }, data: {} })
+      await prisma.sewa.update({ where: { id: s.id }, data: { catatan: 'audit-self-test' } })
       const sesudah = await prisma.auditSewa.count()
       console.log(`· uji: ${sebelum} -> ${sesudah} baris ${sesudah > sebelum ? 'OK' : 'GAGAL'}`)
     }
