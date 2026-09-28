@@ -191,19 +191,41 @@ export default async function DashboardPage() {
         }),
       ].sort((a, b) => a.batasMs - b.batasMs)
 
-  // ── DEBUG: catat isi panel ke log server ──
+  // ── Catat ke DB: counter harian panel "Segera berakhir" ──
+  const hariIni = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  try {
+    await prisma.panelHarian.upsert({
+      where: { propertiId_tanggal: { propertiId: properti.id, tanggal: hariIni } },
+      create: {
+        propertiId: properti.id, tanggal: hariIni,
+        jumlahRender: 1,
+        terakhirIsi: mendesak.length,
+        maksBookingLewat: bookingLewat.length,
+        pertamaIsi: mendesak.length > 0 ? now : null,
+      },
+      update: {
+        jumlahRender: { increment: 1 },
+        terakhirIsi: mendesak.length,
+        maksBookingLewat: bookingLewat.length,
+        terakhirUpdate: now,
+      },
+    })
+    // pertamaIsi hanya diisi sekali: saat panel pertama kali berisi hari itu.
+    if (mendesak.length > 0) {
+      await prisma.panelHarian.updateMany({
+        where: { propertiId: properti.id, tanggal: hariIni, pertamaIsi: null },
+        data: { pertamaIsi: now },
+      })
+    }
+  } catch {
+    // Tabel belum ada (db push belum jalan) — lewati, jangan crash dashboard.
+  }
+
   console.log('[DASHBOARD-DEBUG]', JSON.stringify({
     waktu: now.toISOString(),
     properti: properti.nama,
-    propertiId: properti.id,
-    jamCheckout: properti.jamCheckout,
-    toleransiCheckout: properti.toleransiCheckout,
     mendesakJumlah: mendesak.length,
-    mendesak: mendesak.map(m => ({ jenis: m.jenis, judul: m.judul, sub: m.sub, menit: m.menit, lewat: m.lewat, href: m.href })),
-    sesiKaraokeJumlah: sesiKaraoke.length,
-    sewaMendesakJumlah: sewaMendesak.length,
     bookingLewatJumlah: bookingLewat.length,
-    notifCount,
   }))
 
   const kpi: { label: string; nilai: string; sub: React.ReactNode; aksen: string; Icon: BiIcon }[] = [

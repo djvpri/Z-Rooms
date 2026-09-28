@@ -657,6 +657,23 @@ enum StatusJual {
   BATAL
 }
 
+// Counter harian isi panel "Segera berakhir" di dashboard — untuk melacak
+// kapan panel mulai muncul. BUKAN log per-render: barisnya agregat per
+// properti per hari, jadi tak membanjiri DB dan tak menyimpan data tamu.
+model PanelHarian {
+  id            String   @id @default(cuid())
+  propertiId    String
+  tanggal       DateTime @db.Date
+  jumlahRender  Int      @default(0)
+  terakhirIsi   Int      @default(0)
+  maksBookingLewat Int   @default(0)
+  pertamaIsi    DateTime?
+  terakhirUpdate DateTime @default(now())
+
+  @@unique([propertiId, tanggal])
+  @@index([propertiId, tanggal])
+}
+
 model LogAktivitas {
   id          String   @id @default(cuid())
   propertiId  String
