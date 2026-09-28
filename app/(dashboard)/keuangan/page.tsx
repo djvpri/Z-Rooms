@@ -3,9 +3,10 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, namaPenyewa } from '@/lib/utils'
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns'
 import { piutangBarang } from '@/lib/piutang'
 import TagihanTable from './TagihanTable'
+import { FilterPeriode, defaultRentang } from '@/components/keuangan/FilterPeriode'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,18 +15,39 @@ const kategoriLabel: Record<string, string> = {
   PERAWATAN: 'Perawatan', PAJAK: 'Pajak', GAJI: 'Gaji', LAINNYA: 'Lainnya',
 }
 
-export default async function KeuanganPage() {
+function parseTanggal(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+export default async function KeuanganPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dari?: string; sampai?: string }>
+}) {
   const session = await auth()
   const properti = await propertiAktif(session!.user!.id as string)
   if (!properti) return <div className="p-8 text-gray-500">Belum ada properti.</div>
 
+  const sp = await searchParams
+  const rentang = defaultRentang()
+  const dariStr = sp.dari && /^\d{4}-\d{2}-\d{2}$/.test(sp.dari) ? sp.dari : rentang.dari
+  const sampaiStr = sp.sampai && /^\d{4}-\d{2}-\d{2}$/.test(sp.sampai) ? sp.sampai : rentang.sampai
+
+  // WIB = UTC+7: awal hari WIB = 17:00 UTC hari sebelumnya.
+  const rentangDb = {
+    gte: new Date(parseTanggal(dariStr).getTime() - 7 * 3600_000),
+    lte: new Date(parseTanggal(sampaiStr).getTime() + 17 * 3600_000),
+  }
+
   const now = new Date()
+  const hariIniDb = { gte: startOfDay(now), lte: endOfDay(now) }
   const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
 
-  const [tagihan, pengeluaran, penjualan, trend6bulan] = await Promise.all([
+  const [tagihan, pengeluaran, penjualan, trend6bulan, tagihanHariIni, jualHariIni] = await Promise.all([
     prisma.tagihan.findMany({
       where: {
-        jatuhTempo: bulanIni,
+        jatuhTempo: rentangDb,
         sewa: { kamar: { propertiId: properti.id } },
       },
       include: {
@@ -41,14 +63,14 @@ export default async function KeuanganPage() {
     }),
 
     prisma.pengeluaran.findMany({
-      where: { propertiId: properti.id, tanggal: bulanIni },
+      where: { propertiId: properti.id, tanggal: rentangDb },
       orderBy: { tanggal: 'desc' },
     }),
 
-    // Penjualan barang yang uangnya sudah masuk bulan ini (LUNAS). BELUM_BAYAR
+    // Penjualan barang yang uangnya sudah masuk (LUNAS) dalam rentang. BELUM_BAYAR
     // masuk `belumLunas`, BATAL dibuang.
     prisma.penjualan.findMany({
-      where: { propertiId: properti.id, createdAt: bulanIni, status: 'LUNAS' },
+      where: { propertiId: properti.id, createdAt: rentangDb, status: 'LUNAS' },
       select: { total: true },
     }),
 
@@ -79,7 +101,21 @@ export default async function KeuanganPage() {
         }))
       })
     ),
+
+    // Pendapatan HARI INI — kartu ini tak ikut filter rentang: pemilik yang
+    // baru membuka aplikasi mau tahu "hari ini dapat berapa", bukan harus
+    // menggeser rentang dulu.
+    prisma.tagihan.aggregate({
+      where: { status: 'LUNAS', jatuhTempo: hariIniDb, sewa: { kamar: { propertiId: properti.id } } },
+      _sum: { nominal: true },
+    }),
+    prisma.penjualan.aggregate({
+      where: { propertiId: properti.id, status: 'LUNAS', createdAt: hariIniDb },
+      _sum: { total: true },
+    }),
   ])
+
+  const pendapatanHariIni = Number(tagihanHariIni._sum.nominal ?? 0) + Number(jualHariIni._sum.total ?? 0)
 
   const pendapatanSewa = tagihan.filter(t => t.status === 'LUNAS').reduce((s, t) => s + Number(t.nominal), 0)
   const pendapatanBarang = penjualan.reduce((s, p) => s + Number(p.total), 0)
@@ -95,17 +131,27 @@ export default async function KeuanganPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg font-semibold text-gray-900">Keuangan</h1>
-        <p className="text-sm text-gray-400">Pendapatan, tagihan, dan pengeluaran bulan ini</p>
+        <p className="text-sm text-gray-400">
+          {dariStr === sampaiStr
+            ? `Ringkasan ${dariStr}`
+            : `Pendapatan, tagihan, dan pengeluaran ${dariStr} — ${sampaiStr}`}
+        </p>
       </div>
 
+      <FilterPeriode dari={dariStr} sampai={sampaiStr} />
+
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
         <div className="stat-card">
-          <p className="text-xs text-gray-500 mb-1">Pendapatan bulan ini</p>
+          <p className="text-xs text-gray-500 mb-1">Pendapatan hari ini</p>
+          <p className="text-base md:text-xl font-semibold text-teal-600">{formatRupiah(pendapatanHariIni)}</p>
+        </div>
+        <div className="stat-card">
+          <p className="text-xs text-gray-500 mb-1">Pendapatan rentang</p>
           <p className="text-base md:text-xl font-semibold text-teal-600">{formatRupiah(totalPendapatan)}</p>
         </div>
         <div className="stat-card">
-          <p className="text-xs text-gray-500 mb-1">Pengeluaran bulan ini</p>
+          <p className="text-xs text-gray-500 mb-1">Pengeluaran rentang</p>
           <p className="text-base md:text-xl font-semibold text-coral-600">{formatRupiah(totalPengeluaran)}</p>
         </div>
         <div className="stat-card">
@@ -153,7 +199,7 @@ export default async function KeuanganPage() {
 
         {/* Pengeluaran per kategori */}
         <div className="card">
-          <h2 className="text-sm font-medium text-gray-700 mb-3">Pengeluaran bulan ini</h2>
+          <h2 className="text-sm font-medium text-gray-700 mb-3">Pengeluaran ({dariStr === sampaiStr ? dariStr : `${dariStr}—${sampaiStr}`})</h2>
           <div className="space-y-2">
             {pengeluaran.map(p => (
               <div key={p.id} className="flex justify-between text-sm">
@@ -172,7 +218,7 @@ export default async function KeuanganPage() {
 
       {/* Tabel tagihan bulan ini */}
       <TagihanTable
-        bulanLabel={now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+        bulanLabel={dariStr === sampaiStr ? dariStr : `${dariStr} — ${sampaiStr}`}
         // Identitas properti untuk kepala & kaki nota cetak. Dikirim dari sini
         // karena halaman ini server component yang sudah memegang `properti`.
         properti={{
