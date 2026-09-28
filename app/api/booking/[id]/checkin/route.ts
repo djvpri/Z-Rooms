@@ -23,6 +23,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   })
   if (!sewa) return NextResponse.json({ error: 'Booking tidak ditemukan.' }, { status: 404 })
   if (sewa.statusSewa !== 'PENDING') {
+    await catatAktivitas({
+      propertiId: properti.id,
+      userId: session.user.id as string,
+      userEmail: session.user.email ?? null,
+      aksi: 'CHECKIN_BOOKING',
+      referensiId: sewa.id,
+      alasan: `Check-in ditolak — sewa sudah ${sewa.statusSewa}`,
+      detail: `Kamar ${sewa.kamar.nomor}`,
+    })
     return NextResponse.json({ error: 'Hanya booking menunggu yang bisa check-in.' }, { status: 409 })
   }
 
