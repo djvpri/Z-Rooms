@@ -689,3 +689,22 @@ model LogAktivitas {
 
   @@index([propertiId, wktPada])
 }
+
+// Audit level DB: menangkap SETIAP INSERT/UPDATE/DELETE pada tabel Sewa,
+// termasuk yang dilakukan langsung via SQL (di luar aplikasi). `updatedAt`
+// hanya berubah saat Prisma update; DELETE sama sekali tak menyentuhnya —
+// itulah celah yang membuat 7 sewa PENDING bisa lenyap tanpa jejak.
+// Trigger dipasang oleh scripts/pasang-audit-trigger.mjs (idempoten).
+model AuditSewa {
+  id        String   @id @default(cuid())
+  sewaId    String?
+  aksi      String   // "INSERT" | "UPDATE" | "DELETE"
+  statusLama String?
+  statusBaru String?
+  kamarNomor String?
+  pengguna  String?  // session_user / pg_user
+  wktPada   DateTime @default(now())
+
+  @@index([wktPada])
+  @@index([sewaId])
+}
