@@ -191,6 +191,21 @@ export default async function DashboardPage() {
         }),
       ].sort((a, b) => a.batasMs - b.batasMs)
 
+  // ── DEBUG: catat isi panel ke log server ──
+  console.log('[DASHBOARD-DEBUG]', JSON.stringify({
+    waktu: now.toISOString(),
+    properti: properti.nama,
+    propertiId: properti.id,
+    jamCheckout: properti.jamCheckout,
+    toleransiCheckout: properti.toleransiCheckout,
+    mendesakJumlah: mendesak.length,
+    mendesak: mendesak.map(m => ({ jenis: m.jenis, judul: m.judul, sub: m.sub, menit: m.menit, lewat: m.lewat, href: m.href })),
+    sesiKaraokeJumlah: sesiKaraoke.length,
+    sewaMendesakJumlah: sewaMendesak.length,
+    bookingLewatJumlah: bookingLewat.length,
+    notifCount,
+  }))
+
   const kpi: { label: string; nilai: string; sub: React.ReactNode; aksen: string; Icon: BiIcon }[] = [
     {
       label: 'Total kamar', nilai: String(totalKamar), aksen: 'text-gray-900', Icon: DoorClosedFill,
