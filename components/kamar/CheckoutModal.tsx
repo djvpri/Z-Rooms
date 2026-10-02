@@ -17,6 +17,8 @@ export interface KamarTersedia {
   nomor: string
   tipe: string
   hargaBulanan: number | null
+  /** Tarif harian; server pindah-kamar memilih HARIAN kalau ada. */
+  hargaHarian?: number | null
   deposit: number | null
 }
 
@@ -59,6 +61,13 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
   // Deposit yang ikut pindah = deposit titipan sewa lama; kekurangannya ditagih.
   const depositPindah = sewa.deposit
   const kurangDeposit = tujuan ? Math.max((tujuan.deposit ?? sewa.deposit) - depositPindah, 0) : 0
+
+  // Server pindah-kamar memakai tarif HARIAN kalau ada di tipe tujuan (sisanya
+  // tarif pertama) — tampilkan yang itu, bukan selalu bulanan.
+  const hargaPeriodeBaru = tujuan
+    ? (tujuan.hargaHarian ?? tujuan.hargaBulanan)
+    : null
+  const satuanDurasi = tujuan?.hargaHarian != null ? 'hari' : 'bulan'
 
   const hariIni = new Date().toISOString().slice(0, 10)
   const kembaliNum = Math.min(Math.max(Number(kembali) || 0, 0), sewa.deposit)
@@ -368,7 +377,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                         <option value="">— pilih kamar —</option>
                         {kamarTersedia.map(k => (
                           <option key={k.id} value={k.id}>
-                            {k.nomor} · {k.tipe}{k.hargaBulanan ? ` · ${formatRupiah(k.hargaBulanan)}` : ''}
+                            {k.nomor} · {k.tipe}{(k.hargaHarian ?? k.hargaBulanan) ? ` · ${formatRupiah(k.hargaHarian ?? k.hargaBulanan!)}${k.hargaHarian ? '/hari' : '/bulan'}` : ''}
                           </option>
                         ))}
                       </select>
@@ -382,7 +391,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                       </div>
                       <div>
                         <label className="form-label">
-                          Durasi (bulan)
+                          Durasi ({satuanDurasi})
                         </label>
                         <input type="number" className="form-input" value={durasi} min={1}
                           onChange={e => setDurasi(e.target.value)} />
@@ -410,7 +419,7 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
                         </div>
                         <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
                           <span className="text-gray-500">Harga kamar baru</span>
-                          <span className="text-gray-800">{tujuan.hargaBulanan ? formatRupiah(tujuan.hargaBulanan) : '—'}</span>
+                          <span className="text-gray-800">{hargaPeriodeBaru ? formatRupiah(hargaPeriodeBaru) : '—'}</span>
                         </div>
                       </div>
                     )}

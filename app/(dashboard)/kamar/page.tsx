@@ -115,13 +115,17 @@ export default async function KamarPage() {
     kamar
       .filter(x => x.status === 'TERSEDIA' && x.id !== asalId)
       .map(x => {
-        // Tarif Bulanan untuk kamar tujuan pindah — diwarisi dari tipenya.
+        // Tarif utk kamar tujuan pindah — diwarisi dari tipenya. Server (route
+        // pindah-kamar) memilih HARIAN kalau ada, sisanya tarif pertama; UI
+        // menampilkan keduanya supaya kasir lihat harga yang benar-benar dipakai.
         const hb = hargaEfektif(x, 'BULANAN')
+        const hh = hargaEfektif(x, 'HARIAN')
         return {
           id: x.id,
           nomor: x.nomor,
           tipe: namaTipe(x.tipe),
           hargaBulanan: hb > 0 ? hb : null,
+          hargaHarian: hh > 0 ? hh : null,
           deposit: hb > 0 ? depositEfektif(x, 'BULANAN') : null,
         }
       })
