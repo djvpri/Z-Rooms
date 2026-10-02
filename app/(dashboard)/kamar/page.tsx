@@ -29,6 +29,17 @@ export default async function KamarPage() {
   const properti = await propertiAktif(session!.user!.id as string)
   if (!properti) return <div className="p-8 text-gray-500">Belum ada properti.</div>
 
+  // Identitas tenant utk kepala nota pindah kamar (CheckoutModal). Server
+  // component sudah memegang properti — dikirim sbg prop, JANGAN fetch ulang
+  // dari klien (pola nota kepala tenant).
+  const notaProperti = {
+    nama: properti.nama,
+    alamat: properti.alamat,
+    kota: properti.kota,
+    noHp: properti.noHp,
+    teksNota: properti.teksNota,
+  }
+
   const kamar = await prisma.kamar.findMany({
     where: { propertiId: properti.id },
     include: {
@@ -280,6 +291,7 @@ export default async function KamarPage() {
                               <CheckoutModal
                                 sewa={ringkasSewa(k, sewaAktif)}
                                 kamarTersedia={kamarTersediaUntuk(k.id)}
+                                notaProperti={notaProperti}
                               />
                             )}
               {sewaAktif && <TombolJual sewaId={sewaAktif.id} />}
@@ -326,6 +338,7 @@ export default async function KamarPage() {
                                         <CheckoutModal
                                           sewa={ringkasSewa(k, sewaAktif)}
                           kamarTersedia={kamarTersediaUntuk(k.id)}
+                          notaProperti={notaProperti}
                         />
                         <TombolJual sewaId={sewaAktif.id} />
                       </div>
@@ -442,6 +455,7 @@ export default async function KamarPage() {
                       <CheckoutModal
                         sewa={ringkasSewa(k, sewaAktif)}
                         kamarTersedia={kamarTersediaUntuk(k.id)}
+                        notaProperti={notaProperti}
                       />
                       <TombolJual sewaId={sewaAktif.id} />
                     </div>

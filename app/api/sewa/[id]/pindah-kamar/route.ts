@@ -113,7 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Kredit sisa bayar: selisih antara yang sudah dibayar penyewa untuk sewa
   // lama dan nilai hari yang benar-benar ditempati sampai tanggal pindah.
-  const { kredit, hariDipakai, hariPeriode } = kreditPindahKamar({
+  const { kredit, hariDipakai, hariPeriode, nilaiPakai } = kreditPindahKamar({
     tanggalMasuk: sewa.tanggalMasuk,
     tanggalPindah: pindah,
     tanggalKeluar: sewa.tanggalKeluar,
@@ -188,8 +188,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Sisa kredit yang tak muat di tagihan pertama (kamar baru lebih murah)
       // dicatat di notifikasi + catatan sewa — ponytail: belum otomatis masuk
       // tagihan periode berikutnya; tambahkan saat generator tagihan ada.
+      // Uang diputuskan SATU ARAH di sini (keputusan pemilik):
+      //   - harga kamar baru > kredit → penyewa MENAMBAH bayar, lewat tagihan
+      //     BELUM_BAYAR di bawah (dikasih di modal saat pindah);
+      //   - harga kamar baru < kredit → sisa uang KEMBALI ke penyewa: dicatat
+      //     sbg Pengeluaran (pola pengembalian deposit di checkout — uang keluar
+      //     adalah beban, BUKAN potong pendapatan) dan kasir menyerahkan
+      //     kembaliannya; nominalnya tampil di respons + nota pindah.
       const kreditEfektif = Math.min(kredit, hargaBaru)
-      const sisaKredit = kredit - kreditEfektif
+      const kembalian = kredit - kreditEfektif
       const nominalTagihanBaru = hargaBaru - kreditEfektif
       if (nominalTagihanBaru > 0) {
         await tx.tagihan.create({
@@ -221,6 +228,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         })
       }
 
+      // Kembalian tunai ke penyewa — dicatat sbg Pengeluaran supaya muncul
+      // di laporan keuangan dan kasir punya jejak uang yang diserahkan.
+      if (kembalian > 0) {
+        await tx.pengeluaran.create({
+          data: {
+            propertiId: properti.id,
+            kategori: 'LAINNYA',
+            deskripsi: `Pengembalian selisih pindah kamar ${sewa.kamar.nomor} → ${tujuan.nomor} — ${sewa.penyewa?.nama ?? 'Tanpa nama'}`,
+            nominal: kembalian,
+            tanggal: pindah,
+          },
+        })
+      }
+
       await tx.notifikasi.create({
         data: {
           propertiId: properti.id,
@@ -231,7 +252,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             `Deposit ${label(depositLama)} ikut pindah` +
             `${kurangDeposit > 0 ? `, kurang ${label(kurangDeposit)} ditagih` : ''}.` +
             `${sisaTagihan > 0 ? ` Tagihan lama belum lunas ${label(sisaTagihan)}.` : ''}` +
-            `${kredit > 0 ? ` Kredit sisa bayar ${label(kredit)} (terpakai ${label(kreditEfektif)}${sisaKredit > 0 ? `, sisa ${label(sisaKredit)} jadi perubahan` : ''}).` : ''}`,
+            `${kredit > 0 ? ` Kredit sisa bayar ${label(kredit)} (terpakai ${label(kreditEfektif)}` +
+              `${kembalian > 0 ? `, kembalian ${label(kembalian)} dikembalikan ke penyewa` : ''}).` : ''}`,
         },
       })
 
@@ -239,14 +261,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         sewaBaruId: sewaBaru.id,
         kamarAsal: sewa.kamar.nomor,
         kamarTujuan: tujuan.nomor,
+        penyewa: sewa.penyewa?.nama ?? null,
+        tanggalPindah: pindah.toISOString(),
+        tanggalKeluar: keluarBaru.toISOString(),
+        periodeBaru,
+        durasi: d.durasi,
+        hargaLama: Number(sewa.hargaSewa),
+        hargaBaru,
+        periodeLama: sewa.periodeSewa as string,
+        hariDipakai,
+        nilaiPakai,
+        totalDibayar,
+        kredit,
+        kreditTerpakai: kreditEfektif,
+        kembalian,
+        kurangBayar: nominalTagihanBaru,
         depositPindah: depositLama,
         kurangDeposit,
         tagihanBaru: nominalTagihanBaru + kurangDeposit,
-        kredit,
-        kreditTerpakai: kreditEfektif,
-        sisaKredit,
         sisaTagihanLama: sisaTagihan,
-        tanggalKeluar: keluarBaru,
       }
     })
 

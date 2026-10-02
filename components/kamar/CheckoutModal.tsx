@@ -7,8 +7,12 @@
 //   3. POST /api/sewa/<id>/checkout.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Check2, BoxArrowRight, ExclamationTriangle } from 'react-bootstrap-icons'
-import { formatRupiah } from '@/lib/utils'
+import { X, Check2, BoxArrowRight, ExclamationTriangle, Printer } from 'react-bootstrap-icons'
+import { formatRupiah, formatTanggal } from '@/lib/utils'
+import {
+  barisDuaKolom, barisKiriKanan, barisTengah, cetakNotaKasir,
+  garisKertas, kertasPrefAktif,
+} from '@/lib/cetak'
 
 type Perlakuan = 'PENUH' | 'SEBAGIAN' | 'HANGUS'
 
@@ -39,7 +43,12 @@ export interface SewaAktif {
   barangTitipan?: string[]
 }
 
-export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif; kamarTersedia: KamarTersedia[] }) {
+export default function CheckoutModal({ sewa, kamarTersedia, notaProperti }: {
+  sewa: SewaAktif
+  kamarTersedia: KamarTersedia[]
+  /** Identitas tenant utk kepala nota pindah. Dari server component (page kamar). */
+  notaProperti?: { nama: string; alamat: string; kota: string; noHp: string | null; teksNota: string | null }
+}) {
   const router = useRouter()
   const [mode, setMode] = useState<'KELUAR' | 'PINDAH'>('KELUAR')
   const [buka, setBuka] = useState(false)
@@ -47,6 +56,28 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
   const [error, setError] = useState('')
   const [peringatan, setPeringatan] = useState('')   // 409 masih ada tagihan
   const [sukses, setSukses] = useState('')
+  // Hasil pindah sukses — dipakai nota pindah kamar. Null = belum pindah.
+  const [hasilPindah, setHasilPindah] = useState<{
+    kamarAsal: string
+    kamarTujuan: string
+    penyewa: string | null
+    tanggalPindah: string
+    tanggalKeluar: string
+    periodeBaru: string
+    hargaLama: number
+    hargaBaru: number
+    hariDipakai: number
+    nilaiPakai: number
+    totalDibayar: number
+    kredit: number
+    kreditTerpakai: number
+    kembalian: number
+    kurangBayar: number
+    durasi: number
+    sisaTagihanLama: number
+    depositPindah: number
+    kurangDeposit: number
+  } | null>(null)
 
   const [perlakuan, setPerlakuan] = useState<Perlakuan>('PENUH')
   const [kembali, setKembali] = useState('')
@@ -111,17 +142,69 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
         return
       }
       const kreditMsg = data.kredit > 0
-        ? ` Kredit sisa bayar ${formatRupiah(data.kredit)} dipakai ke tagihan baru${data.sisaKredit > 0 ? ` (sisa ${formatRupiah(data.sisaKredit)} — tangani manual)` : ''}.`
+        ? ` Kredit sisa bayar ${formatRupiah(data.kredit)} dipakai ke tagihan baru${data.kembalian > 0 ? ` — kembalian ${formatRupiah(data.kembalian)} dikembalikan ke penyewa.` : '.'}`
         : ''
       setSukses(`Pindah ke kamar ${data.kamarTujuan}.${kreditMsg}`)
       setPeringatan('')
-      router.refresh()
-      setTimeout(() => { setSukses(''); setBuka(false) }, 1600)
+      // Nota pindah: modal TETAP TERBUKA sampai kasir klik "Selesai" — reload
+      // langsung menghapus banner + tombol cetak sebelum sempat dipakai
+      // (pola pitfall banner sukses).
+      setHasilPindah(data)
     } catch (err: any) {
       setError('Terjadi kesalahan: ' + String(err?.message || err))
     } finally {
       setLoading(false)
     }
+  }
+
+  /** Selesai setelah pindah: tutup modal, baru refresh halaman. */
+  function selesaiPindah() {
+    setHasilPindah(null)
+    setSukses('')
+    setBuka(false)
+    router.refresh()
+  }
+
+  /**
+   * Nota pindah kamar — struk thermal via ZXR_APK (pola cetakNotaKasir).
+   * Kepala = identitas tenant (nama → alamat/kota → HP), kaki = Powered by.
+   */
+  async function cetakNotaPindah() {
+    if (!hasilPindah) return
+    const h = hasilPindah
+    const kertas = await kertasPrefAktif()
+    const p = notaProperti
+    const now = new Date()
+    const ddmm = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const baris: string[] = [
+      barisTengah(p?.nama || 'ZXRoom', kertas),
+      ...((p?.alamat && p.alamat !== '-') || (p?.kota && p.kota !== '-')
+        ? [barisTengah([p?.alamat, p?.kota].filter(v => v && v !== '-').join(', '), kertas)]
+        : []),
+      ...(p?.noHp ? [barisTengah(`HP ${p.noHp}`, kertas)] : []),
+      garisKertas(kertas),
+      barisTengah('NOTA PINDAH KAMAR', kertas),
+      garisKertas(kertas),
+      barisDuaKolom('Tanggal', ddmm, kertas),
+      barisDuaKolom('Penyewa', h.penyewa || '-', kertas),
+      barisDuaKolom('Dari kamar', h.kamarAsal, kertas),
+      barisDuaKolom('Ke kamar', h.kamarTujuan, kertas),
+      barisDuaKolom('Periode baru', h.periodeBaru === 'HARIAN' ? `${h.durasi} hari` : `${h.durasi} ${h.periodeBaru === 'BULANAN' ? 'bulan' : h.periodeBaru === 'TAHUNAN' ? 'tahun' : 'minggu'}`, kertas),
+      barisDuaKolom('Masuk', formatTanggal(h.tanggalPindah, { day: 'numeric', month: 'short', year: 'numeric' }), kertas),
+      barisDuaKolom('Checkout', `${formatTanggal(h.tanggalKeluar, { day: 'numeric', month: 'short', year: 'numeric' })} (${formatRupiah(h.hargaBaru)}/${h.periodeBaru === 'HARIAN' ? 'hari' : h.periodeBaru === 'BULANAN' ? 'bulan' : 'periode'})`, kertas),
+      garisKertas(kertas),
+      ...(h.totalDibayar > 0 ? [barisDuaKolom('Sudah dibayar', formatRupiah(h.totalDibayar), kertas)] : []),
+      ...(h.hariDipakai > 0 && h.nilaiPakai > 0 ? [barisDuaKolom(`Terpakai (${h.hariDipakai} hr)`, formatRupiah(h.nilaiPakai), kertas)] : []),
+      ...(h.kredit > 0 ? [barisDuaKolom('Kredit sisa bayar', formatRupiah(h.kreditTerpakai), kertas)] : []),
+      ...(h.kembalian > 0 ? [barisDuaKolom('KEMBALIAN', formatRupiah(h.kembalian), kertas)] : []),
+      ...(h.kurangDeposit > 0 ? [barisDuaKolom('Kurang deposit', formatRupiah(h.kurangDeposit), kertas)] : []),
+      ...(h.sisaTagihanLama > 0 ? [barisDuaKolom('Tagihan lama', formatRupiah(h.sisaTagihanLama), kertas)] : []),
+      ...(h.kurangBayar > 0 ? [barisKiriKanan('TOTAL DIBAYAR', formatRupiah(h.kurangBayar), kertas)] : []),
+      garisKertas(kertas),
+      ...(p?.teksNota ? [barisTengah(p.teksNota, kertas)] : []),
+      barisTengah('Powered by ZXRoom', kertas),
+    ]
+    await cetakNotaKasir(baris)
   }
 
   async function kirim(paksa: boolean) {
@@ -196,9 +279,50 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
             </div>
 
             {sukses ? (
-              <div className="px-5 py-10 text-center">
+              <div className="px-5 py-6 text-center">
                 <Check2 className="text-4xl text-teal-600 mx-auto mb-3" aria-hidden="true" />
                 <p className="text-sm font-medium text-gray-900">{sukses}</p>
+                {/* Rincian uang pindah + tombol nota — modal dibuka sampai
+                    kasir klik "Selesai" (reload dini menghapus banner). */}
+                {hasilPindah && (
+                  <>
+                    <div className="text-xs bg-gray-50 rounded-xl px-3 py-2.5 space-y-1 mt-4 text-left">
+                      {hasilPindah.kurangBayar > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Dibayar penyewa (selisih)</span>
+                          <span className="text-gray-800 font-medium">{formatRupiah(hasilPindah.kurangBayar)}</span>
+                        </div>
+                      )}
+                      {hasilPindah.kembalian > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Dikembalikan ke penyewa</span>
+                          <span className="text-teal-700 font-medium">{formatRupiah(hasilPindah.kembalian)}</span>
+                        </div>
+                      )}
+                      {hasilPindah.kurangDeposit > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Kurang deposit (ditagih)</span>
+                          <span className="text-gray-800">{formatRupiah(hasilPindah.kurangDeposit)}</span>
+                        </div>
+                      )}
+                      {hasilPindah.sisaTagihanLama > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Tagihan lama (tetap)</span>
+                          <span className="text-gray-800">{formatRupiah(hasilPindah.sisaTagihanLama)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button type="button" onClick={cetakNotaPindah}
+                        className="btn btn-ghost flex-1 flex items-center justify-center gap-1.5">
+                        <Printer size={14} aria-hidden="true" /> Cetak Nota
+                      </button>
+                      <button type="button" onClick={selesaiPindah} className="btn btn-primary flex-1">
+                        Selesai
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto">
