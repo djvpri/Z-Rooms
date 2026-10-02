@@ -101,7 +101,10 @@ export default function CheckoutModal({ sewa, kamarTersedia }: { sewa: SewaAktif
         setError(typeof pesan === 'string' ? pesan : 'Gagal pindah kamar.')
         return
       }
-      setSukses(`Pindah ke kamar ${data.kamarTujuan}.`)
+      const kreditMsg = data.kredit > 0
+        ? ` Kredit sisa bayar ${formatRupiah(data.kredit)} dipakai ke tagihan baru${data.sisaKredit > 0 ? ` (sisa ${formatRupiah(data.sisaKredit)} — tangani manual)` : ''}.`
+        : ''
+      setSukses(`Pindah ke kamar ${data.kamarTujuan}.${kreditMsg}`)
       setPeringatan('')
       router.refresh()
       setTimeout(() => { setSukses(''); setBuka(false) }, 1600)

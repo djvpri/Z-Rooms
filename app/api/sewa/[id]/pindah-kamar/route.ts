@@ -19,7 +19,7 @@ import { prisma } from '@/lib/prisma'
 import { propertiAktif } from '@/lib/properti'
 import { kekuranganDeposit } from '@/lib/deposit'
 import { addDays } from 'date-fns'
-import { tanggalKeluar } from '@/lib/sewa'
+import { tanggalKeluar, kreditPindahKamar } from '@/lib/sewa'
 import { z } from 'zod'
 
 const pindahSchema = z.object({
@@ -57,13 +57,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     include: {
       kamar: { select: { id: true, nomor: true, propertiId: true } },
       penyewa: { select: { id: true, nama: true } },
-      tagihan: { where: { status: { in: ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'] } } },
+      // Semua tagihan (bukan cuma belum lunas): pembayaran perlu dijumlah
+      // untuk hitung kredit sisa bayar. DIBATALKAN disaring di bawah.
+      tagihan: { include: { pembayaran: true } },
     },
   })
   if (!sewa) return NextResponse.json({ error: 'Sewa tidak ditemukan' }, { status: 404 })
   if (sewa.statusSewa !== 'AKTIF') {
     return NextResponse.json({ error: `Sewa sudah berstatus ${sewa.statusSewa}` }, { status: 400 })
   }
+
+  const hidup = sewa.tagihan.filter(t => t.status !== 'DIBATALKAN')
+  const sisaTagihan = hidup
+    .filter(t => t.status === 'BELUM_BAYAR' || t.status === 'TERLAMBAT' || t.status === 'SEBAGIAN')
+    .reduce((s, t) => s + Number(t.nominal), 0)
+  // Total yang benar-benar masuk untuk sewa lama. Deposit sengaja di luar —
+  // jalur uang masuk sendiri, bukan Tagihan/Pembayaran (lihat schema).
+  const totalDibayar = hidup.reduce(
+    (s, t) => s + t.pembayaran.reduce((a, b) => a + Number(b.nominal), 0),
+    0,
+  )
 
   const tujuan = await prisma.kamar.findFirst({
     where: { id: d.kamarTujuanId, propertiId: properti.id },
@@ -79,7 +92,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: `Kamar ${tujuan.nomor} sedang ${tujuan.status}` }, { status: 400 })
   }
 
-  const sisaTagihan = sewa.tagihan.reduce((s, t) => s + Number(t.nominal), 0)
   if (sisaTagihan > 0 && !d.paksa) {
     return NextResponse.json(
       {
@@ -98,6 +110,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const label = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
+
+  // Kredit sisa bayar: selisih antara yang sudah dibayar penyewa untuk sewa
+  // lama dan nilai hari yang benar-benar ditempati sampai tanggal pindah.
+  const { kredit, hariDipakai, hariPeriode } = kreditPindahKamar({
+    tanggalMasuk: sewa.tanggalMasuk,
+    tanggalPindah: pindah,
+    tanggalKeluar: sewa.tanggalKeluar,
+    hargaSewa: Number(sewa.hargaSewa),
+    totalDibayar,
+  })
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -157,16 +179,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-      await tx.tagihan.create({
-        data: {
-          sewaId: sewaBaru.id,
-          nominal: hargaBaru,
-          periodeDari: pindah,
-          periodeHingga: keluarBaru,
-          jatuhTempo: addDays(pindah, 3),
-          status: 'BELUM_BAYAR',
-        },
-      })
+      // Kredit sisa bayar dari sewa lama (periode sudah dibayar penuh, pindah
+      // di tengah): POTONG nominal tagihan pertama — bukan baris Pembayaran.
+      // Alasan: laporan keuangan menjumlahkan Tagihan LUNAS berdasar nominal;
+      // uang kredit ini sudah terhitung sbg pendapatan saat tagihan lama
+      // dilunasi, jadi tagihan baru harus lebih kecil, bukan lunas dgn
+      // "pembayaran" fiktif (yang mendobel pendapatan).
+      // Sisa kredit yang tak muat di tagihan pertama (kamar baru lebih murah)
+      // dicatat di notifikasi + catatan sewa — ponytail: belum otomatis masuk
+      // tagihan periode berikutnya; tambahkan saat generator tagihan ada.
+      const kreditEfektif = Math.min(kredit, hargaBaru)
+      const sisaKredit = kredit - kreditEfektif
+      const nominalTagihanBaru = hargaBaru - kreditEfektif
+      if (nominalTagihanBaru > 0) {
+        await tx.tagihan.create({
+          data: {
+            sewaId: sewaBaru.id,
+            nominal: nominalTagihanBaru,
+            periodeDari: pindah,
+            periodeHingga: keluarBaru,
+            jatuhTempo: addDays(pindah, 3),
+            status: 'BELUM_BAYAR',
+            ...(kreditEfektif > 0 ? { catatan: `Sudah dikredit ${label(kreditEfektif)} dari sisa bayar kamar ${sewa.kamar.nomor}` } : {}),
+          },
+        })
+      }
 
       // Kekurangan deposit jadi tagihan tersendiri supaya terlihat jelas di
       // daftar tagihan sebagai "kekurangan deposit", bukan menempel di sewa.
@@ -193,7 +230,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             `${sewa.penyewa?.nama ?? 'Penyewa'} pindah dari ${sewa.kamar.nomor} ke ${tujuan.nomor}. ` +
             `Deposit ${label(depositLama)} ikut pindah` +
             `${kurangDeposit > 0 ? `, kurang ${label(kurangDeposit)} ditagih` : ''}.` +
-            `${sisaTagihan > 0 ? ` Tagihan lama belum lunas ${label(sisaTagihan)}.` : ''}`,
+            `${sisaTagihan > 0 ? ` Tagihan lama belum lunas ${label(sisaTagihan)}.` : ''}` +
+            `${kredit > 0 ? ` Kredit sisa bayar ${label(kredit)} (terpakai ${label(kreditEfektif)}${sisaKredit > 0 ? `, sisa ${label(sisaKredit)} jadi perubahan` : ''}).` : ''}`,
         },
       })
 
@@ -203,7 +241,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         kamarTujuan: tujuan.nomor,
         depositPindah: depositLama,
         kurangDeposit,
-        tagihanBaru: hargaBaru + kurangDeposit,
+        tagihanBaru: nominalTagihanBaru + kurangDeposit,
+        kredit,
+        kreditTerpakai: kreditEfektif,
+        sisaKredit,
         sisaTagihanLama: sisaTagihan,
         tanggalKeluar: keluarBaru,
       }
