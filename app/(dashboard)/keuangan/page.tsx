@@ -5,6 +5,8 @@ import { propertiAktif } from '@/lib/properti'
 import { formatRupiah, namaPenyewa } from '@/lib/utils'
 import { startOfMonth, endOfMonth, subMonths, startOfDay, endOfDay } from 'date-fns'
 import { piutangBarang } from '@/lib/piutang'
+import { pendapatanSewa, pendapatanBarang, piutangSewa } from '@/lib/uang'
+import { hariIniWib } from '@/lib/rentang'
 import TagihanTable from './TagihanTable'
 import { FilterPeriode } from '@/components/keuangan/FilterPeriode'
 import { defaultRentang } from '@/lib/rentang'
@@ -42,10 +44,15 @@ export default async function KeuanganPage({
   }
 
   const now = new Date()
-  const hariIniDb = { gte: startOfDay(now), lte: endOfDay(now) }
-  const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
+  // "Hari ini" ikut WIB (keputusan 2026-10-02): sama dgn rentangDb, satu hari WIB.
+  const hariIniStr = hariIniWib()
+  const hariIniDb = {
+    gte: new Date(parseTanggal(hariIniStr).getTime() - 7 * 3600_000),
+    lte: new Date(parseTanggal(hariIniStr).getTime() + 17 * 3600_000),
+  }
 
-  const [tagihan, pengeluaran, penjualan, trend6bulan, tagihanHariIni, jualHariIni] = await Promise.all([
+  const [tagihan, pengeluaran, trend6bulan, sewaRentang, barangRentang, sewaHariIni = 0, barangHariIni = 0] = await Promise.all([
+    // Daftar tagihan utk tabel (tetap per jatuhTempo — ini daftar invoice, bukan hitungan uang).
     prisma.tagihan.findMany({
       where: {
         jatuhTempo: rentangDb,
@@ -68,36 +75,26 @@ export default async function KeuanganPage({
       orderBy: { tanggal: 'desc' },
     }),
 
-    // Penjualan barang yang uangnya sudah masuk (LUNAS) dalam rentang. BELUM_BAYAR
-    // masuk `belumLunas`, BATAL dibuang.
-    prisma.penjualan.findMany({
-      where: { propertiId: properti.id, createdAt: rentangDb, status: 'LUNAS' },
-      select: { total: true },
-    }),
-
-    // Rekap 6 bulan
+    // Rekap 6 bulan — basis uang fisik, sama dgn kartu ringkasan (lib/uang.ts).
     Promise.all(
       Array.from({ length: 6 }, (_, i) => {
         const bulan = subMonths(now, 5 - i)
-        const range = { gte: startOfMonth(bulan), lte: endOfMonth(bulan) }
+        const range = {
+          gte: new Date(startOfMonth(bulan).getTime() - 7 * 3600_000),
+          lte: new Date(endOfMonth(bulan).getTime() + 17 * 3600_000),
+        }
         return Promise.all([
-          prisma.tagihan.aggregate({
-            where: { status: 'LUNAS', jatuhTempo: range, sewa: { kamar: { propertiId: properti.id } } },
-            _sum: { nominal: true },
-          }),
+          pendapatanSewa(properti.id, range),
           prisma.pengeluaran.aggregate({
             where: { propertiId: properti.id, tanggal: range },
             _sum: { nominal: true },
           }),
-          prisma.penjualan.aggregate({
-            where: { propertiId: properti.id, status: 'LUNAS', createdAt: range },
-            _sum: { total: true },
-          }),
-        ]).then(([pend, penge, jual]) => ({
+          pendapatanBarang(properti.id, range),
+        ]).then(([sewa, penge, barang]) => ({
           bulan: bulan.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
           // Pendapatan = sewa + barang. Digabung di sini karena grafiknya satu
           // batang; porsi sewa vs barang dirinci di kartu ringkasan.
-          pendapatan: Number(pend._sum.nominal ?? 0) + Number(jual._sum.total ?? 0),
+          pendapatan: sewa + barang,
           pengeluaran: Number(penge._sum.nominal ?? 0),
         }))
       })
@@ -105,27 +102,20 @@ export default async function KeuanganPage({
 
     // Pendapatan HARI INI — kartu ini tak ikut filter rentang: pemilik yang
     // baru membuka aplikasi mau tahu "hari ini dapat berapa", bukan harus
-    // menggeser rentang dulu.
-    prisma.tagihan.aggregate({
-      where: { status: 'LUNAS', jatuhTempo: hariIniDb, sewa: { kamar: { propertiId: properti.id } } },
-      _sum: { nominal: true },
-    }),
-    prisma.penjualan.aggregate({
-      where: { propertiId: properti.id, status: 'LUNAS', createdAt: hariIniDb },
-      _sum: { total: true },
-    }),
+    // menggeser rentang dulu. Basis uang fisik (lib/uang.ts), hari WIB.
+    pendapatanSewa(properti.id, hariIniDb),
+    pendapatanBarang(properti.id, hariIniDb),
   ])
 
-  const pendapatanHariIni = Number(tagihanHariIni._sum.nominal ?? 0) + Number(jualHariIni._sum.total ?? 0)
+  const pendapatanHariIni = sewaHariIni + barangHariIni
 
-  const pendapatanSewa = tagihan.filter(t => t.status === 'LUNAS').reduce((s, t) => s + Number(t.nominal), 0)
-  const pendapatanBarang = penjualan.reduce((s, p) => s + Number(p.total), 0)
-  const totalPendapatan = pendapatanSewa + pendapatanBarang
+  const sewaUang = sewaRentang
+  const barangUang = barangRentang
+  const totalPendapatan = sewaUang + barangUang
   const totalPengeluaran = pengeluaran.reduce((s, p) => s + Number(p.nominal), 0)
-  // Piutang barang (titipan kamar yang belum dilunasi) — tanpa ini "Belum
-  // terkumpul" terlihat lebih kecil dari yang sebenarnya harus ditagih.
-  const belumLunasSewa = tagihan.filter(t => ['BELUM_BAYAR', 'TERLAMBAT', 'SEBAGIAN'].includes(t.status)).reduce((s, t) => s + Number(t.nominal), 0)
-  const belumLunas = belumLunasSewa + await piutangBarang(properti.id)
+  // Piutang sewa = sisa nominal tagihan belum lunas − pembayaran parsial yang
+  // sudah masuk; barang = titipan kamar belum dilunasi.
+  const belumLunas = await piutangSewa(properti.id) + await piutangBarang(properti.id)
   const maxBar = Math.max(...trend6bulan.map(t => Math.max(t.pendapatan, t.pengeluaran)), 1)
 
   return (

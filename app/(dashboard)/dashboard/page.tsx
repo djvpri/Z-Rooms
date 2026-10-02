@@ -8,6 +8,7 @@ import {
 } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
 import { startOfMonth, endOfMonth } from 'date-fns'
+import { pendapatanSewa, pendapatanBarang } from '@/lib/uang'
 import Link from 'next/link'
 import DemoBanner from '@/components/demo/DemoBanner'
 import { TombolBookingLewat } from '@/components/dashboard/TombolBookingLewat'
@@ -55,15 +56,19 @@ export default async function DashboardPage() {
 
   const now = new Date()
   const bulanIni = { gte: startOfMonth(now), lte: endOfMonth(now) }
+  // Kartu uang bulan ini pakai basis yang SAMA dgn tab Keuangan (lib/uang.ts,
+  // uang fisik + hari WIB) supaya dua halaman tak pernah bertengkar.
+  const bulanIniDb = {
+    gte: new Date(bulanIni.gte.getTime() - 7 * 3600_000),
+    lte: new Date(bulanIni.lte.getTime() + 17 * 3600_000),
+  }
 
-  const [totalKamar, kamarByStatus, pendapatanBulanIni, pengeluaranBulanIni,
+  const [totalKamar, kamarByStatus, sewaBulanIni, barangBulanIni, pengeluaranBulanIni,
       tagihanBelumBayar, aktivitas, notifCount, sesiKaraoke, sewaMendesak, bookingLewat] = await Promise.all([
     prisma.kamar.count({ where: { propertiId: properti.id } }),
     prisma.kamar.groupBy({ by: ['status'], where: { propertiId: properti.id }, _count: true }),
-    prisma.tagihan.aggregate({
-      where: { status: 'LUNAS', createdAt: bulanIni, sewa: { kamar: { propertiId: properti.id } } },
-      _sum: { nominal: true },
-    }),
+    pendapatanSewa(properti.id, bulanIniDb),
+    pendapatanBarang(properti.id, bulanIniDb),
     prisma.pengeluaran.aggregate({
       where: { propertiId: properti.id, tanggal: bulanIni },
       _sum: { nominal: true },
@@ -123,7 +128,7 @@ export default async function DashboardPage() {
   ])
 
   const statusMap = kamarByStatus.reduce((acc, s) => { acc[s.status] = s._count; return acc }, {} as Record<string, number>)
-  const pendapatan = Number(pendapatanBulanIni._sum.nominal ?? 0)
+  const pendapatan = sewaBulanIni + barangBulanIni
   const pengeluaran = Number(pengeluaranBulanIni._sum.nominal ?? 0)
   const laba = pendapatan - pengeluaran
   const hunian = totalKamar ? Math.round((statusMap['TERISI'] ?? 0) / totalKamar * 100) : 0

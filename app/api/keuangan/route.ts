@@ -1,4 +1,10 @@
 // app/api/keuangan/route.ts
+//
+// CATATAN (2026-10-02): penghitungan uang resmi pindah ke lib/uang.ts (basis
+// uang fisik: Pembayaran.dibayarPada + Penjualan LUNAS). Halaman dashboard &
+// tab keuangan sudah pakai lib/uang.ts. Route ini tidak lagi dipakai UI —
+// sengaja tak dihapus/ubah agar konsumen lama (bila ada) tak putus. Jangan
+// jadikan rute ini acuan hitung uang.
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
