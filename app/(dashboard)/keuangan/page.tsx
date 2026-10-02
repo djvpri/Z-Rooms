@@ -136,10 +136,18 @@ export default async function KeuanganPage({
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pendapatan hari ini</p>
           <p className="text-base md:text-xl font-semibold text-teal-600">{formatRupiah(pendapatanHariIni)}</p>
+          {/* ponytail: DEBUG sementara — buang setelah akar masalah kartu-0 ketemu */}
+          <p className="text-[10px] text-gray-400">
+            db {hariIniDb.gte.toISOString()} → {hariIniDb.lte.toISOString()} · sewa {sewaHariIni} · barang {barangHariIni}
+          </p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pendapatan rentang</p>
           <p className="text-base md:text-xl font-semibold text-teal-600">{formatRupiah(totalPendapatan)}</p>
+          {/* ponytail: DEBUG sementara */}
+          <p className="text-[10px] text-gray-400">
+            db {rentangDb.gte.toISOString()} → {rentangDb.lte.toISOString()} · sewa {sewaUang} · barang {barangUang}
+          </p>
         </div>
         <div className="stat-card">
           <p className="text-xs text-gray-500 mb-1">Pengeluaran rentang</p>
