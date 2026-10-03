@@ -65,8 +65,8 @@ export default async function DashboardPage() {
 
   const [totalKamar, kamarByStatus, sewaBulanIni, barangBulanIni, pengeluaranBulanIni,
       tagihanBelumBayar, aktivitas, notifCount, sesiKaraoke, sewaMendesak, bookingLewat] = await Promise.all([
-    prisma.kamar.count({ where: { propertiId: properti.id } }),
-    prisma.kamar.groupBy({ by: ['status'], where: { propertiId: properti.id }, _count: true }),
+    prisma.kamar.count({ where: { propertiId: properti.id, arsip: false } }),
+    prisma.kamar.groupBy({ by: ['status'], where: { propertiId: properti.id, arsip: false }, _count: true }),
     pendapatanSewa(properti.id, bulanIniDb),
     pendapatanBarang(properti.id, bulanIniDb),
     prisma.pengeluaran.aggregate({

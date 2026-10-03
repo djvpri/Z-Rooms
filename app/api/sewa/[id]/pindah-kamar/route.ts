@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   )
 
   const tujuan = await prisma.kamar.findFirst({
-    where: { id: d.kamarTujuanId, propertiId: properti.id },
+    where: { id: d.kamarTujuanId, propertiId: properti.id, arsip: false },
     include: { tipe: { include: { harga: { where: { aktif: true } } } } },
   })
   if (!tujuan) return NextResponse.json({ error: 'Kamar tujuan tidak ditemukan' }, { status: 404 })

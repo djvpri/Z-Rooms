@@ -12,6 +12,8 @@ import CheckoutModal from '@/components/kamar/CheckoutModal'
 import TombolCheckin from '@/components/kamar/TombolCheckin'
 import TombolJual from '@/components/kamar/TombolJual'
 import TombolHapusKamar from '@/components/kamar/TombolHapusKamar'
+import TombolArsipKamar from '@/components/kamar/TombolArsipKamar'
+import DaftarArsipKamar from '@/components/kamar/DaftarArsipKamar'
 import TabelKamar from '@/components/kamar/TabelKamar'
 import { PemicuJadwal } from '@/components/kamar/JadwalKamar'
 import { DoorClosedFill } from 'react-bootstrap-icons'
@@ -42,7 +44,7 @@ export default async function KamarPage() {
   }
 
   const kamar = await prisma.kamar.findMany({
-    where: { propertiId: properti.id },
+    where: { propertiId: properti.id, arsip: false },
     include: {
       // Tipe master data: kamar menunjuk ke sini. Dua hal diwarisi dari tipe —
       // fasilitas (untuk kamar yang belum diisi sendiri) dan harga sewa.
@@ -73,6 +75,13 @@ export default async function KamarPage() {
         orderBy: [{ statusSewa: 'asc' }, { tanggalMasuk: 'asc' }],
       },
     },
+    orderBy: { nomor: 'asc' },
+  })
+
+  // Kamar terarsip — daftar terpisah, bisa dikembalikan. Ringkas saja.
+  const kamarArsip = await prisma.kamar.findMany({
+    where: { propertiId: properti.id, arsip: true },
+    select: { id: true, nomor: true, lantai: true },
     orderBy: { nomor: 'asc' },
   })
 
@@ -275,6 +284,7 @@ export default async function KamarPage() {
                   boleh dikoreksi kapan saja; yang tak boleh cuma `status`. */}
               <div className="mt-2 flex items-center gap-1">
                 <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                <TombolArsipKamar id={k.id} nomor={k.nomor} />
                 <TombolHapusKamar id={k.id} nomor={k.nomor} />
               </div>
               {/* Check-in tamu yang memesan tapi belum di-check-in (tanggal masuk sudah
@@ -332,6 +342,7 @@ export default async function KamarPage() {
                 aksi: (
                                   <div className="flex items-center gap-1">
                                     <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                                    <TombolArsipKamar id={k.id} nomor={k.nomor} />
                                     <TombolHapusKamar id={k.id} nomor={k.nomor} />
                                     {k.sewa.filter(x => x.statusSewa === 'PENDING' && new Date(x.tanggalMasuk) <= sekarang).map(x => (
                                       <TombolCheckin key={x.id} sewaId={x.id} nama={x.penyewa?.nama ?? 'tanpa nama'} kamar={k.nomor} />
@@ -469,6 +480,8 @@ export default async function KamarPage() {
           })}
         </div>
       </div>
+
+      <DaftarArsipKamar daftar={kamarArsip} />
     </div>
   )
 }

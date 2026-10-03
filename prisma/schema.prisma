@@ -148,6 +148,9 @@ model Kamar {
   fasilitas   String[]     @default([])
   foto        String[]     @default([])
   status      StatusKamar  @default(TERSEDIA)
+  // Arsip = kamar pensiun (punya riwayat sewa, tak bisa dihapus). Hilang dari
+  // daftar kamar/dashboard/booking, riwayat & laporan tetap utuh.
+  arsip       Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 

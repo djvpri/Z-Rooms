@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   // memegang kamar berakhir. Dulu hanya AKTIF yang diambil, sehingga dua
   // booking bisa sama-sama tersimpan PENDING untuk kamar yang sama.
   const kamar = await prisma.kamar.findFirst({
-    where: { id: d.kamarId, propertiId: properti.id },
+    where: { id: d.kamarId, propertiId: properti.id, arsip: false },
     include: {
       tipe: { include: { harga: { where: { periodeSewa: d.periodeSewa, aktif: true } } } },
       sewa: {

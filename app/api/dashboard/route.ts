@@ -19,12 +19,12 @@ export async function GET() {
   const [totalKamar, kamarByStatus, pendapatanBulanIni, tagihanBelumBayar,
     pengeluaranBulanIni, aktivitasTerbaru, notifBelumDibaca] = await Promise.all([
     // Total kamar
-    prisma.kamar.count({ where: { propertiId: properti.id } }),
+    prisma.kamar.count({ where: { propertiId: properti.id, arsip: false } }),
 
     // Kamar per status
     prisma.kamar.groupBy({
       by: ['status'],
-      where: { propertiId: properti.id },
+      where: { propertiId: properti.id, arsip: false },
       _count: { status: true },
     }),
 

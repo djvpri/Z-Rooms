@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   const kamar = await prisma.kamar.findMany({
     where: {
       propertiId: properti.id,
+      arsip: false,
       ...(status ? { status: status as any } : {}),
     },
     include: {
