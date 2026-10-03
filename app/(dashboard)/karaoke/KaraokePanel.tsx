@@ -906,10 +906,11 @@ function StrukKaraoke({
     const item = (sesi as Sesi & { item?: { jamKe: number; mulai: string; selesai: string; hargaPerJam: string | number }[] }).item ?? []
     // Sisa setelah prepay + jaminan. Nol = lunas di muka; negatif = kembalian.
     // Struk akhir dicetak SETELAH klik "Selesai & bayar" — uang berpindah di
-    // detik yang sama, jadi selalu LUNAS; `dibayar > 0` hanyalah nominal yang
-    // baru saja dikumpulkan kasir (KEMBALIAN tetap tampil utk prepay lebih).
-    // Penerimaan di muka = uang SEBAGIAN saat sesi baru mulai → label lama.
-    const sudahLunas = penerimaan ? ringkas.dibayar <= 0 : true
+    // detik yang sama → sisa nol, selalu LUNAS (KEMBALIAN terpisah bila prepay
+    // lebih). Penerimaan di muka: `dibayar` = uang yang BARU masuk, bukan sisa
+    // — hitung sisa dari total, dan tunjukkan baris "Dibayar di muka".
+    const sisa = penerimaan ? ringkas.total - ringkas.dibayar : 0
+    const sudahLunas = sisa <= 0
 
     const jam = (d: string | null) =>
     d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
@@ -961,11 +962,12 @@ function StrukKaraoke({
         garisKertas(kertas),
         barisKiriKanan('TOTAL', rupiah(ringkas.total), kertas),
         ...(ringkas.jaminan > 0 ? [barisKiriKanan('Jaminan di depan', `-${rupiah(ringkas.jaminan)}`, kertas)] : []),
+        ...(penerimaan && ringkas.dibayar > 0 ? [barisKiriKanan('Dibayar di muka', rupiah(ringkas.dibayar), kertas)] : []),
         ...(ringkas.dibayar < 0 ? [barisKiriKanan('KEMBALIAN', rupiah(-ringkas.dibayar), kertas)] : []),
         // LUNAS saat sisa nol (prepay menutup total), BELUM LUNAS saat masih
         // ada sisa — satu baris penutup angka, bukan dua baris yang bisa
         // dibaca orang sebagai "dibayar dua kali".
-        barisKiriKanan(sudahLunas ? 'LUNAS' : 'BELUM LUNAS', sudahLunas ? '' : rupiah(ringkas.dibayar), kertas),
+        barisKiriKanan(sudahLunas ? 'LUNAS' : 'BELUM LUNAS', sudahLunas ? '' : rupiah(sisa), kertas),
         garisKertas(kertas),
         barisTengah(p.teksNota || 'Terima kasih.', kertas),
         barisTengah('Powered by ZXRoom', kertas),
@@ -1071,6 +1073,12 @@ function StrukKaraoke({
                               <span>-{rupiah(ringkas.jaminan)}</span>
                             </div>
                           )}
+                          {penerimaan && ringkas.dibayar > 0 && (
+                            <div className="flex justify-between text-xs">
+                              <span>Dibayar di muka</span>
+                              <span>{rupiah(ringkas.dibayar)}</span>
+                            </div>
+                          )}
                           {ringkas.dibayar < 0 && (
                             <div className="flex justify-between font-bold text-teal-600">
                               <span>KEMBALIAN</span>
@@ -1079,7 +1087,7 @@ function StrukKaraoke({
                           )}
                           <div className={`flex justify-between font-bold ${sudahLunas ? 'text-teal-600' : 'text-amber-600'}`}>
                             <span>{sudahLunas ? 'LUNAS' : 'BELUM LUNAS'}</span>
-                            <span>{sudahLunas ? '' : rupiah(ringkas.dibayar)}</span>
+                            <span>{sudahLunas ? '' : rupiah(sisa)}</span>
                           </div>
                         </div>
 
