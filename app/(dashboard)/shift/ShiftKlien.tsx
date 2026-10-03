@@ -13,6 +13,7 @@ type Rekap = {
   sewaLainnya: number
   barangTunai: number
   barangLainnya: number
+  karaokeTunai: number
   tunaiSistem: number
   totalMasuk: number
   jumlahTransaksi: number
@@ -103,9 +104,10 @@ export default function ShiftKlien({
       </div>
 
       {rekap && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Stat label="Tunai sewa" nilai={rekap.sewaTunai} />
           <Stat label="Tunai barang" nilai={rekap.barangTunai} />
+          <Stat label="Karaoke" nilai={rekap.karaokeTunai} />
           <Stat label="Non-tunai (QRIS/transfer/VA)" nilai={rekap.sewaLainnya + rekap.barangLainnya} />
           <Stat label="Total masuk" nilai={rekap.totalMasuk} tebal />
         </div>
@@ -113,7 +115,7 @@ export default function ShiftKlien({
 
       <div className="rounded-lg bg-gray-50 border border-gray-100 p-4 text-sm space-y-1">
         <div className="flex justify-between"><span>Modal awal</span><b className="tabular-nums">{formatRupiah(aktif.modalAwal)}</b></div>
-        <div className="flex justify-between"><span>Tunai sistem (sewa + barang)</span><b className="tabular-nums">{formatRupiah(rekap?.tunaiSistem ?? 0)}</b></div>
+        <div className="flex justify-between"><span>Tunai sistem (sewa + barang + karaoke)</span><b className="tabular-nums">{formatRupiah(rekap?.tunaiSistem ?? 0)}</b></div>
         <div className="flex justify-between border-t pt-1"><span>Seharusnya di laci</span><b className="tabular-nums">{formatRupiah(diperkirakan)}</b></div>
         <p className="text-xs text-gray-400">{rekap?.jumlahTransaksi ?? 0} transaksi selama shift ini · {propertiNama}</p>
       </div>

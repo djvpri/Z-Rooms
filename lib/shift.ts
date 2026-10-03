@@ -4,6 +4,10 @@
 //   - sewa  = baris Pembayaran.dibayarPada dalam rentang shift
 //   - barang = Penjualan LUNAS, tanggal uang = dibayarPada fallback createdAt
 //     (sama dgn barangTanggal di lib/uang.ts — titipan dilunasi saat checkout)
+//   - karaoke = sesi SELESAI selesaiAktual dalam rentang shift. Uang karaoke
+//     TIDAK lewat Pembayaran/Penjualan — ia hidup di SesiKaraoke sendiri
+//     (totalSewa + minuman − bayarDiMuka − jaminan), rumus sama dgn `dibayar`
+//     di route tutup sesi. Karaoke selalu tunai di kasir.
 //
 // Transaksi TIDAK bertanda shiftId: rentang waktu shift yang membatasi.
 // Data lama sebelum fitur shift tetap terhitung di shift pertama.
@@ -16,16 +20,16 @@ export type RekapShift = {
   sewaLainnya: number
   barangTunai: number
   barangLainnya: number
-  // Tunai sistem = sewaTunai + barangTunai — pembanding hitungan laci kasir.
+  // Sesi karaoke yang ditutup selama shift (uang diterima kasir saat itu).
+  karaokeTunai: number
+  // Tunai sistem = sewaTunai + barangTunai + karaokeTunai — pembanding laci.
   tunaiSistem: number
   totalMasuk: number
   jumlahTransaksi: number
 }
 
-const bukanTunai = { not: 'TUNAI' as const }
-
 export async function rekapShift(propertiId: string, rentang: Rentang): Promise<RekapShift> {
-  const [sewa, barang] = await Promise.all([
+  const [sewa, barang, karaoke] = await Promise.all([
     prisma.pembayaran.groupBy({
       by: ['metodeBayar'],
       where: { dibayarPada: rentang, tagihan: { sewa: { kamar: { propertiId } } } },
@@ -47,6 +51,13 @@ export async function rekapShift(propertiId: string, rentang: Rentang): Promise<
       _sum: { total: true },
       _count: true,
     }),
+    // Sesi karaoke: uangnya = totalSewa + Σ minuman.subtotal − bayarDiMuka −
+    // jaminan. Dihitung dari baris yang sudah disalin saat tutup sesi
+    // (totalSewa DISALIN, tak dihitung ulang). BATAL/BERJALAN tidak ikut.
+    prisma.sesiKaraoke.findMany({
+      where: { propertiId, status: 'SELESAI', selesaiAktual: rentang },
+      select: { totalSewa: true, bayarDiMuka: true, jaminan: true, minuman: { select: { subtotal: true } } },
+    }),
   ])
 
   let sewaTunai = 0, sewaLainnya = 0, barangTunai = 0, barangLainnya = 0, jumlahTransaksi = 0
@@ -62,20 +73,23 @@ export async function rekapShift(propertiId: string, rentang: Rentang): Promise<
     else barangLainnya += n
     jumlahTransaksi += g._count
   }
+  let karaokeTunai = 0
+  for (const s of karaoke) {
+    const minuman = s.minuman.reduce((a, m) => a + Number(m.subtotal), 0)
+    // Rumus `dibayar` route tutup sesi: total − prepay − jaminan (jaminan
+    // dikembalikan ke pelanggan, bukan uang masuk).
+    karaokeTunai += Number(s.totalSewa) + minuman - Number(s.bayarDiMuka) - Number(s.jaminan)
+  }
+  jumlahTransaksi += karaoke.length
 
   return {
     sewaTunai,
     sewaLainnya,
     barangTunai,
     barangLainnya,
-    tunaiSistem: sewaTunai + barangTunai,
-    totalMasuk: sewaTunai + sewaLainnya + barangTunai + barangLainnya,
+    karaokeTunai,
+    tunaiSistem: sewaTunai + barangTunai + karaokeTunai,
+    totalMasuk: sewaTunai + sewaLainnya + barangTunai + barangLainnya + karaokeTunai,
     jumlahTransaksi,
   }
 }
-
-// Guard ringan: enum metode non-tunai (LAINNYA mis. transfer manual) tetap
-// masuk "lainnya" — bukan hilang. ponytail: sekarang grup by metode lalu
-// bagi dua; kalau nanti butuh rincian per metode (QRIS vs VA), tampilkan
-// langsung dari hasil groupBy tanpa ubah bentuk data.
-export const _metodeNonTunai = bukanTunai
