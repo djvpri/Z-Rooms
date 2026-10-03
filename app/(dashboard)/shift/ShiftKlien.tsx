@@ -7,7 +7,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatRupiah, formatTanggal } from '@/lib/utils'
-
 type Rekap = {
   sewaTunai: number
   sewaLainnya: number
@@ -36,8 +35,12 @@ export default function ShiftKlien({
   rekapAwal: Rekap | null
 }) {
   const router = useRouter()
-  const [aktif] = useState<ShiftAktif | null>(aktifAwal)
-  const [rekap] = useState<Rekap | null>(rekapAwal)
+  // aktif & rekap = prop dari server (sumber kebenaran). JANGAN dikopi ke
+  // useState: setelah POST sukses kita router.refresh() → server kirim data
+  // baru sebagai prop; kalau dikopi, state lama menutupi data baru dan
+  // tombol tampak "tanpa respon".
+  const aktif = aktifAwal
+  const rekap = rekapAwal
   const [modal, setModal] = useState('0')
   const [fisik, setFisik] = useState('')
   const [catatan, setCatatan] = useState('')
