@@ -6,6 +6,7 @@
 // ulang di klien.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CashStack } from 'react-bootstrap-icons'
 import { formatRupiah, formatTanggal } from '@/lib/utils'
 type Rekap = {
   sewaTunai: number
@@ -117,7 +118,7 @@ export default function ShiftKlien({
         <p className="text-xs text-gray-400">{rekap?.jumlahTransaksi ?? 0} transaksi selama shift ini · {propertiNama}</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="block text-xs font-medium text-gray-500 mb-1">Hitung uang fisik di laci (Rp)</label>
         <input
           className="w-48 rounded-lg border border-gray-300 px-3 py-2"
@@ -140,7 +141,12 @@ export default function ShiftKlien({
           </p>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="btn-danger" disabled={sibuk || fisik === ''} onClick={tutup}>
+        <button
+          className="w-full py-3.5 rounded-xl text-base font-semibold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-coral-600 text-white hover:bg-coral-900"
+          disabled={sibuk || fisik === ''}
+          onClick={tutup}
+        >
+          <CashStack className="w-5 h-5" />
           {sibuk ? 'Menutup…' : 'Tutup shift'}
         </button>
       </div>
