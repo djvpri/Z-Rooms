@@ -83,3 +83,35 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json(kamar)
 }
+
+// Hapus kamar. HANYA kamar tanpa riwayat sewa — riwayat (Sewa → Tagihan →
+// Pembayaran) adalah bahan laporan keuangan, tak boleh ikut terhapus (FK Sewa
+// juga tak cascade, DB akan menolak). Kamar berriwayat ditolak dengan pesan
+// jelas, bukan dihapus diam-diam.
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+
+  const properti = await propertiAktif(session.user.id as string)
+  if (!properti) return NextResponse.json({ error: 'Properti tidak ditemukan' }, { status: 404 })
+
+  const kamar = await prisma.kamar.findFirst({
+    where: { id, propertiId: properti.id },
+    select: { id: true, nomor: true, _count: { select: { sewa: true } } },
+  })
+  if (!kamar) {
+    return NextResponse.json({ error: { message: 'Kamar tidak ditemukan.' } }, { status: 404 })
+  }
+
+  if (kamar._count.sewa > 0) {
+    return NextResponse.json(
+      { error: { message: `Kamar ${kamar.nomor} punya riwayat sewa dan tidak bisa dihapus.` } },
+      { status: 409 },
+    )
+  }
+
+  await prisma.kamar.delete({ where: { id: kamar.id } })
+  return NextResponse.json({ ok: true })
+}

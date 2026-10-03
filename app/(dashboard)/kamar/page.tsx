@@ -11,6 +11,7 @@ import KamarTambahModal from '@/components/kamar/KamarTambahModal'
 import CheckoutModal from '@/components/kamar/CheckoutModal'
 import TombolCheckin from '@/components/kamar/TombolCheckin'
 import TombolJual from '@/components/kamar/TombolJual'
+import TombolHapusKamar from '@/components/kamar/TombolHapusKamar'
 import TabelKamar from '@/components/kamar/TabelKamar'
 import { PemicuJadwal } from '@/components/kamar/JadwalKamar'
 import { DoorClosedFill } from 'react-bootstrap-icons'
@@ -272,8 +273,9 @@ export default async function KamarPage() {
               })()}
               {/* Ubah data kamar. Selalu tersedia — nomor, tipe, luas, fasilitas
                   boleh dikoreksi kapan saja; yang tak boleh cuma `status`. */}
-              <div className="mt-2">
+              <div className="mt-2 flex items-center gap-1">
                 <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                <TombolHapusKamar id={k.id} nomor={k.nomor} />
               </div>
               {/* Check-in tamu yang memesan tapi belum di-check-in (tanggal masuk sudah
                                 lewat). Di atas check-out karena ini yang harus diselesaikan
@@ -330,6 +332,7 @@ export default async function KamarPage() {
                 aksi: (
                                   <div className="flex items-center gap-1">
                                     <KamarTambahModal daftarTipe={daftarTipe} kamar={ringkasEdit(k)} />
+                                    <TombolHapusKamar id={k.id} nomor={k.nomor} />
                                     {k.sewa.filter(x => x.statusSewa === 'PENDING' && new Date(x.tanggalMasuk) <= sekarang).map(x => (
                                       <TombolCheckin key={x.id} sewaId={x.id} nama={x.penyewa?.nama ?? 'tanpa nama'} kamar={k.nomor} />
                                     ))}
