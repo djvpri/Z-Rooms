@@ -47,4 +47,10 @@ body {
   .stat-card {
     @apply bg-gray-50 rounded-xl p-4 border border-gray-100;
   }
+  /* Badge status mode offline (app/offline/page.tsx). */
+  .badge-green { @apply badge bg-green-100 text-green-700; }
+  .badge-amber { @apply badge bg-amber-100 text-amber-700; }
+  .btn-teal {
+    @apply bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700;
+  }
 }

@@ -7,13 +7,17 @@ export default auth((req) => {
   
   // Allow public routes
   if (
-    pathname === '/' || 
-    pathname.startsWith('/api/auth') || 
+    pathname === '/' ||
+    pathname.startsWith('/api/auth') ||
     pathname === '/api/health' ||
     pathname === '/api/admin/cross-app' ||
     pathname.startsWith('/api/demo') ||
     pathname === '/auth/qr-approve' ||
-    pathname === '/sso'
+    pathname === '/sso' ||
+    // Halaman offline: dirender dari snapshot localStorage, tapi URL-nya
+    // dimuat APK saat jaringan mati — di sini tak ada session cookie yang
+    // bisa diverifikasi server (server tak terjangkau), jadi biarkan lewat.
+    pathname === '/offline'
   ) {
     return NextResponse.next()
   }

@@ -711,3 +711,37 @@ model AuditSewa {
   @@index([wktPada])
   @@index([sewaId])
 }
+
+// ───────────────────────────────────────────────
+// SINKRONISASI OFFLINE
+// ───────────────────────────────────────────────
+// Buku besar idempotensi untuk transaksi yang dibuat saat tak ada jaringan.
+// Kasir membuat transaksi di halaman offline (APK), disimpan di perangkat
+// (localStorage), lalu dikirim ke /api/sinkron begitu online kembali.
+//
+// Kunci idempotensi = idOperasi, dibuat klien saat transaksi dibuat (crypto
+// randomUUID()). Kirim ulang dengan id sama → dibalas hasil KIRIMAN LAMA,
+// TIDAK dibuat dua kali. Tanpa ini, jaringan putus di tengah kirim → kasir
+// kirim ulang → uang tercatat dobel.
+//
+// Tanpa FK ke tabel sasaran: satu baris bisa merekam operasi ke Tagihan /
+// Penjualan / Sewa, dan sasaran gagal-tak-ditemukan pun tetap terekam —
+// daftar "gagal sync" harus menunjuk operasi yang bermasalah, bukan hilang.
+model SinkronLog {
+  id          String   @id @default(cuid())
+  propertiId  String
+  // id operasi dari klien — sumber kebenaran idempotensi.
+  idOperasi   String
+  // PENJUALAN | BAYAR_TAGIHAN | CHECKIN
+  jenis       String
+  // "OK" | "KIRIMAN_LAMA" | "GAGAL"
+  status      String
+  // Hasil ringkas untuk ditampilkan kasir: nomor penjualan, nama kamar, pesan error.
+  hasil       String?
+  detail      Json?
+  dibuatKlien DateTime? // waktu klien saat transaksi dibuat (offline), opsional
+  createdAt   DateTime @default(now())
+
+  @@unique([propertiId, idOperasi])
+  @@index([propertiId, createdAt])
+}
