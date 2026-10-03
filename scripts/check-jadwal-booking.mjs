@@ -44,17 +44,22 @@ assert(selKuning < 336, 'semua sel kuning — aturan bentrok terlalu longgar')
 
 // Silang-periksa dengan aturan server: tanggal yang ditandai kuning memang
 // ditolak `bolehDipesan`, dan tanggal yang tak ditandai memang boleh.
+// `sekarang` diteruskan eksplisit: default `new Date()` menjadikan booking
+// PENDING dengan tanggal masuk lampau diabaikan (fitur buka kunci kamar,
+// 16d4270) — uji dengan tanggal tetap akan salah bila dijalankan setelah
+// 20 Sep 2026.
 const dihuni = { mulai: new Date('2026-09-20T14:00:00+07:00'), selesai: new Date('2026-09-22T12:00:00+07:00') }
 assert.equal(
-  bolehDipesan(dihuni, sewa, aturan).boleh,
+  bolehDipesan(dihuni, sewa, aturan, sekarang).boleh,
   false,
   'jam yang ditandai kuning oleh grid justru dinyatakan boleh — grid & server tak sepakat',
 )
 const bebas = { mulai: new Date('2026-09-24T14:00:00+07:00'), selesai: new Date('2026-09-26T12:00:00+07:00') }
-assert.equal(bolehDipesan(bebas, sewa, aturan).boleh, true, 'tanggal bebas justru dinyatakan bentrok')
+assert.equal(bolehDipesan(bebas, sewa, aturan, sekarang).boleh, true, 'tanggal bebas justru dinyatakan bentrok')
 
-// Tombol di halaman booking memakai komponen ini, bukan salinannya.
-const halaman = fs.readFileSync('app/(dashboard)/booking/page.tsx', 'utf8')
+// Tombol di panel booking memakai komponen ini, bukan salinannya.
+// (Dipindah ke BookingPanel.tsx — page.tsx kini server component tipis.)
+const halaman = fs.readFileSync('app/(dashboard)/booking/BookingPanel.tsx', 'utf8')
 assert(halaman.includes("from '@/components/kamar/JadwalKamar'"), 'halaman booking tak memakai JadwalKamar bersama')
 assert(halaman.includes('Lihat jadwal 14 hari'), 'label tombol tak ada di halaman booking')
 

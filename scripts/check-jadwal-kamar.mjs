@@ -20,6 +20,11 @@ import { daftarTanggal, labelChip, JAM_MASUK } from '../app/(dashboard)/booking/
 
 const aturan = { jamCheckout: '12:00', toleransiCheckout: 0 }
 const aturanTol = { jamCheckout: '12:00', toleransiCheckout: 120 }   // +2 jam
+// Waktu acuan tetap untuk semua pemanggilan `bolehDipesan`/`penghalangUntuk`
+// dalam berkas ini: default `new Date()` menjadikan booking PENDING dengan
+// tanggal masuk lampau diabaikan (fitur buka kunci kamar, 16d4270) — uji
+// bertanggal Sep/Okt 2026 akan salah bila dijalankan setelah tanggal itu.
+const SEKARANG = new Date('2026-09-17T10:00:00+07:00')
 
 /** Rentang sewa baru: masuk jam 14:00, tinggal `hari` hari. */
 const baru = (masukIso, keluarIso) => ({
@@ -52,7 +57,7 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 
 // 3. Kamar kosong selalu boleh.
 {
-  const r = bolehDipesan(baru('2026-09-05T10:00:00+07:00', '2026-09-06T10:00:00+07:00'), null, aturan)
+  const r = bolehDipesan(baru('2026-09-05T10:00:00+07:00', '2026-09-06T10:00:00+07:00'), null, aturan, SEKARANG)
   assert.equal(r.boleh, true, 'kamar kosong boleh dibooking')
   assert.equal(lepasPada(null, aturan), null, 'tak ada penghuni -> tak ada waktu lepas')
 }
@@ -60,7 +65,7 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 // 4. Rentang yang beririsan dengan penghuni sekarang -> tolak, dengan pesan yang
 //    menyebut KAPAN kamar terpakai. Kasir butuh rentangnya, bukan "tidak tersedia".
 {
-  const r = bolehDipesan(baru('2026-09-20T10:00:00+07:00', '2026-09-21T10:00:00+07:00'), sewaAktif, aturan)
+  const r = bolehDipesan(baru('2026-09-20T10:00:00+07:00', '2026-09-21T10:00:00+07:00'), sewaAktif, aturan, SEKARANG)
   assert.equal(r.boleh, false, 'masuk saat masih dihuni -> tolak')
   assert.match(r.pesan, /1 Sep/, 'pesan menyebut kapan kamar mulai terpakai')
   assert.match(r.pesan, /1 Okt/, 'pesan menyebut kapan kamar lepas')
@@ -70,15 +75,15 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 // 5. TEPAT saat penghuni sebelumnya lepas -> boleh. Batasnya inklusif: pada jam
 //    check-out kamar sudah kosong.
 {
-  assert.equal(bolehDipesan(baru('2026-10-01T12:00:00+07:00', '2026-10-02T12:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-01T12:00:00+07:00', '2026-10-02T12:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     true, 'masuk tepat pada jam check-out boleh')
 }
 
 // 6. Sehari sebelum -> tolak; sehari sesudah -> boleh. Batasnya tajam.
 {
-  assert.equal(bolehDipesan(baru('2026-09-30T14:00:00+07:00', '2026-10-01T14:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-30T14:00:00+07:00', '2026-10-01T14:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     false, '30 Sep 14:00 masih dihuni')
-  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     true, '2 Okt 08:00 sudah bebas')
 }
 
@@ -106,9 +111,9 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 // 8. Jam masuk dini hari (00:00 WIB) tak menggeser tanggal. Ini bug yang pernah
 //    terjadi di batasCheckout: tanggal dibaca UTC -> sehari terlalu cepat.
 {
-  assert.equal(bolehDipesan(baru('2026-10-01T00:00:00+07:00', '2026-10-02T00:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-01T00:00:00+07:00', '2026-10-02T00:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     false, 'masuk 1 Okt 00:00 masih dihuni (bebas 12:00)')
-  assert.equal(bolehDipesan(baru('2026-10-01T12:00:00+07:00', '2026-10-02T12:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-01T12:00:00+07:00', '2026-10-02T12:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     true, 'masuk 1 Okt 12:00 sudah bebas')
 }
 
@@ -126,20 +131,20 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
   const daftar = [lama]
 
   // (a) 17 Sep 14:00 -> 18 Sep 14:00. Selesai 18 Sep <= mulai lama 20 Sep.
-  assert.equal(bolehDipesan(baru('2026-09-17T14:00:00+07:00', '2026-09-18T14:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-17T14:00:00+07:00', '2026-09-18T14:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     true, 'booking SEBELUM jam masuk penghuni berikutnya -> boleh')
 
   // (b) 21 Sep 12:00 (tepat check-out lama) -> boleh.
-  assert.equal(bolehDipesan(baru('2026-09-21T12:00:00+07:00', '2026-09-22T12:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-21T12:00:00+07:00', '2026-09-22T12:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     true, 'booking SETELAH jam keluar -> boleh')
 
   // (c) 20 Sep 16:00 -> 21 Sep 16:00. Mulai di tengah masa sewa lama.
-  assert.equal(bolehDipesan(baru('2026-09-20T16:00:00+07:00', '2026-09-21T16:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-20T16:00:00+07:00', '2026-09-21T16:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     false, 'booking di tengah masa sewa lama -> tolak')
 
   // (d) Yang baru KELUAR setelah lama mulai tapi masuk sebelum lama mulai:
   //     19 Sep 20:00 -> 20 Sep 20:00. Lewat tengah malam, tetap beririsan.
-  assert.equal(bolehDipesan(baru('2026-09-19T20:00:00+07:00', '2026-09-20T20:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-19T20:00:00+07:00', '2026-09-20T20:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     false, 'keluar melewati jam masuk lama -> tolak')
 }
 
@@ -166,20 +171,20 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 
   // 23 Sep 10:00 -> jatuh persis di sela 20..22 dan 23..25? 23 Sep 10:00 masih
   // di dalam masa pending22 (keluar 23 Sep 12:00) -> tolak.
-  assert.equal(bolehDipesan(baru('2026-09-23T10:00:00+07:00', '2026-09-24T10:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-23T10:00:00+07:00', '2026-09-24T10:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     false, 'booking di sela antrean -> tolak (dulu lolos)')
-  assert.equal(bolehDipesan(baru('2026-09-25T10:00:00+07:00', '2026-09-26T10:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-25T10:00:00+07:00', '2026-09-26T10:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     false, 'masuk saat PENDING 25 Sep masih memegang -> tolak')
-  assert.equal(bolehDipesan(baru('2026-09-26T12:00:00+07:00', '2026-09-27T12:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-26T12:00:00+07:00', '2026-09-27T12:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     true, 'tepat setelah sewa terakhir lepas -> boleh')
 
   // Celah sah yang harus tetap terbuka: 21 Sep 12:00 (setelah aktif lepas
   // 20 Sep 12:00, sebelum pending22 masuk 22 Sep 00:00).
-  assert.equal(bolehDipesan(baru('2026-09-20T12:00:00+07:00', '2026-09-21T12:00:00+07:00'), daftar, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-20T12:00:00+07:00', '2026-09-21T12:00:00+07:00'), daftar, aturan, SEKARANG).boleh,
     true, 'celah kosong di antara dua sewa tetap boleh dipesan')
 
   // Beberapa penghalang sekaligus -> semuanya dilaporkan.
-  const r = bolehDipesan(baru('2026-09-19T00:00:00+07:00', '2026-09-27T00:00:00+07:00'), daftar, aturan)
+  const r = bolehDipesan(baru('2026-09-19T00:00:00+07:00', '2026-09-27T00:00:00+07:00'), daftar, aturan, SEKARANG)
   assert.equal(r.boleh, false, 'rentang panjang menabrak semua sewa -> tolak')
   assert.equal(r.halangan.length, 3, 'ketiga sewa dilaporkan sebagai penghalang')
 }
@@ -191,7 +196,7 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
     tanggalMasuk: new Date('2026-09-22T14:00:00+07:00'),
     tanggalKeluar: new Date('2026-09-23T14:00:00+07:00'),
   }
-  const r = bolehDipesan(baru('2026-09-22T14:00:00+07:00', '2026-09-23T14:00:00+07:00'), s, aturan)
+  const r = bolehDipesan(baru('2026-09-22T14:00:00+07:00', '2026-09-23T14:00:00+07:00'), s, aturan, SEKARANG)
   assert.equal(r.boleh, false, 'tanggal & jam identik -> bentrok')
   assert.match(r.pesan, /22 Sep/, 'pesan menyebut tanggal bentroknya')
 }
@@ -199,11 +204,11 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
 // 12. Kompatibilitas pemanggil lama: satu sewa (atau null) tetap diterima, dan
 //     daftar kosong berarti kamar bebas.
 {
-  assert.equal(bolehDipesan(baru('2026-09-20T10:00:00+07:00', '2026-09-21T10:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-09-20T10:00:00+07:00', '2026-09-21T10:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     false, 'satu sewa saja masih dinormalkan ke daftar')
-  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), sewaAktif, aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), sewaAktif, aturan, SEKARANG).boleh,
     true, 'setelah lepas -> boleh')
-  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), [], aturan).boleh,
+  assert.equal(bolehDipesan(baru('2026-10-02T08:00:00+07:00', '2026-10-03T08:00:00+07:00'), [], aturan, SEKARANG).boleh,
     true, 'daftar kosong -> boleh')
 }
 
@@ -230,7 +235,7 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
   // Tiap celah harus LULUS validasi — kalau tidak, layar menyarankan tanggal
   // yang justru ditolak server.
   for (const c of celah) {
-    assert.equal(bolehDipesan(c, daftar, aturan).boleh, true,
+    assert.equal(bolehDipesan(c, daftar, aturan, SEKARANG).boleh, true,
       `celah ${c.mulai.toISOString()} seharusnya boleh dipesan`)
   }
 
@@ -301,11 +306,11 @@ const BEBAS = new Date('2026-10-01T12:00:00+07:00')
     { statusSewa: 'PENDING', tanggalMasuk: new Date('2026-09-25T00:00:00+07:00'), tanggalKeluar: new Date('2026-09-26T00:00:00+07:00') },
     { statusSewa: 'AKTIF', tanggalMasuk: new Date('2026-09-18T00:00:00+07:00'), tanggalKeluar: new Date('2026-09-20T00:00:00+07:00') },
   ]
-  const h = penghalangUntuk(baru('2026-09-19T00:00:00+07:00', '2026-09-25T12:00:00+07:00'), daftar, aturan)
+  const h = penghalangUntuk(baru('2026-09-19T00:00:00+07:00', '2026-09-25T12:00:00+07:00'), daftar, aturan, SEKARANG)
   assert.equal(h.length, 2, 'dua sewa beririsan')
   assert.equal(h[0].mulai.getTime() < h[1].mulai.getTime(), true, 'urut dari yang paling awal mulai')
 
-  const takAda = penghalangUntuk(baru('2026-09-21T00:00:00+07:00', '2026-09-22T00:00:00+07:00'), daftar, aturan)
+  const takAda = penghalangUntuk(baru('2026-09-21T00:00:00+07:00', '2026-09-22T00:00:00+07:00'), daftar, aturan, SEKARANG)
   assert.equal(takAda.length, 0, 'rentang di celah kosong -> tak ada penghalang')
 }
 
