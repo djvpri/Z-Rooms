@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Printer, PersonFill, BuildingFill, FloppyFill, Clock, Calendar3 } from 'react-bootstrap-icons'
 import { formatRupiah, namaPenyewa, metodeBayarLabel, tglJam, tglJamJadiDate, tglJamSingkat, sekarangWib, akhirBulan } from '@/lib/utils'
 import { batasCheckout } from '@/lib/checkout'
+import { catat } from '@/lib/logError'
 import { celahKosong, bolehDipesan } from '@/lib/jadwalKamar'
 import { tanggalKeluar, type PeriodeDikenal } from '@/lib/sewa'
 import {
@@ -163,6 +164,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
 
   const ambilDari = (sumber: 'kamera' | 'berkas') => {
     const el = sumber === 'kamera' ? inputKamera.current : inputBerkas.current
+    catat('INFO', `tombol KTP diklik: sumber=${sumber} input=${el ? 'ada' : 'TIDAK ADA'}`)
     if (!el) return
     // Input file mengingat berkas terakhir. Kalau tak dikosongkan, memilih
     // foto yang sama dua kali tak memicu `change` — kasir mengira tombolnya
