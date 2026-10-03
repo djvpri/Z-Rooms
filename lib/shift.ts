@@ -29,6 +29,7 @@ export type RekapShift = {
 }
 
 export async function rekapShift(propertiId: string, rentang: Rentang): Promise<RekapShift> {
+  const rentangStart = rentang.gte
   const [sewa, barang, karaoke] = await Promise.all([
     prisma.pembayaran.groupBy({
       by: ['metodeBayar'],
@@ -51,12 +52,25 @@ export async function rekapShift(propertiId: string, rentang: Rentang): Promise<
       _sum: { total: true },
       _count: true,
     }),
-    // Sesi karaoke: uangnya = totalSewa + Σ minuman.subtotal − bayarDiMuka −
-    // jaminan. Dihitung dari baris yang sudah disalin saat tutup sesi
-    // (totalSewa DISALIN, tak dihitung ulang). BATAL/BERJALAN tidak ikut.
+    // Sesi karaoke: kas bergerak dua kali, dihitung di kedua peristiwa:
+    //   buka (createdAt)   → +bayarDiMuka +jaminan  (uang masuk laci)
+    //   tutup (selesaiAktual, SELESAI) → +(totalSewa + minuman) −(muka+jaminan)
+    //                                        (sisa; minus = kembalian keluar)
+    // Buka & tutup dalam shift sama menjumlah tepat totalSewa+minuman; buka di
+    // shift A, tutup di shift B → A pegang kasnya, B catat sisa (0 bila prepay
+    // penuh). BATAL setelah prepay? Uang sudah diterima — tetap dihitung dari
+    // createdAt; pengembaliannya jadi urusan manual, bukan silentRp0.
+    // BERJALAN tanpa prepay = tak ada kas = tak muncul.
     prisma.sesiKaraoke.findMany({
-      where: { propertiId, status: 'SELESAI', selesaiAktual: rentang },
-      select: { totalSewa: true, bayarDiMuka: true, jaminan: true, minuman: { select: { subtotal: true } } },
+      where: {
+        propertiId,
+        OR: [{ createdAt: rentang }, { status: 'SELESAI', selesaiAktual: rentang }],
+      },
+      select: {
+        status: true, createdAt: true, selesaiAktual: true,
+        totalSewa: true, bayarDiMuka: true, jaminan: true,
+        minuman: { select: { subtotal: true } },
+      },
     }),
   ])
 
@@ -76,11 +90,17 @@ export async function rekapShift(propertiId: string, rentang: Rentang): Promise<
   let karaokeTunai = 0
   for (const s of karaoke) {
     const minuman = s.minuman.reduce((a, m) => a + Number(m.subtotal), 0)
-    // Rumus `dibayar` route tutup sesi: total − prepay − jaminan (jaminan
-    // dikembalikan ke pelanggan, bukan uang masuk).
-    karaokeTunai += Number(s.totalSewa) + minuman - Number(s.bayarDiMuka) - Number(s.jaminan)
+    // Kas masuk saat buka sesi (prepay + jaminan dipegang kasir).
+    if (s.createdAt >= rentangStart) karaokeTunai += Number(s.bayarDiMuka) + Number(s.jaminan)
+    // Kas di tutup sesi: sisa tagihan — bisa minus = kembalian keluar laci.
+    if (s.status === 'SELESAI' && s.selesaiAktual && s.selesaiAktual >= rentangStart) {
+      karaokeTunai += Number(s.totalSewa) + minuman - Number(s.bayarDiMuka) - Number(s.jaminan)
+    }
+    // Sesi dihitung satu transaksi bila salah satu peristiwanya di shift ini.
+    if ((s.createdAt >= rentangStart) || (s.status === 'SELESAI' && s.selesaiAktual && s.selesaiAktual >= rentangStart)) {
+      jumlahTransaksi += 1
+    }
   }
-  jumlahTransaksi += karaoke.length
 
   return {
     sewaTunai,
