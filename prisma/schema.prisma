@@ -25,6 +25,7 @@ model User {
   updatedAt     DateTime   @updatedAt
 
   properti      Properti[]
+  shift         Shift[]
   accounts      Account[]
   sessions      Session[]
 }
@@ -126,6 +127,7 @@ model Properti {
   fasilitasMaster Fasilitas[]
   produk      Produk[]
   penjualan   Penjualan[]
+  shift       Shift[]
   ruangKaraoke RuangKaraoke[]
   sesiKaraoke  SesiKaraoke[]
 }
@@ -744,4 +746,42 @@ model SinkronLog {
 
   @@unique([propertiId, idOperasi])
   @@index([propertiId, createdAt])
+}
+
+// ───────────────────────────────────────────────
+// SHIFT KASIR
+// ───────────────────────────────────────────────
+// Satu kasir = satu shift aktif per properti. Batasnya ORANG + uang fisik,
+// bukan tanggal: transaksi tak bertanda shiftId — dihitung dari waktunya
+// (mulaiPada..selesaiPada) supaya data lama tetap terhitung & nol migrasi
+// tabel transaksi.
+//
+// Lupa tutup = biarkan menggantung (keputusan user); tak ada auto-tutup.
+// Modal awal & uang fisik (hitungan kasir saat tutup) IDR bulat.
+model Shift {
+  id          String    @id @default(cuid())
+  propertiId  String
+  userId      String
+  // Dana awal laci saat buka shift.
+  modalAwal   Decimal   @db.Decimal(12, 0) @default(0)
+  status      StatusShift @default(AKTIF)
+  mulaiPada   DateTime  @default(now())
+  // NULL sampai kasir menutup shift.
+  selesaiPada DateTime?
+  // Hitungan uang fisik di laci saat tutup (input kasir).
+  uangFisik   Decimal?  @db.Decimal(12, 0)
+  // uangFisik − (modalAwal + tunai sistem). Positif = lebih, negatif = kurang.
+  selisih     Decimal?  @db.Decimal(12, 0)
+  catatan     String?
+
+  properti Properti @relation(fields: [propertiId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([propertiId, status])
+  @@index([userId, mulaiPada])
+}
+
+enum StatusShift {
+  AKTIF
+  TUTUP
 }

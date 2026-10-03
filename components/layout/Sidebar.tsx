@@ -6,7 +6,7 @@ import { cn, inisial } from '@/lib/utils'
 import PemilihProperti from '@/components/layout/PemilihProperti'
 import {
   X, List as Menu, BoxArrowRight as LogOut,
-  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Gear, Bag, MusicNoteBeamed,
+  Speedometer2, DoorOpen, People, CalendarPlus, CashCoin, Gear, Bag, MusicNoteBeamed, ArrowRepeat,
 } from 'react-bootstrap-icons'
 import type { ComponentType } from 'react'
 
@@ -22,6 +22,9 @@ const navItems: { href: string; label: string; Icon: ComponentType<{ className?:
   // Jalur uang kedua, di samping Keuangan (sewa). Ditaruh berdampingan supaya
   // terbaca sebagai pasangan: sewa | barang.
   { href: '/penjualan-barang', label: 'Penjualan', Icon: Bag },
+  // Shift kasir: batas uang per ORANG (modal awal ↔ hitung fisik), bukan
+  // per tanggal seperti Keuangan. Ikut jalur uang, sebelum Keuangan.
+  { href: '/shift',        label: 'Shift',       Icon: ArrowRepeat },
   { href: '/keuangan',     label: 'Keuangan',    Icon: CashCoin },
   // Notifikasi BUKAN menu: dipindah ke lonceng di judul tiap halaman
   // (`components/layout/NotifikasiLonceng.tsx`). Alasan: slot nav terbatas dan
