@@ -905,7 +905,11 @@ function StrukKaraoke({
     const p = (sesi as Sesi & { properti?: NotaProperti }).properti ?? {}
     const item = (sesi as Sesi & { item?: { jamKe: number; mulai: string; selesai: string; hargaPerJam: string | number }[] }).item ?? []
     // Sisa setelah prepay + jaminan. Nol = lunas di muka; negatif = kembalian.
-    const sudahLunas = ringkas.dibayar <= 0
+    // Struk akhir dicetak SETELAH klik "Selesai & bayar" — uang berpindah di
+    // detik yang sama, jadi selalu LUNAS; `dibayar > 0` hanyalah nominal yang
+    // baru saja dikumpulkan kasir (KEMBALIAN tetap tampil utk prepay lebih).
+    // Penerimaan di muka = uang SEBAGIAN saat sesi baru mulai → label lama.
+    const sudahLunas = penerimaan ? ringkas.dibayar <= 0 : true
 
     const jam = (d: string | null) =>
     d ? new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
