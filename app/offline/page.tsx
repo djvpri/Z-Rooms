@@ -65,11 +65,6 @@ export default function HalamanOffline() {
     return () => window.removeEventListener('online', dt)
   }, [muatSemua])
 
-  const kamarDenganSewa = useMemo(() => {
-    if (!snap) return []
-    return snap.kamar.filter((k) => k.sewa.length > 0)
-  }, [snap])
-
   function pilihSnapshotBaru() {
     // Paksa muat snapshot segar saat online — dipakai pertama kali.
     fetch('/api/snapshot')
@@ -183,7 +178,7 @@ export default function HalamanOffline() {
 
       <nav className="flex gap-1 mb-4" role="tablist">
         {([
-          ['kamar', `Kamar (${kamarDenganSewa.length})`],
+          ['kamar', `Kamar (${snap.kamar.length})`],
           ['tagihan', `Tagihan (${snap.tagihan.length})`],
           ['jualan', 'Jual barang'],
           ['outbox', `Antrean (${outbox.length})`],
@@ -197,26 +192,34 @@ export default function HalamanOffline() {
 
       {tab === 'kamar' && (
         <ul className="space-y-2">
-          {kamarDenganSewa.map((k) => {
+          {/* Semua kamar non-arsip tampil (opsi 2): TERSEDIA = hijau muda,
+              bersewa = seperti sebelumnya. Kosong-kosongan tetap terlihat. */}
+          {snap.kamar.map((k) => {
             const s = k.sewa[0]
-            const tagihan = s.tagihan.reduce((a, t) => a + t.nominal, 0)
+            const tagihan = s ? s.tagihan.reduce((a, t) => a + t.nominal, 0) : 0
             return (
-              <li key={k.id} className="bg-white border rounded-xl p-3">
+              <li key={k.id} className={`bg-white border rounded-xl p-3 ${s ? '' : 'border-gray-200 opacity-70'}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="font-bold">Kamar {k.nomor}</span>
-                    <span className={`ml-2 badge ${s.statusSewa === 'AKTIF' ? 'badge-green' : 'badge-amber'}`}>{s.statusSewa}</span>
-                    <p className="text-sm text-gray-600">{s.penyewa?.nama ?? 'tanpa nama'}{s.penyewa?.noHp ? ` · ${s.penyewa.noHp}` : ''}</p>
-                    {tagihan > 0 && <p className="text-sm text-red-600">Tagihan {rupiah(tagihan)}</p>}
-                    {s.sisaBarang > 0 && <p className="text-sm text-gray-600">Titipan {rupiah(s.sisaBarang)}</p>}
+                    {s ? (
+                      <>
+                        <span className={`ml-2 badge ${s.statusSewa === 'AKTIF' ? 'badge-green' : 'badge-amber'}`}>{s.statusSewa}</span>
+                        <p className="text-sm text-gray-600">{s.penyewa?.nama ?? 'tanpa nama'}{s.penyewa?.noHp ? ` · ${s.penyewa.noHp}` : ''}</p>
+                        {tagihan > 0 && <p className="text-sm text-red-600">Tagihan {rupiah(tagihan)}</p>}
+                        {s.sisaBarang > 0 && <p className="text-sm text-gray-600">Titipan {rupiah(s.sisaBarang)}</p>}
+                      </>
+                    ) : (
+                      <span className="ml-2 badge bg-emerald-50 text-emerald-700">TERSEDIA</span>
+                    )}
                   </div>
-                  {s.statusSewa === 'PENDING' && (
+                  {s?.statusSewa === 'PENDING' && (
                     <button onClick={() => checkin(s.id, `kamar ${k.nomor}`)}
                       className="text-sm bg-teal-600 text-white px-3 py-1.5 rounded-lg">
                       <i className="bi bi-box-arrow-in-right" aria-hidden="true" /> Check-in
                     </button>
                   )}
-                  {s.statusSewa === 'AKTIF' && (
+                  {s?.statusSewa === 'AKTIF' && (
                     <button onClick={() => { setSewaAktif(s.id); setTab('jualan') }}
                       className="text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg">
                       <i className="bi bi-cart-plus" aria-hidden="true" /> Jual
@@ -226,7 +229,7 @@ export default function HalamanOffline() {
               </li>
             )
           })}
-          {kamarDenganSewa.length === 0 && <li className="text-sm text-gray-500 p-4">Tidak ada kamar terisi/booking pada data tersimpan.</li>}
+          {snap.kamar.length === 0 && <li className="text-sm text-gray-500 p-4">Belum ada kamar pada data tersimpan.</li>}
         </ul>
       )}
 
