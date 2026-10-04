@@ -20,7 +20,19 @@ const URL_FONT = '/_next/static/media/bootstrap-icons.bfa90bda.woff2'
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((c) => Promise.allSettled([c.add(URL_OFFLINE), c.add(URL_FONT)]))
+      .then(async (c) => {
+        await Promise.allSettled([c.add(URL_OFFLINE), c.add(URL_FONT)])
+        // Rangkai aset yang HTML /offline butuhkan: baca HTML dari cache,
+        // kumpulkan semua src/href /_next/static/*, simpan semuanya. Tanpa
+        // ini buka-offline-nyata hanya menampilkan HTML SSR ("Belum ada data
+        // tersimpan") — chunk JS-nya gagal dimuat, log pun tak jalan.
+        const html = await caches.match(URL_OFFLINE)
+        if (!html) return
+        const teks = await html.text()
+        const urls = [...teks.matchAll(/(?:src|href)="(\/_next\/static\/[^"]+\.(?:js|css|woff2?))"/g)]
+          .map((m) => m[1])
+        if (urls.length) await Promise.allSettled(urls.map((u) => c.add(u)))
+      })
       .then(() => self.skipWaiting()),
   )
 })
