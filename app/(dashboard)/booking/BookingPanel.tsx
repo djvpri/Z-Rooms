@@ -259,7 +259,9 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     try {
       const fd = new FormData()
       fd.append('foto', berkas)
+      catat('INFO', `ktp/baca: mulai kirim ${berkas.name} (${berkas.size} byte, tipe=${berkas.type || 'kosong'})`)
       const res = await fetch('/api/ktp/baca', { method: 'POST', body: fd })
+      catat('INFO', `ktp/baca: balasan HTTP ${res.status}`)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Gagal membaca KTP.')
 
@@ -281,6 +283,10 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
 
       if (data.terdaftar) setKtpDuplikat(data.terdaftar)
     } catch (err: any) {
+      // "TypeError: Failed to fetch" = gagal di lapisan jaringan SEBELUM
+      // server menjawab (DNS/koneksi/diputus) — berbeda dari error API yang
+      // punya res.status. Dicatat agar pola kegagalan terbaca di LogKasir.
+      catat('KESALAHAN', `ktp/baca GAGAL: ${err?.name}: ${err?.message}`)
       setPesanKtp({ teks: err.message, gagal: true })
     } finally {
       setBacaKtpLoading(false)
