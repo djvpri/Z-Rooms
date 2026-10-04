@@ -52,10 +52,11 @@ export default function HalamanOffline() {
       // Snapshot tetap dirender kalau ada; ini cuma penanda.
       sessionStorage.setItem(BUKA_HALAMAN_OFFLINE, '1')
     }
-    // Diagnostik "Belum ada data tersimpan" (laporan kasir 2026-10-04):
-    // halaman ini terbuka tapi snapshot kosong — catat keadaannya supaya
-    // laporan log memperlihatkan sebabnya (belum pernah online? quota?).
-    catat('INFO', `offline/buka: snapshot=${snap ? 'ada' : 'KOSONG'} navigatorOnline=${navigator.onLine} sw=${'serviceWorker' in navigator}`)
+    // Diagnostik "Belum ada data tersimpan": baca LANGSUNG dari localStorage
+    // (state React masih null di render pertama — versi lama baris ini selalu
+    // menulis KOSONG walau data ada). `via` membedakan buka nyata vs prasuap.
+    const s = ambilSnapshot()
+    catat('INFO', `offline/buka: via=${self !== top ? 'prasuap' : 'halaman'} snapshot=${s ? `ada (${s.kamar.length} kamar, diambil ${jam(s.diambilPada)})` : 'KOSONG'} navigatorOnline=${navigator.onLine} sw=${'serviceWorker' in navigator}`)
     muatSemua()
     // Coba kirim outbox saat online kembali / saat halaman dibuka.
     kirimOutbox().finally(muatSemua)
