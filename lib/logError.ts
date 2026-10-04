@@ -186,8 +186,12 @@ function diagnosaCetak(): string {
   const j = (window as unknown as Record<string, unknown>)[NAMA_JEMBATAN]
   if (!j || (typeof j !== 'object' && typeof j !== 'function')) return 'peramban (tak ada jembatan APK)'
   // ZXR_APK ada — cek apakah punya `cetak` (APK cukup baru) atau tidak.
+  // PANGGIL TER-ATTACHED (j.versi(), bukan lepas lewat referensi): method
+  // jembatan Android WebView butuh receiver = objek jembatan; dipanggil
+  // lepas `this`-nya undefined → throw → selalu "(gagal baca)" (produksi
+  // 1.0.36–1.0.39 semuanya begitu).
   const v = typeof (j as { versi?: () => string }).versi === 'function'
-    ? safeVersi((j as { versi: () => string }).versi)
+    ? safeVersi(() => (j as { versi: () => string }).versi())
     : '?'
   if (typeof (j as { cetak?: unknown }).cetak !== 'function')
     return `APK lama (versi ${v}, tanpa cetak)`
