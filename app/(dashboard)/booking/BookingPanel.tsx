@@ -175,7 +175,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     // yang menjelaskan diam itu — elemen sudah lepas dari dokumen (ref basi
     // setelah render ulang), input disabled, atau WebView menolak chooser
     // (internal callback pemilih lama belum lepas). Semuanya terbaca di sini.
-    catat('INFO', `klik input ${sumber}: connected=${el.isConnected} disabled=${el.disabled}`)
+    catat('INFO', `klik input ${sumber}: connected=${el.isConnected} disabled=${el.disabled} fokus=${document.hasFocus()}`)
     el.click()
     catat('INFO', `klik input ${sumber}: dipanggil (WebView harus memanggil pemilih)`)
   }
