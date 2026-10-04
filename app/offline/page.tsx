@@ -17,7 +17,7 @@ import {
   BUKA_HALAMAN_OFFLINE, simpanSnapshot, ambilSnapshot, Snapshot,
   muatOutbox, antreOperasi, hapusDariOutbox, kirimOutbox, Operasi,
 } from '@/lib/offline'
-import { catat } from '@/lib/logError'
+import { catat, isiLog, perangkatId, jumlahBaris } from '@/lib/logError'
 
 function rupiah(n: number) {
   return 'Rp ' + n.toLocaleString('id-ID')
@@ -38,6 +38,8 @@ export default function HalamanOffline() {
   const [item, setItem] = useState<Item[]>([])
   const [metode, setMetode] = useState('TUNAI')
   const [pesan, setPesan] = useState('')
+  const [sedangLog, setSedangLog] = useState(false)
+  const [pesanLog, setPesanLog] = useState('')
 
   const muatSemua = useCallback(() => {
     setSnap(ambilSnapshot())
@@ -128,6 +130,23 @@ export default function HalamanOffline() {
     setItem([])
   }
 
+  function kirimLogOffline() {
+    setSedangLog(true)
+    fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perangkat: perangkatId(), nama: '', konten: isiLog() }),
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((d) => {
+        const ok = (d as { ok?: boolean; dedup?: boolean }).ok
+        setPesanLog(ok ? (jumlahBaris() > 0 ? `Log terkirim (${jumlahBaris()} kejadian).` : 'Log terkirim.') : `Gagal mengirim log (${JSON.stringify(d)})`)
+        if (ok) setPesanLog('Laporan log terkirim.')
+      })
+      .catch(() => setPesanLog('Tak bisa menghubungi server — masih offline. Coba lagi saat wifi nyala.'))
+      .finally(() => setSedangLog(false))
+  }
+
   if (!snap) {
     return (
       <main className="max-w-md mx-auto p-6 pt-16 text-center">
@@ -138,6 +157,11 @@ export default function HalamanOffline() {
           online — data akan disimpan otomatis dan siap dipakai offline.
         </p>
         <button onClick={pilihSnapshotBaru} className="btn-teal mt-4">Coba ambil data</button>
+        {pesanLog && <p className="text-xs text-gray-500 mt-2">{pesanLog}</p>}
+        <button onClick={kirimLogOffline} disabled={sedangLog}
+          className="mt-3 text-xs text-gray-400 underline">
+          {sedangLog ? 'Mengirim…' : `Kirim log error (${jumlahBaris()} kejadian)`}
+        </button>
       </main>
     )
   }
