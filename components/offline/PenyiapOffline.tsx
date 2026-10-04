@@ -83,5 +83,11 @@ export default function PenyiapOffline() {
     return () => window.removeEventListener('online', simpan)
   }, [])
 
-  return null
+  // Prasuap: muat /offline tersembunyi saat dashboard online — SW menyimpan
+  // chunk JS/CSS halaman itu ke cache. Tanpa ini halaman /offline blank saat
+  // dibaca offline (chunk-nya tak pernah dimuat sebelumnya), dan kasir APK
+  // tak mungkin membuka /offline manual supaya ke-cache.
+  return (
+    <iframe src="/offline?prasuap=1" title="prasuap offline" className="hidden" aria-hidden="true" tabIndex={-1} />
+  )
 }
