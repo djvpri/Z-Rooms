@@ -254,6 +254,14 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     // (mis. foto pertama buram, kasir mengulang dengan berkas yang sama).
     e.target.value = ''
     if (!berkas) return
+    // Hasil kamera APK bisa sampai sebagai berkas 0 byte (kamera itel membalas
+    // RESULT_OK sebelum flush — lihat PemilihBerkas 1.0.37). Fetch dengan body
+    // kosong selalu "TypeError: Failed to fetch" — pesan yang menyesatkan.
+    if (berkas.size === 0) {
+      catat('KESALAHAN', 'ktp/baca: berkas 0 byte dari input — batal, jangan fetch')
+      setPesanKtp({ teks: 'Foto kosong (0 byte). Ulangi ambil foto.', gagal: true })
+      return
+    }
 
     setBacaKtpLoading(true); setPesanKtp(null); setKtpDuplikat(null)
     try {
