@@ -227,9 +227,6 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
     // "tombol cetak tak bisa diklik". Tanpa baris ini, log tak menjawab
     // pertanyaan dasar pengembang: APK mana dan kenapa tombol mati?
     `apk      : ${diagnosaCetak()}`,
-    // Versi APK dari User-Agent: satu-satunya sumber yang tersisa saat APK
-    // terlalu lama untuk punya method versi(). Tanpa ini, log hanya bisa
-    // bilang "APK lama (versi ?)" dan asal-usulnya tak pernah ketahuan.
     `apk-agen : ${versiDariAgen()}`,
     '',
     `--- ${baris.length} kejadian ---`,
@@ -237,6 +234,17 @@ export function isiLog(info: { versi?: string; halaman?: string } = {}): string 
   const isi = baris.map((b) =>
     `[${b.ts}] ${b.jenis}${b.tempat ? ` (${b.tempat})` : ''}: ${b.pesan}`)
   if (isi.length === 0) isi.push('(tak ada error tercatat)')
+  // Log sisi APK diambil LANGSUNG lewat jembatan (bukan lewat event live
+  // 'zxr-apk-log' yang rapuh — pesan saat halaman tak siap hilang; produksi
+  // 1.0.35–1.0.37 seluruh log kamera tak pernah sampai laporan). APK lama
+  // tanpa method ini diabaikan — jalur event tetap ada untuk mereka.
+  const jembatan = (window as unknown as Record<string, { isiLog?: () => string }>).ZXR_APK
+  if (jembatan && typeof jembatan.isiLog === 'function') {
+    try {
+      const dariApk = jembatan.isiLog().trim()
+      if (dariApk) isi.push('', '--- log APK (via jembatan) ---', dariApk)
+    } catch { /* jembatan error — biarkan laporan tanpa log APK */ }
+  }
   return [...kepala, ...isi].join('\n')
 }
 
