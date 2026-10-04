@@ -17,6 +17,7 @@ import {
   BUKA_HALAMAN_OFFLINE, simpanSnapshot, ambilSnapshot, Snapshot,
   muatOutbox, antreOperasi, hapusDariOutbox, kirimOutbox, Operasi,
 } from '@/lib/offline'
+import { catat } from '@/lib/logError'
 
 function rupiah(n: number) {
   return 'Rp ' + n.toLocaleString('id-ID')
@@ -49,6 +50,10 @@ export default function HalamanOffline() {
       // Snapshot tetap dirender kalau ada; ini cuma penanda.
       sessionStorage.setItem(BUKA_HALAMAN_OFFLINE, '1')
     }
+    // Diagnostik "Belum ada data tersimpan" (laporan kasir 2026-10-04):
+    // halaman ini terbuka tapi snapshot kosong — catat keadaannya supaya
+    // laporan log memperlihatkan sebabnya (belum pernah online? quota?).
+    catat('INFO', `offline/buka: snapshot=${snap ? 'ada' : 'KOSONG'} navigatorOnline=${navigator.onLine} sw=${'serviceWorker' in navigator}`)
     muatSemua()
     // Coba kirim outbox saat online kembali / saat halaman dibuka.
     kirimOutbox().finally(muatSemua)
@@ -70,12 +75,17 @@ export default function HalamanOffline() {
         if (data?.kamar) {
           simpanSnapshot(data)
           muatSemua()
+          catat('INFO', `offline/snapshot: tersimpan (${data.kamar.length} kamar)`)
           setPesan('Snapshot terbaru disimpan.')
         } else {
+          catat('INFO', 'offline/snapshot: balasan tak valid (masih offline?)')
           setPesan('Gagal mengambil snapshot (masih offline?).')
         }
       })
-      .catch(() => setPesan('Gagal mengambil snapshot (masih offline?).'))
+      .catch((e) => {
+        catat('KESALAHAN', `offline/snapshot: ${e?.message ?? e}`)
+        setPesan('Gagal mengambil snapshot (masih offline?).')
+      })
   }
 
   // ── aksi outbox ──

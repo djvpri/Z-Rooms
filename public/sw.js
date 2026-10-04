@@ -8,13 +8,19 @@
 // kamar). Snapshot data ditangani lib/offline.ts via localStorage, bukan di
 // sini. Halaman /offline sendiri adalah aset statis (client-only) → aman
 // di-cache satu kali.
-const CACHE = 'zxroom-offline-v1'
+const CACHE = 'zxroom-offline-v2'
 const URL_OFFLINE = '/offline'
+// Font ikon: CSS halaman /offline memuat bootstrap-icons.woff2. Tanpa
+// pra-cache, ikon jadi kotak kosong (tofu) saat offline — font dimuat
+// SETELAH SW jalan, jadi fetch handler navigasi tak menolongnya. Hash nama
+// berubah tiap build font berubah; kalau pra-cache gagal (404), install
+// tetap lanjut — ikon rusak lebih baik daripada halaman offline mati.
+const URL_FONT = '/_next/static/media/bootstrap-icons.bfa90bda.woff2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll([URL_OFFLINE]))
+      .then((c) => Promise.allSettled([c.add(URL_OFFLINE), c.add(URL_FONT)]))
       .then(() => self.skipWaiting()),
   )
 })
