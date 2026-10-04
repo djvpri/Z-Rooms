@@ -162,6 +162,21 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
   const inputKamera = useRef<HTMLInputElement>(null)
   const inputBerkas = useRef<HTMLInputElement>(null)
 
+  // Foto hasil kamera APK bisa diambil LANGSUNG lewat jembatan ZXR_APK.fotoKtp()
+  // (base64 JPEG) — satu-satunya jalur yang TERBUKTI sampai di perangkat yang
+  // WebView-nya membaca hasil pemilih berkas selalu 0 byte (itel S685LN; tiga
+  // jalur URI gagal: FileProvider cache-dir, MediaStore, FileProvider ktp.jpg —
+  // produksi 2026-10-03 s.d. 04). Input file tetap jadi fallback utk APK lama
+  // dan browser biasa.
+  const jembatanFoto = () => {
+    const j = (window as unknown as Record<string, { fotoKtp?: () => string }>).ZXR_APK
+    return j && typeof j.fotoKtp === 'function' ? j.fotoKtp() : null
+  }
+  const jembatanSampai = useRef(false)
+  const polingJembatan = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => () => { if (polingJembatan.current) clearInterval(polingJembatan.current) }, [])
+
   const ambilDari = (sumber: 'kamera' | 'berkas') => {
     const el = sumber === 'kamera' ? inputKamera.current : inputBerkas.current
     catat('INFO', `tombol KTP diklik: sumber=${sumber} input=${el ? 'ada' : 'TIDAK ADA'}`)
@@ -170,6 +185,30 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     // foto yang sama dua kali tak memicu `change` — kasir mengira tombolnya
     // rusak. Dikosongkan di sini, sebelum klik.
     el.value = ''
+    jembatanSampai.current = false
+    // Saat jembatan foto tersedia, tunggu hasil kamera dari sana. Nilai lama
+    // jadi garis dasar: yang dicari PERUBAHAN, supaya foto sesi sebelumnya
+    // tak terkirim ulang.
+    const viaJembatan = sumber === 'kamera' && jembatanFoto() !== null
+    if (viaJembatan) {
+      const dasar = jembatanFoto() ?? ''
+      if (polingJembatan.current) clearInterval(polingJembatan.current)
+      const mulai = Date.now()
+      polingJembatan.current = setInterval(() => {
+        const b64 = jembatanFoto()
+        if (b64 && b64 !== dasar) {
+          clearInterval(polingJembatan.current!)
+          polingJembatan.current = null
+          jembatanSampai.current = true
+          catat('INFO', `ktp/jembatan: foto diterima (${b64.length} b64)`)
+          kirimKeOcr(b64KeBerkas(b64), 'jembatan')
+        } else if (Date.now() - mulai > 120_000) {
+          clearInterval(polingJembatan.current!)
+          polingJembatan.current = null
+          catat('INFO', 'ktp/jembatan: habis tunggu 2 menit — pakai fallback input')
+        }
+      }, 500)
+    }
     // Diagnostik "klik kamera diam" (itel S685LN, 2026-10-03): klik tercatat
     // tapi WebView tak memanggil onShowFileChooser sama sekali. Tiga keadaan
     // yang menjelaskan diam itu — elemen sudah lepas dari dokumen (ref basi
@@ -178,6 +217,14 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     catat('INFO', `klik input ${sumber}: connected=${el.isConnected} disabled=${el.disabled} fokus=${document.hasFocus()}`)
     el.click()
     catat('INFO', `klik input ${sumber}: dipanggil (WebView harus memanggil pemilih)`)
+  }
+
+  /** Base64 JPEG dari jembatan → File siap FormData. */
+  function b64KeBerkas(b64: string): File {
+    const bin = atob(b64)
+    const bytea = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytea[i] = bin.charCodeAt(i)
+    return new File([bytea], 'ktp.jpg', { type: 'image/jpeg' })
   }
 
 
@@ -254,20 +301,28 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     // (mis. foto pertama buram, kasir mengulang dengan berkas yang sama).
     e.target.value = ''
     if (!berkas) return
-    // Hasil kamera APK bisa sampai sebagai berkas 0 byte (kamera itel membalas
-    // RESULT_OK sebelum flush — lihat PemilihBerkas 1.0.37). Fetch dengan body
-    // kosong selalu "TypeError: Failed to fetch" — pesan yang menyesatkan.
+    // Hasil kamera via jembatan sudah ditangani poling di ambilDari. Berkas
+    // 0 byte dari input kamera =WebView tak bisa membaca URI (itel) — abaikan
+    // kalau foto jembatannya sudah diterima, pesan galat bila belum.
     if (berkas.size === 0) {
-      catat('KESALAHAN', 'ktp/baca: berkas 0 byte dari input — batal, jangan fetch')
-      setPesanKtp({ teks: 'Foto kosong (0 byte). Ulangi ambil foto.', gagal: true })
+      if (jembatanSampai.current) {
+        catat('INFO', 'ktp/input: berkas 0 byte diabaikan — foto via jembatan sudah diterima')
+      } else {
+        catat('KESALAHAN', 'ktp/baca: berkas 0 byte dari input — batal, jangan fetch')
+        setPesanKtp({ teks: 'Foto kosong (0 byte). Ulangi ambil foto.', gagal: true })
+      }
       return
     }
+    await kirimKeOcr(berkas, 'input')
+  }
 
+  /** Kirim foto KTP ke /api/ktp/baca. Dipakai input file & jembatan fotoKtp(). */
+  async function kirimKeOcr(berkas: File, sumber: 'input' | 'jembatan') {
     setBacaKtpLoading(true); setPesanKtp(null); setKtpDuplikat(null)
     try {
       const fd = new FormData()
       fd.append('foto', berkas)
-      catat('INFO', `ktp/baca: mulai kirim ${berkas.name} (${berkas.size} byte, tipe=${berkas.type || 'kosong'})`)
+      catat('INFO', `ktp/baca (${sumber}): mulai kirim ${berkas.name} (${berkas.size} byte, tipe=${berkas.type || 'kosong'})`)
       const res = await fetch('/api/ktp/baca', { method: 'POST', body: fd })
       catat('INFO', `ktp/baca: balasan HTTP ${res.status}`)
       const data = await res.json().catch(() => ({}))
