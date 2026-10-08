@@ -107,7 +107,9 @@ export async function POST(req: NextRequest) {
   // kosong padahal masih ada orang di dalamnya.
   const statusSewaBaru = statusUntuk(masuk, kamar.sewa, aturan)
 
-  const harga = Number(kamar.tipe?.harga[0]?.harga ?? 0)
+  // Harga tarif per satuan (hari/minggu/bulan/tahun). Total = tarif × durasi.
+  const tarif = Number(kamar.tipe?.harga[0]?.harga ?? 0)
+  const harga = tarif * d.durasi
 
   // Buat / temukan penyewa. Kosong -> null supaya kolom nullable terisi null,
   // bukan string kosong ('' bikin UI tampil blank dan upsert by nik tak akurat).

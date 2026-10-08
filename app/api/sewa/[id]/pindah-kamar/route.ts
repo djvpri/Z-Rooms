@@ -152,10 +152,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // PERTAMA YANG ADA pada kamar tujuan — kamar yang hanya disewakan bulanan
       // tetap bisa dituju, dan sewa pindahannya ikut bulanan. HARIAN diutamakan
       // kalau ada, karena itu yang paling umum di properti ini.
-      const tarifTujuan = tujuan.tipe?.harga ?? []
-      const dipilih = tarifTujuan.find(h => h.periodeSewa === 'HARIAN') ?? tarifTujuan[0]
+      const daftarTarif = tujuan.tipe?.harga ?? []
+      const dipilih = daftarTarif.find(h => h.periodeSewa === 'HARIAN') ?? daftarTarif[0]
       const periodeBaru = (dipilih?.periodeSewa ?? sewa.periodeSewa) as typeof sewa.periodeSewa
-      const hargaBaru = Number(dipilih?.harga ?? sewa.hargaSewa)
+      const tarifTujuan = Number(dipilih?.harga ?? sewa.hargaSewa)
+      const hargaBaru = tarifTujuan * d.durasi
       const keluarBaru = tanggalKeluar(pindah, periodeBaru, d.durasi)
 
       // Deposit pindah apa adanya — tanpa baris Pengeluaran/Pembayaran, karena

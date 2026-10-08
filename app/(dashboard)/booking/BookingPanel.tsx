@@ -510,7 +510,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
         tanggalMasuk: hasil.masuk ?? tglJamJadiDate(form.tanggalMasuk, form.jamMasuk).toISOString(),
         tanggalKeluar: hasil.keluar ?? '',
         durasi: Number(form.durasi),
-        harga: hargaNum,
+        harga: hargaNum * Number(form.durasi),
         deposit: Number(form.deposit) || 0,
         metodeBayar: form.metodeBayar,
         bayarSekarang: form.bayarSekarang,
@@ -1082,7 +1082,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
               <span className="text-sm text-gray-700">
                 Bayar sekarang
                 <span className="block text-xs text-gray-400">
-                  {hargaNum > 0 ? `${formatRupiah(hargaNum)} langsung tercatat lunas` : 'Tagihan langsung tercatat lunas'}
+                  {hargaNum > 0 ? `${formatRupiah(hargaNum * Number(form.durasi))} langsung tercatat lunas` : 'Tagihan langsung tercatat lunas'}
                 </span>
               </span>
             </label>
@@ -1114,7 +1114,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
               </div>
               <div className="flex justify-between font-semibold text-teal-900 pt-1 border-t border-teal-200">
                 <span>{form.bayarSekarang ? 'Total dibayar' : 'Total dibayar pertama'}</span>
-                <span>{formatRupiah(hargaNum + (Number(form.deposit) || 0))}</span>
+                <span>{formatRupiah(hargaNum * Number(form.durasi) + (Number(form.deposit) || 0))}</span>
               </div>
               <div className="text-xs text-teal-600 pt-1">
                 {form.bayarSekarang
