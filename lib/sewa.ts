@@ -10,12 +10,10 @@
 import { addDays, addMonths, addYears } from 'date-fns'
 import type { PeriodeSewa } from '@prisma/client'
 
-/** Periode yang dikenal sistem (nilai enum `PeriodeSewa`). Semuanya masih
+/** Periode yang dikenal sistem (nilai enum `PeriodeSewa`). Semuanya
  *  dihitung `tanggalKeluar` supaya sewa LAMA tetap akurat.
  *
- *  Booking baru menawarkan HARIAN, BULANAN, dan TAHUNAN. MINGGUAN tak
- *  ditawarkan form, tapi tetap dikenal di sini karena sewa lama berperiode itu
- *  masih dibaca dan ditampilkan (label nota, durasi, tanggal keluar). */
+ *  Booking baru menawarkan HARIAN, MINGGUAN, BULANAN, dan TAHUNAN. */
 export type PeriodeDikenal = 'HARIAN' | 'MINGGUAN' | 'BULANAN' | 'TAHUNAN'
 
 /**
