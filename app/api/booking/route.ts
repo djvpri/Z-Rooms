@@ -25,8 +25,8 @@ const bookingSchema = z.object({
   // Sewa
   kamarId: z.string(),
   // Periode sewa yang bisa dibooking BARU. Sewa lama berperiode MINGGUAN tetap
-  // ada di DB dan terbaca; MINGGUAN tak ditawarkan form, jadi tak ada di sini.
-  periodeSewa: z.enum(['HARIAN', 'BULANAN', 'TAHUNAN']),
+  // ada di DB dan terbaca; MINGGUAN sekarang ditawarkan form.
+  periodeSewa: z.enum(['HARIAN', 'MINGGUAN', 'BULANAN', 'TAHUNAN']),
   tanggalMasuk: z.string(),
   // Jam masuk "HH:mm" 24 jam, dipilih kasir dari dropdown. Opsional supaya
   // pemanggil lama (mis. skrip/uji) yang hanya mengirim tanggal tetap jalan —

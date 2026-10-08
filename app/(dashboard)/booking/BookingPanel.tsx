@@ -73,7 +73,11 @@ type PropertiNota = {
   toleransiCheckout: number
 }
 
-const PERIODE = ['HARIAN', 'BULANAN', 'TAHUNAN']
+const PERIODE = ['HARIAN', 'MINGGUAN', 'BULANAN', 'TAHUNAN']
+
+/** Satuan durasi untuk label: hari/minggu/bulan/tahun. */
+const satuanPeriode = (p: string) =>
+  p === 'HARIAN' ? 'hari' : p === 'MINGGUAN' ? 'minggu' : p === 'BULANAN' ? 'bulan' : 'tahun'
 
 const METODE_BAYAR = ['TUNAI', 'TRANSFER', 'QRIS', 'LAINNYA'] as const
 
@@ -525,7 +529,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
     }
   }
 
-  const PERIODE_LABEL: Record<string, string> = { HARIAN: 'Harian', BULANAN: 'Bulanan', TAHUNAN: 'Tahunan' }
+  const PERIODE_LABEL: Record<string, string> = { HARIAN: 'Harian', MINGGUAN: 'Mingguan', BULANAN: 'Bulanan', TAHUNAN: 'Tahunan' }
 
   /**
    * Cetak nota booking ke printer Bluetooth lewat aplikasi Android.
@@ -587,7 +591,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
       barisDuaKolom('Periode', PERIODE_LABEL[nota.periodeSewa] ?? nota.periodeSewa, kertas),
       barisDuaKolom('Masuk', fmtCetak(nota.tanggalMasuk), kertas),
       barisDuaKolom('Keluar', keluarFmt, kertas),
-      barisDuaKolom('Durasi', `${nota.durasi} ${nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}`, kertas),
+      barisDuaKolom('Durasi', `${nota.durasi} ${satuanPeriode(nota.periodeSewa)}`, kertas),
       garisKertas(kertas),
       barisKiriKanan('Harga', formatRupiah(nota.harga), kertas),
       ...(nota.deposit > 0 ? [barisKiriKanan('Deposit', formatRupiah(nota.deposit), kertas)] : []),
@@ -1016,7 +1020,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Durasi ({form.periodeSewa === 'HARIAN' ? 'hari' : form.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'})</label>
+              <label className="form-label">Durasi ({satuanPeriode(form.periodeSewa)})</label>
               <input type="number" min={1} max={36} className="form-input" value={form.durasi} onChange={e => set('durasi', Number(e.target.value))} />
             </div>
             <div className="flex items-end">
@@ -1203,7 +1207,7 @@ export default function BookingPanel({ butuhPin }: { butuhPin?: boolean }) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Durasi</span>
-                  <span>{nota.durasi} {nota.periodeSewa === 'HARIAN' ? 'hari' : nota.periodeSewa === 'BULANAN' ? 'bulan' : 'tahun'}</span>
+                  <span>{nota.durasi} {satuanPeriode(nota.periodeSewa)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Pembayaran</span>
