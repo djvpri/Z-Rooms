@@ -1,7 +1,7 @@
 // app/(public)/page.tsx
-'use client'
 import Link from 'next/link'
 import { Building, People, GraphUpArrow, ShieldCheck, ClockFill, BarChartLine, CheckCircleFill, RocketTakeoff, ArrowRight } from 'react-bootstrap-icons'
+import ArtikelSection from './ArtikelSection'
 
 export default function LandingPage() {
   return (
@@ -248,6 +248,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Artikel terbaru */}
+      <ArtikelSection />
 
       {/* CTA */}
       <section className="bg-teal-600 py-20">

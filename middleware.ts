@@ -8,6 +8,7 @@ export default auth((req) => {
   // Allow public routes
   if (
     pathname === '/' ||
+    pathname.startsWith('/artikel') ||
     pathname.startsWith('/api/auth') ||
     pathname === '/api/health' ||
     pathname === '/api/admin/cross-app' ||
