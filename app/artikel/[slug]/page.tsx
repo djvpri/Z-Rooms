@@ -13,6 +13,7 @@ type Artikel = {
   tags: string[] | null
   konten: string
   publishedAt: string
+  gambarPath: string | null
 }
 
 async function getArtikel(slug: string): Promise<Artikel | null> {
@@ -24,6 +25,12 @@ async function getArtikel(slug: string): Promise<Artikel | null> {
   } catch {
     return null
   }
+}
+
+function imgUrl(p: string | null | undefined): string | null {
+  if (!p) return null
+  if (/^https?:\/\//.test(p)) return p
+  return `${ZADV_API}${p}`
 }
 
 // Renderer markdown — konten dari cron sendiri, dipercaya.
@@ -110,6 +117,12 @@ export default async function ArtikelDetail({ params }: Props) {
       </nav>
 
       <article className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 pb-20">
+        {a.gambarPath && imgUrl(a.gambarPath) && (
+          <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imgUrl(a.gambarPath)!} alt={a.judul} className="w-full aspect-[16/9] object-cover" />
+          </div>
+        )}
         <div className="text-xs text-gray-400 mb-4">
           {a.publishedAt
             ? new Date(a.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
