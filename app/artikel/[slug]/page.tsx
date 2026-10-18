@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-const ZADV_API = process.env.ZADV_API_URL || 'http://af7witcncxxt5fvjn0yg2bdz.103.93.129.94.sslip.io'
+const ZADV_API = process.env.ZADV_API_URL || 'https://zpromo.zomet.my.id'
 
 type Artikel = {
   judul: string
