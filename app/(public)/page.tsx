@@ -3,6 +3,11 @@ import Link from 'next/link'
 import { Building, People, GraphUpArrow, ShieldCheck, ClockFill, BarChartLine, CheckCircleFill, RocketTakeoff, ArrowRight } from 'react-bootstrap-icons'
 import ArtikelSection from './ArtikelSection'
 
+// Landing fetch artikel dari DB saat RUNTIME (env ZADV_API_URL hadir di runtime,
+// bukan saat prerender build). Tanpa ini halaman diprerender statis saat build:
+// getArtikel() gagal → [] → <ArtikelSection> render null → section hilang permanen.
+export const dynamic = 'force-dynamic'
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
@@ -15,9 +20,14 @@ export default function LandingPage() {
             </div>
             <span className="text-xl font-semibold text-gray-900">ZXRoom</span>
           </div>
-          <Link href="/login" className="btn btn-primary">
-            Masuk
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/artikel" className="text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors">
+              Artikel
+            </Link>
+            <Link href="/login" className="btn btn-primary">
+              Masuk
+            </Link>
+          </div>
         </div>
       </header>
 

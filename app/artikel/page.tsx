@@ -1,9 +1,20 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
+const SITE_URL = 'https://www.zxroom.zomet.my.id'
+
 export const metadata: Metadata = {
-  title: 'Artikel & Tips Properti | ZXRoom',
-  description: 'Tips mengelola kos, kontrakan, hotel, dan properti sewa dari ZXRoom.',
+  title: 'Artikel & Tips Properti',
+  description: 'Tips mengelola kos, kontrakan, hotel, dan properti sewa dari ZXRoom. Artikel baru tiap hari.',
+  alternates: { canonical: '/artikel' },
+  openGraph: {
+    type: 'website',
+    locale: 'id_ID',
+    url: `${SITE_URL}/artikel`,
+    siteName: 'ZXRoom',
+    title: 'Artikel & Tips Properti · ZXRoom',
+    description: 'Tips mengelola kos, kontrakan, hotel, dan properti sewa dari ZXRoom.',
+  },
 }
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +32,9 @@ type ArtikelCard = {
 
 async function getArtikel(): Promise<ArtikelCard[]> {
   try {
-    const res = await fetch(`${ZADV_API}/api/artikel/publik?appId=8`)
+    const res = await fetch(`${ZADV_API}/api/artikel/publik?appId=8`, {
+      next: { revalidate: 300 },
+    })
     if (!res.ok) return []
     const data = await res.json()
     return (data.items ?? data.artikel ?? []) as ArtikelCard[]

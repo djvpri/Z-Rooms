@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 export const dynamic = 'force-dynamic'
 
 const ZADV_API = process.env.ZADV_API_URL || 'https://zpromo.zomet.my.id'
+const SITE_URL = 'https://www.zxroom.zomet.my.id'
 
 type Artikel = {
   judul: string
@@ -18,12 +19,30 @@ type Artikel = {
 
 async function getArtikel(slug: string): Promise<Artikel | null> {
   try {
-    const res = await fetch(`${ZADV_API}/api/artikel/publik/${slug}`)
+    const res = await fetch(`${ZADV_API}/api/artikel/publik/${slug}`, {
+      next: { revalidate: 300 },
+    })
     if (!res.ok) return null
     const data = await res.json()
     return (data.artikel ?? data.item ?? data) as Artikel | null
   } catch {
     return null
+  }
+}
+
+type ArtikelMin = Pick<Artikel, 'judul' | 'slug' | 'deskripsi' | 'publishedAt'>
+
+async function getTerkait(excludeSlug: string, limit = 3): Promise<ArtikelMin[]> {
+  try {
+    const res = await fetch(`${ZADV_API}/api/artikel/publik?appId=8`, {
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    const all = (data.items ?? data.artikel ?? []) as ArtikelMin[]
+    return all.filter((x) => x.slug !== excludeSlug).slice(0, limit)
+  } catch {
+    return []
   }
 }
 
@@ -92,13 +111,40 @@ type Props = { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const a = await getArtikel(slug)
-  return { title: `${a?.judul ?? 'Artikel'} | ZXRoom`, description: a?.deskripsi ?? undefined }
+  const title = a?.judul ?? 'Artikel'
+  const description = a?.deskripsi ?? 'Tips mengelola kos, kontrakan, hotel, dan properti sewa dari ZXRoom.'
+  const img = a?.gambarPath ? imgUrl(a.gambarPath) : null
+  const ogImages = img ? [{ url: img, width: 1200, height: 630, alt: title }] : undefined
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/artikel/${slug}` },
+    openGraph: {
+      type: 'article',
+      locale: 'id_ID',
+      url: `${SITE_URL}/artikel/${slug}`,
+      siteName: 'ZXRoom',
+      title,
+      description,
+      images: ogImages,
+      ...(a?.publishedAt ? { publishedTime: a.publishedAt } : {}),
+      ...(a?.tags?.length ? { tags: a.tags } : {}),
+    },
+    twitter: {
+      card: img ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: img ? [img] : undefined,
+    },
+  }
 }
 
 export default async function ArtikelDetail({ params }: Props) {
   const { slug } = await params
   const a = await getArtikel(slug)
   if (!a) notFound()
+  const terkait = await getTerkait(slug)
 
   return (
     <div className="min-h-screen bg-white">
@@ -141,6 +187,30 @@ export default async function ArtikelDetail({ params }: Props) {
           dangerouslySetInnerHTML={{ __html: renderMarkdown(a.konten) }}
         />
       </article>
+
+      {terkait.length > 0 && (
+        <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Artikel lainnya</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {terkait.map((t) => (
+              <Link
+                key={t.slug}
+                href={`/artikel/${t.slug}`}
+                className="group block bg-white rounded-xl border border-gray-100 hover:border-teal-200 hover:shadow-sm transition-all p-4"
+              >
+                <div className="text-xs text-gray-400 mb-2">
+                  {t.publishedAt
+                    ? new Date(t.publishedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : ''}
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900 group-hover:text-teal-600 transition-colors line-clamp-3">
+                  {t.judul}
+                </h3>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <footer className="border-t border-gray-100 py-6">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center text-xs text-gray-400">
